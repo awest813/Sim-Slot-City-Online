@@ -20,9 +20,26 @@ export class CampScene extends Phaser.Scene {
         super({ key: 'CampScene' });
     }
 
-    create(): void {
+    create(data?: { result?: string }): void {
         this.cameras.main.setBackgroundColor(0x0d0d1a);
         this.drawStarfield();
+
+        // Show Victory / Defeat banner when returning from battle
+        if (data?.result) {
+            const isVictory = data.result === 'Victory';
+            const bannerW   = 200, bannerH = 30;
+            const bannerX   = GAME_WIDTH / 2 - bannerW / 2;
+            const bannerY   = GAME_HEIGHT - 60;
+            drawPanel(this, bannerX, bannerY, bannerW, bannerH);
+            this.add.text(GAME_WIDTH / 2, bannerY + bannerH / 2,
+                `— ${data.result.toUpperCase()} —`,
+                {
+                    fontFamily: 'monospace', fontSize: '12px',
+                    color: isVictory ? '#e0c55a' : '#ff4444',
+                    stroke: '#000000', strokeThickness: 2,
+                },
+            ).setOrigin(0.5).setDepth(10);
+        }
 
         // ── Title banner ───────────────────────────────
         drawPanel(this, 4, 4, GAME_WIDTH - 8, 18);

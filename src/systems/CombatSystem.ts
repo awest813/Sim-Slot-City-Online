@@ -1,47 +1,72 @@
 // ─────────────────────────────────────────────
-//  CombatSystem – damage formulas (FFT-inspired).
-//  Pure math, no Phaser dependency.
+//  CombatSystem – MVP battle logic.
+//  Fixed damage, range checks, greedy AI step.
+//  Pure logic – no Phaser dependency.
 // ─────────────────────────────────────────────
 import type { Unit } from '../entities/Unit';
 
-export interface AttackResult {
-    damage: number;
-    hit:    boolean;
-    crit:   boolean;
-}
+/** Fixed damage per hit for MVP. */
+export const ATTACK_DAMAGE = 5;
 
 export class CombatSystem {
+    /** Manhattan distance between two units. */
+    static dist(a: Unit, b: Unit): number {
+        return Math.abs(a.col - b.col) + Math.abs(a.row - b.row);
+    }
+
+    /** True if attacker can reach defender (alive, within attackRange). */
+    static canAttack(attacker: Unit, defender: Unit): boolean {
+        return defender.isAlive &&
+               CombatSystem.dist(attacker, defender) <= attacker.attackRange;
+    }
+
     /**
-     * Calculate a physical attack result.
-     *   hit chance  = 75 + (atk.spd − def.spd) × 3  (clamped 10–98)
-     *   base damage = max(1, atk.atk × 2 − def.def)
-     *   crit (5 %)  = damage × 2
+     * Apply ATTACK_DAMAGE to defender. Marks attacker.hasActed = true.
+     * Returns damage dealt (0 if defender already dead).
      */
-    static calcDamage(attacker: Unit, defender: Unit): AttackResult {
-        const hitChance = Math.min(98, Math.max(10,
-            75 + (attacker.data.spd - defender.data.spd) * 3,
-        ));
-        if (Math.random() * 100 >= hitChance) {
-            return { damage: 0, hit: false, crit: false };
-        }
-
-        const crit   = Math.random() * 100 < 5;
-        const base   = Math.max(1, attacker.data.atk * 2 - defender.data.def);
-        const damage = crit ? base * 2 : base;
-        return { damage, hit: true, crit };
+    static attack(attacker: Unit, defender: Unit): number {
+        if (!defender.isAlive) return 0;
+        defender.hp    = Math.max(0, defender.hp - ATTACK_DAMAGE);
+        attacker.hasActed = true;
+        return ATTACK_DAMAGE;
     }
 
-    /** Apply the result to the defender's HP. */
-    static applyDamage(defender: Unit, result: AttackResult): void {
-        if (result.hit) {
-            defender.hp = Math.max(0, defender.hp - result.damage);
-        }
-    }
+    /**
+     * Greedy single-step: move `mover` one tile toward `target`.
+     * Picks the orthogonal neighbour that minimises Manhattan distance,
+     * skipping out-of-bounds and occupied tiles.
+     * Updates mover.col/row and sets hasMoved = true on success.
+     * Returns true if a step was taken.
+     */
+    static greedyStep(
+        mover:    Unit,
+        target:   Unit,
+        occupied: ReadonlySet<string>,
+        gridCols: number,
+        gridRows: number,
+    ): boolean {
+        const candidates = [
+            { col: mover.col + 1, row: mover.row },
+            { col: mover.col - 1, row: mover.row },
+            { col: mover.col,     row: mover.row + 1 },
+            { col: mover.col,     row: mover.row - 1 },
+        ].filter(c =>
+            c.col >= 0 && c.col < gridCols &&
+            c.row >= 0 && c.row < gridRows &&
+            !occupied.has(`${c.col},${c.row}`),
+        );
 
-    /** Convenience: calc + apply in one call. */
-    static attack(attacker: Unit, defender: Unit): AttackResult {
-        const result = CombatSystem.calcDamage(attacker, defender);
-        CombatSystem.applyDamage(defender, result);
-        return result;
+        if (candidates.length === 0) return false;
+
+        const best = candidates.reduce((a, b) => {
+            const da = Math.abs(a.col - target.col) + Math.abs(a.row - target.row);
+            const db = Math.abs(b.col - target.col) + Math.abs(b.row - target.row);
+            return da <= db ? a : b;
+        });
+
+        mover.col      = best.col;
+        mover.row      = best.row;
+        mover.hasMoved = true;
+        return true;
     }
 }
