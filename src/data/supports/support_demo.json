@@ -1,0 +1,13 @@
+{
+  "id":    "alyx_bram_A",
+  "unitA": "alyx",
+  "unitB": "bram",
+  "rank":  "A",
+  "lines": [
+    { "speaker": "Alyx", "text": "Bram... I've been watching you in battle. You never hesitate." },
+    { "speaker": "Bram", "text": "Ha. That's because I calculated every angle before we marched." },
+    { "speaker": "Alyx", "text": "You make it sound so cold." },
+    { "speaker": "Bram", "text": "Maybe. But it keeps you alive. And that..." },
+    { "speaker": "Bram", "text": "...matters to me more than I expected." }
+  ]
+}

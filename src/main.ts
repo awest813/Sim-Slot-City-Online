@@ -1,7 +1,6 @@
-import StartGame from './game/main';
+import Phaser from 'phaser';
+import { gameConfig } from './game/config';
 
-document.addEventListener('DOMContentLoaded', () => {
-
-    StartGame('game-container');
-
-});
+// Module scripts in index.html are deferred – DOM is ready by the time
+// this executes, so no DOMContentLoaded wrapper needed.
+new Phaser.Game(gameConfig);
