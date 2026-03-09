@@ -5,6 +5,16 @@ import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, COL_TRIM,
 } from '../../game/constants';
 
+// ── Session-level tracking for once-per-session items ─────────────────────────
+// Persists across bar visits within a single gameplay session so that
+// once-per-session bonuses (e.g. Lucky Shot) cannot be farmed by reopening
+// the bar panel. Call resetBarSession() when a new casino session starts.
+const _sessionClaimedBonuses = new Set<string>();
+
+export function resetBarSession(): void {
+    _sessionClaimedBonuses.clear();
+}
+
 interface DrinkOption {
     name: string;
     baseCost: number;
@@ -96,7 +106,6 @@ export class BarPanel {
 
     // Session state
     private drinksOrdered: number = 0;
-    private usedOnceItems: Set<string> = new Set();
     private specialIdx: number;
 
     constructor(scene: Phaser.Scene, onClose: () => void) {
@@ -182,18 +191,21 @@ export class BarPanel {
         this.drinks.forEach((drink, i) => {
             const by = startY + i * (bh + gap) + bh / 2;
             const isSpecial = i === this.specialIdx;
+            const alreadyDisabled = this.isDisabled(drink);
 
             const baseColor  = isSpecial ? 0x2a2005 : 0x2a1505;
             const hoverColor = isSpecial ? 0x4a3510 : 0x3a2010;
             const borderCol  = isSpecial ? 0x9a7a10 : 0x5a3010;
 
-            const rect = this.scene.add.rectangle(0, by, pw - 60, bh, baseColor, 1)
+            // Start with disabled appearance if already claimed this session
+            const rect = this.scene.add.rectangle(0, by, pw - 60, bh, alreadyDisabled ? DISABLED_COLOR : baseColor, 1)
                 .setStrokeStyle(isSpecial ? 2 : 1, borderCol, 1)
                 .setInteractive({ useHandCursor: true });
 
             const nameLabel = this.scene.add.text(-pw / 2 + 46, by - 8, `${drink.emoji}  ${drink.name}`, {
                 fontFamily: 'monospace', fontSize: '12px',
-                color: isSpecial ? '#e0c060' : '#d4b070',
+                // Dim name immediately if already claimed
+                color: alreadyDisabled ? '#444444' : (isSpecial ? '#e0c060' : '#d4b070'),
             }).setOrigin(0, 0.5);
 
             const costStr = drink.baseCost === 0 ? 'FREE' : `${drink.baseCost}◈`;
@@ -275,7 +287,8 @@ export class BarPanel {
     }
 
     private isDisabled(drink: DrinkOption): boolean {
-        return !!(drink.oncePerSession && this.usedOnceItems.has(drink.name));
+        // Check both session-level (cross-visit) and instance-level tracking
+        return !!(drink.oncePerSession && _sessionClaimedBonuses.has(drink.name));
     }
 
     private updateChips(): void {
@@ -311,7 +324,7 @@ export class BarPanel {
         }
 
         if (drink.oncePerSession) {
-            this.usedOnceItems.add(drink.name);
+            _sessionClaimedBonuses.add(drink.name);
             nameLabel.setColor('#444444');
         }
 

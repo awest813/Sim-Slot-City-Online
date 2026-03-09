@@ -106,6 +106,8 @@ export class PokerPanel {
     private fKey!: Phaser.Input.Keyboard.Key;
     private cKey!: Phaser.Input.Keyboard.Key;
     private rKey!: Phaser.Input.Keyboard.Key;
+    private spaceKey!: Phaser.Input.Keyboard.Key;
+    private dealButtonVisible = false;
     private closed = false;
 
     // Session tracking
@@ -257,6 +259,12 @@ export class PokerPanel {
         this.cKey.on('down', () => this.tryKeyAction('check_call'));
         this.rKey.on('down', () => this.tryKeyAction('raise_min'));
 
+        // SPACE triggers Deal when the deal button is visible
+        this.spaceKey = this.scene.input.keyboard!.addKey('SPACE');
+        this.spaceKey.on('down', () => {
+            if (this.dealButtonVisible) this.startHand();
+        });
+
         this.updateChipsDisplay();
         this.showDealButton(false);
     }
@@ -355,8 +363,8 @@ export class PokerPanel {
             btn.add([badgeRect, badgeText]);
         }
 
-        // Clickable only for empty non-AI seats while not in a game
-        if (!sc.aiName && !isYou && !this.game) {
+        // Clickable only for empty non-AI seats while not in a game and player has not yet chosen a seat
+        if (!sc.aiName && !isYou && !this.game && this.playerSeatId === null) {
             rect.setInteractive({ useHandCursor: true });
             rect.on('pointerover', () => rect.setFillStyle(0x1a3a1a));
             rect.on('pointerout',  () => rect.setFillStyle(fillCol));
@@ -427,8 +435,10 @@ export class PokerPanel {
         SEAT_CONFIGS.forEach(sc => {
             if (sc.aiName) {
                 const prev = prevPlayers.find(p => p.seatId === sc.id);
-                const chips = prev ? prev.chips : (sc.aiChips ?? 500);
-                if (chips > 0) activePlayers.push({ seatId: sc.id, name: sc.aiName, chips, isAI: true });
+                let chips = prev ? prev.chips : (sc.aiChips ?? 500);
+                // Auto-rebuy busted AI players so the game never runs out of opponents
+                if (chips === 0) chips = sc.aiChips ?? 500;
+                activePlayers.push({ seatId: sc.id, name: sc.aiName, chips, isAI: true });
             } else if (sc.id === this.playerSeatId) {
                 const prev = prevPlayers.find(p => p.seatId === sc.id);
                 const chips = prev ? prev.chips : BUY_IN;
@@ -443,6 +453,9 @@ export class PokerPanel {
 
         if (activePlayers.length < 2) {
             this.setStatus('Not enough players to deal.', '#e74c3c');
+            // Auto-close after a short delay so the player isn't stuck
+            const t = this.scene.time.delayedCall(2200, () => this.close());
+            this.aiTimers.push(t);
             return;
         }
 
@@ -749,6 +762,7 @@ export class PokerPanel {
 
     private showDealButton(show: boolean): void {
         this.actionArea.removeAll(true);
+        this.dealButtonVisible = show;
         if (!show) return;
 
         const r = this.scene.add.rectangle(0, 0, 150, 32, 0x0a2a0a, 1)
@@ -759,7 +773,11 @@ export class PokerPanel {
         r.on('pointerover', () => r.setFillStyle(0x1a4a1a));
         r.on('pointerout',  () => r.setFillStyle(0x0a2a0a));
         r.on('pointerdown', () => this.startHand());
-        this.actionArea.add([r, lbl]);
+        // Keyboard hint for SPACE shortcut
+        const hint = this.scene.add.text(0, 22, '[SPACE] to deal', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#445544',
+        }).setOrigin(0.5);
+        this.actionArea.add([r, lbl, hint]);
     }
 
     // ── Display helpers ───────────────────────────────────────────────────────
@@ -844,6 +862,7 @@ export class PokerPanel {
         this.fKey.destroy();
         this.cKey.destroy();
         this.rKey.destroy();
+        this.spaceKey.destroy();
         this.overlay.destroy();
         this.container.destroy();
         this.onClose();
