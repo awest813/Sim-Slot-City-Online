@@ -137,11 +137,12 @@ export class SlotsPanel {
         // Bet amount buttons
         const betBtnXs = [-90, -30, 30, 90];
         BET_OPTIONS.forEach((amount, i) => {
-            const rect = this.scene.add.rectangle(betBtnXs[i], ph / 2 - 130, 52, 26, 0x1a1a3e, 1)
-                .setStrokeStyle(1, i === 1 ? COL_SLOT_TRIM : 0x444488, 1)
+            const isDefault = amount === this.currentBet;
+            const rect = this.scene.add.rectangle(betBtnXs[i], ph / 2 - 130, 52, 28, isDefault ? 0x2a2a5e : 0x1a1a3e, 1)
+                .setStrokeStyle(isDefault ? 2 : 1, isDefault ? COL_SLOT_TRIM : 0x444488, 1)
                 .setInteractive({ useHandCursor: true });
             const label = this.scene.add.text(betBtnXs[i], ph / 2 - 130, `${amount}`, {
-                fontFamily: 'monospace', fontSize: '13px', color: i === 1 ? '#c9a84c' : '#8888bb',
+                fontFamily: 'monospace', fontSize: '13px', color: isDefault ? '#c9a84c' : '#8888bb',
             }).setOrigin(0.5);
 
             rect.on('pointerover', () => rect.setStrokeStyle(1, COL_SLOT_TRIM, 1));
@@ -171,16 +172,23 @@ export class SlotsPanel {
         }).setOrigin(0.5);
 
         this.spinBtn.on('pointerover', () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x4a3a8a); });
-        this.spinBtn.on('pointerout',  () => this.spinBtn.setFillStyle(0x3a2a6a));
-        this.spinBtn.on('pointerdown', () => this.spin());
+        this.spinBtn.on('pointerout',  () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x3a2a6a); });
+        this.spinBtn.on('pointerdown', () => {
+            if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x2a1a5a);
+            this.spin();
+        });
+        this.spinBtn.on('pointerup', () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x4a3a8a); });
 
         this.container.add([this.spinBtn, this.spinBtnLabel]);
 
-        // Payout table hint
-        const payHint = this.scene.add.text(0, ph / 2 - 44, '7️⃣×3=50x  💎×3=20x  ⭐×3=10x  🍇×3=6x', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#555577',
+        // Payout table hint (two lines)
+        const payHint1 = this.scene.add.text(0, ph / 2 - 46, '7️⃣×3=50x  💎×3=20x  ⭐×3=10x  🍇×3=6x', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#666688',
         }).setOrigin(0.5);
-        this.container.add(payHint);
+        const payHint2 = this.scene.add.text(0, ph / 2 - 32, '🍊×3=4x  🍋×3=3x  🍒×3=2x  🍒pair=1x', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#555566',
+        }).setOrigin(0.5);
+        this.container.add([payHint1, payHint2]);
 
         // Close button
         const closeRect = this.scene.add.rectangle(pw / 2 - 14, -ph / 2 + 14, 20, 20, 0x3a1e1e, 1)
@@ -192,7 +200,8 @@ export class SlotsPanel {
 
         closeRect.on('pointerover', () => closeRect.setFillStyle(0x5a2a2a));
         closeRect.on('pointerout',  () => closeRect.setFillStyle(0x3a1e1e));
-        closeRect.on('pointerdown', () => this.close());
+        closeRect.on('pointerdown', () => { closeRect.setFillStyle(0x2a0a0a); this.close(); });
+        closeRect.on('pointerup',   () => closeRect.setFillStyle(0x5a2a2a));
 
         this.container.add([closeRect, closeLabel]);
 
@@ -209,17 +218,18 @@ export class SlotsPanel {
 
     private updateBetDisplay(): void {
         const chips = GameState.get().chips;
-        // Highlight selected bet
+        // Highlight selected bet; dim unaffordable bets
         BET_OPTIONS.forEach((amount, i) => {
             const btn = this.betBtns[i];
             const rect = btn.list[0] as Phaser.GameObjects.Rectangle;
             const label = btn.list[1] as Phaser.GameObjects.Text;
             const selected = this.currentBet === amount;
-            rect.setStrokeStyle(1, selected ? COL_SLOT_TRIM : 0x444488, 1);
-            rect.setFillStyle(selected ? 0x2a2a5e : 0x1a1a3e);
-            label.setColor(selected ? '#c9a84c' : (chips >= amount ? '#8888bb' : '#445'));
+            const canAfford = chips >= amount;
+            rect.setStrokeStyle(selected ? 2 : 1, selected ? COL_SLOT_TRIM : (canAfford ? 0x444488 : 0x332233), 1);
+            rect.setFillStyle(selected ? 0x2a2a5e : (canAfford ? 0x1a1a3e : 0x110d1a));
+            label.setColor(selected ? '#c9a84c' : (canAfford ? '#8888bb' : '#443344'));
         });
-        this.betText.setText(`Bet: ${this.currentBet} chips`);
+        this.betText.setText(`Bet: ${this.currentBet}◈`);
     }
 
     private spin(): void {
@@ -227,7 +237,7 @@ export class SlotsPanel {
 
         const chips = GameState.get().chips;
         if (chips < this.currentBet) {
-            this.showResult('Not enough chips!', '#e74c3c');
+            this.showResult(`Need ${this.currentBet - chips} more chips!`, '#e74c3c');
             return;
         }
 
@@ -235,7 +245,10 @@ export class SlotsPanel {
         this.updateChipsDisplay();
 
         this.spinState = 'spinning';
-        this.spinBtnLabel.setText('...');
+        // Grey out spin button during spin
+        this.spinBtn.setFillStyle(0x1a1a3a);
+        this.spinBtn.setStrokeStyle(2, 0x555577, 0.6);
+        this.spinBtnLabel.setText('SPINNING...').setColor('#666688');
         this.resultText.setText('');
         this.spinDone = [false, false, false];
 
@@ -271,7 +284,10 @@ export class SlotsPanel {
 
     private evalResult(): void {
         this.spinState = 'result';
-        this.spinBtnLabel.setText('SPIN');
+        // Restore spin button to active style
+        this.spinBtn.setFillStyle(0x3a2a6a);
+        this.spinBtn.setStrokeStyle(2, COL_SLOT_TRIM, 1);
+        this.spinBtnLabel.setText('SPIN').setColor('#c9a84c');
         this.spinTimers = [];
 
         const [a, b, c] = this.reelValues;
@@ -284,13 +300,13 @@ export class SlotsPanel {
             // Three of a kind
             const mult = PAYOUTS[a] ?? 2;
             payout = this.currentBet * mult;
-            msg = `THREE ${a}  +${payout} chips!`;
+            msg = `3×${a} JACKPOT!  +${payout}◈`;
             msgColor = '#2ecc71';
         } else if (a === b || b === c || a === c) {
             // Two of a kind — check cherry pair consolation
             if (a === '🍒' || b === '🍒') {
                 payout = this.currentBet * CHERRY_PAIR_PAYOUT;
-                msg = `Cherry pair  +${payout} chips`;
+                msg = `Cherry pair!  +${payout}◈`;
                 msgColor = '#f0a040';
             } else {
                 msg = 'No match — try again';
@@ -318,7 +334,7 @@ export class SlotsPanel {
 
         this.showResult(msg, msgColor);
 
-        this.scene.time.delayedCall(300, () => {
+        this.scene.time.delayedCall(500, () => {
             this.spinState = 'idle';
             this.updateBetDisplay();
         });

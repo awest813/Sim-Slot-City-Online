@@ -506,25 +506,41 @@ export class CasinoLobbyScene extends Phaser.Scene {
         const cx = GAME_WIDTH / 2;
         const cy = 70;
 
-        const bg = this.add.rectangle(cx, cy, 380, 42, 0x000000, 0.75)
+        const bg = this.add.rectangle(cx, cy, 420, 48, 0x000000, 0.80)
             .setScrollFactor(0).setDepth(DEPTH_HUD + 5);
-        bg.setStrokeStyle(1, COL_TRIM, 0.7);
+        bg.setStrokeStyle(1, COL_TRIM, 0.8);
 
-        const text = this.add.text(cx, cy, '★  Welcome to Slot City Casino  ★', {
+        const text = this.add.text(cx, cy - 8, '★  Welcome to Slot City Casino  ★', {
             fontFamily: FONT, fontSize: '14px', color: '#c9a84c',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 6);
 
-        const sub = this.add.text(cx, cy + 14, 'WASD / Arrow keys to move  ·  E to interact', {
+        const sub = this.add.text(cx, cy + 10, 'WASD / Arrow keys to move  ·  E to interact  ·  ESC to close panels', {
             fontFamily: FONT, fontSize: '10px', color: '#668866',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 6);
 
-        this.time.delayedCall(4000, () => {
+        this.time.delayedCall(5500, () => {
             this.tweens.add({
                 targets: [bg, text, sub],
                 alpha: 0,
-                duration: 600,
+                duration: 700,
                 onComplete: () => { bg.destroy(); text.destroy(); sub.destroy(); },
             });
+        });
+
+        // Persistent controls hint at bottom edge
+        const hintBg = this.add.rectangle(cx, GAME_HEIGHT - 14, 380, 20, 0x000000, 0.55)
+            .setScrollFactor(0).setDepth(DEPTH_HUD + 1);
+        hintBg.setStrokeStyle(0);
+
+        const hint = this.add.text(cx, GAME_HEIGHT - 14,
+            'WASD / ↑↓←→ to move  ·  E to interact', {
+            fontFamily: FONT, fontSize: '10px', color: '#446644',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2);
+        hint.setAlpha(0);
+
+        // Fade hint in after welcome banner fades
+        this.time.delayedCall(6500, () => {
+            this.tweens.add({ targets: [hintBg, hint], alpha: 1, duration: 500 });
         });
     }
 }

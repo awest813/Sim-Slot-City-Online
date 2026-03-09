@@ -9,6 +9,7 @@ export interface ButtonConfig {
     label: string;
     color?: number;
     hoverColor?: number;
+    disabled?: boolean;
     onClick: () => void;
 }
 
@@ -72,18 +73,28 @@ export class Panel {
     addButton(cfg: ButtonConfig, fullWidth = false): Phaser.GameObjects.Container {
         const bw = fullWidth ? this.w - 60 : 160;
         const bh = 34;
+        const baseFill  = cfg.disabled ? 0x1a1a1a : (cfg.color ?? 0x2a5f2a);
+        const hoverFill = cfg.disabled ? 0x1a1a1a : (cfg.hoverColor ?? 0x3a7f3a);
+        const pressFill = cfg.disabled ? 0x1a1a1a : Math.max(0, (cfg.color ?? 0x2a5f2a) - 0x101010);
 
-        const rect = this.scene.add.rectangle(0, this.contentY + bh / 2, bw, bh, cfg.color ?? 0x2a5f2a, 1)
-            .setStrokeStyle(1, COL_UI_BORDER, 0.8)
-            .setInteractive({ useHandCursor: true });
+        const rect = this.scene.add.rectangle(0, this.contentY + bh / 2, bw, bh, baseFill, 1)
+            .setStrokeStyle(1, cfg.disabled ? 0x444444 : COL_UI_BORDER, cfg.disabled ? 0.4 : 0.8)
+            .setInteractive({ useHandCursor: !cfg.disabled });
 
         const label = this.scene.add.text(0, this.contentY + bh / 2, cfg.label, {
-            fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d3',
+            fontFamily: 'monospace', fontSize: '13px',
+            color: cfg.disabled ? '#555555' : '#f0e6d3',
         }).setOrigin(0.5);
 
-        rect.on('pointerover', () => rect.setFillStyle(cfg.hoverColor ?? 0x3a7f3a));
-        rect.on('pointerout',  () => rect.setFillStyle(cfg.color ?? 0x2a5f2a));
-        rect.on('pointerdown', () => cfg.onClick());
+        if (!cfg.disabled) {
+            rect.on('pointerover', () => rect.setFillStyle(hoverFill));
+            rect.on('pointerout',  () => rect.setFillStyle(baseFill));
+            rect.on('pointerdown', () => {
+                rect.setFillStyle(pressFill);
+                cfg.onClick();
+            });
+            rect.on('pointerup', () => rect.setFillStyle(hoverFill));
+        }
 
         const btn = this.scene.add.container(0, 0, [rect, label]);
         this.container.add(btn);
@@ -110,7 +121,8 @@ export class Panel {
 
         rect.on('pointerover', () => rect.setFillStyle(0x5a2a2a));
         rect.on('pointerout',  () => rect.setFillStyle(0x3a1e1e));
-        rect.on('pointerdown', () => onClose());
+        rect.on('pointerdown', () => { rect.setFillStyle(0x2a0a0a); onClose(); });
+        rect.on('pointerup',   () => rect.setFillStyle(0x5a2a2a));
 
         // ESC key
         this.scene.input.keyboard!.once('keydown-ESC', onClose);

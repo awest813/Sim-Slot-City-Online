@@ -88,6 +88,8 @@ export class PokerPanel {
     private chipsText!: Phaser.GameObjects.Text;
     private potText!: Phaser.GameObjects.Text;
     private handNumText!: Phaser.GameObjects.Text;
+    private phaseText!: Phaser.GameObjects.Text;
+    private aiThinkingText!: Phaser.GameObjects.Text;
 
     private seatBtns: Map<number, Phaser.GameObjects.Container> = new Map();
     private communityCardObjs: Phaser.GameObjects.Container[] = [];
@@ -159,6 +161,19 @@ export class PokerPanel {
         }).setOrigin(0.5);
         this.container.add(this.potText);
 
+        // Phase label (PREFLOP / FLOP / TURN / RIVER / SHOWDOWN)
+        this.phaseText = this.scene.add.text(0, -80, '', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#6a9a6a',
+            fontStyle: 'bold',
+        }).setOrigin(0.5);
+        this.container.add(this.phaseText);
+
+        // AI thinking indicator
+        this.aiThinkingText = this.scene.add.text(0, 135, '', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#888866',
+        }).setOrigin(0.5).setScrollFactor(0);
+        this.container.add(this.aiThinkingText);
+
         // Community card placeholder slots
         for (let i = 0; i < 5; i++) {
             const placeholder = this.scene.add.rectangle(COMM_XS[i], COMM_Y, 32, 44, 0x0d2a0d, 1)
@@ -203,7 +218,8 @@ export class PokerPanel {
         }).setOrigin(0.5);
         closeRect.on('pointerover', () => closeRect.setFillStyle(0x5a2a2a));
         closeRect.on('pointerout',  () => closeRect.setFillStyle(0x3a1e1e));
-        closeRect.on('pointerdown', () => this.close());
+        closeRect.on('pointerdown', () => { closeRect.setFillStyle(0x2a0a0a); this.close(); });
+        closeRect.on('pointerup',   () => closeRect.setFillStyle(0x5a2a2a));
         this.container.add([closeRect, closeLabel]);
 
         this.escKey = this.scene.input.keyboard!.addKey('ESC');
@@ -378,6 +394,7 @@ export class PokerPanel {
         this.refreshAllSeats();
         this.updateCommunityCards();
         this.updatePot();
+        this.updatePhaseLabel();
         this.updateChipsDisplay();
         this.setStatus(this.game.statusMessage, '#c9a84c');
         this.handNumText.setText(`Hand #${this.game.handNumber}`);
@@ -398,14 +415,23 @@ export class PokerPanel {
         if (!activePlayer) return;
 
         if (!activePlayer.isAI && activePlayer.seatId === this.playerSeatId) {
+            this.aiThinkingText.setText('');
             this.showPlayerActions();
         } else {
             this.waitingForAI = true;
             this.hidePlayerActions();
             this.refreshAllSeats();
             const delay = 900 + Math.random() * 700;
+            // Show thinking indicator after a short pause
+            const thinkTimer = this.scene.time.delayedCall(300, () => {
+                if (this.waitingForAI) {
+                    this.aiThinkingText.setText(`${activePlayer.name} is thinking...`);
+                }
+            });
+            this.aiTimers.push(thinkTimer);
             const t = this.scene.time.delayedCall(delay, () => {
                 this.waitingForAI = false;
+                this.aiThinkingText.setText('');
                 this.doAIAction(activePlayerIdx);
             });
             this.aiTimers.push(t);
@@ -423,6 +449,7 @@ export class PokerPanel {
         this.refreshAllSeats();
         this.updateCommunityCards();
         this.updatePot();
+        this.updatePhaseLabel();
         this.updateChipsDisplay();
         this.setStatus(this.game.statusMessage, '#c9a84c');
         this.scheduleNextAction();
@@ -479,7 +506,8 @@ export class PokerPanel {
             }).setOrigin(0.5);
             r.on('pointerover', () => r.setFillStyle(def.fill + 0x101010));
             r.on('pointerout',  () => r.setFillStyle(def.fill));
-            r.on('pointerdown', () => def.cb());
+            r.on('pointerdown', () => { r.setFillStyle(Math.max(0, def.fill - 0x080808)); def.cb(); });
+            r.on('pointerup',   () => r.setFillStyle(def.fill + 0x101010));
             this.actionArea.add([r, t]);
         });
     }
@@ -600,6 +628,20 @@ export class PokerPanel {
     private updatePot(): void {
         if (!this.game || this.game.pot === 0) { this.potText.setText(''); return; }
         this.potText.setText(`Pot: ${this.game.pot}◈`);
+    }
+
+    private updatePhaseLabel(): void {
+        if (!this.game) { this.phaseText.setText(''); return; }
+        const labels: Record<string, string> = {
+            preflop: '— PRE-FLOP —',
+            flop:    '— FLOP —',
+            turn:    '— TURN —',
+            river:   '— RIVER —',
+            showdown:'— SHOWDOWN —',
+            waiting: '',
+        };
+        const label = labels[this.game.phase] ?? '';
+        this.phaseText.setText(label);
     }
 
     private updateChipsDisplay(): void {
