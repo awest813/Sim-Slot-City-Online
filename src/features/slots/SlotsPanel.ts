@@ -1,0 +1,339 @@
+// ── Playable slot machine minigame ───────────────────────────────────────────
+// Three reels, configurable bet, payout table, win/loss feedback.
+import Phaser from 'phaser';
+import { GameState } from '../../core/state/GameState';
+import {
+    GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
+    COL_SLOT_BODY, COL_SLOT_TRIM,
+} from '../../game/constants';
+
+const SYMBOLS  = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
+const WEIGHTS  = [30, 25, 20, 12, 7, 4, 2];  // weighted rarity (lower = rarer)
+
+// Payout multipliers for matching symbols (3-of-a-kind)
+const PAYOUTS: Record<string, number> = {
+    '🍒': 2,
+    '🍋': 3,
+    '🍊': 4,
+    '🍇': 6,
+    '⭐': 10,
+    '💎': 20,
+    '7️⃣': 50,
+};
+// Two-of-a-kind cherry = small consolation
+const CHERRY_PAIR_PAYOUT = 1;
+
+function weightedRandom(): string {
+    const total = WEIGHTS.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < SYMBOLS.length; i++) {
+        r -= WEIGHTS[i];
+        if (r <= 0) return SYMBOLS[i];
+    }
+    return SYMBOLS[0];
+}
+
+type SpinState = 'idle' | 'spinning' | 'result';
+
+const BET_OPTIONS = [10, 25, 50, 100];
+
+export class SlotsPanel {
+    private scene: Phaser.Scene;
+    private onClose: () => void;
+
+    // Phaser objects
+    private overlay!: Phaser.GameObjects.Rectangle;
+    private container!: Phaser.GameObjects.Container;
+    private reelTexts: Phaser.GameObjects.Text[] = [];
+    private resultText!: Phaser.GameObjects.Text;
+    private chipsText!: Phaser.GameObjects.Text;
+    private betText!: Phaser.GameObjects.Text;
+    private spinBtn!: Phaser.GameObjects.Rectangle;
+    private spinBtnLabel!: Phaser.GameObjects.Text;
+    private betBtns: Phaser.GameObjects.Container[] = [];
+
+    // State
+    private spinState: SpinState = 'idle';
+    private currentBet: number = 25;
+    private reelValues: string[] = ['🎰', '🎰', '🎰'];
+    private spinTimers: Phaser.Time.TimerEvent[] = [];
+    private spinDone: boolean[] = [false, false, false];
+
+    constructor(scene: Phaser.Scene, onClose: () => void) {
+        this.scene = scene;
+        this.onClose = onClose;
+        this.build();
+    }
+
+    private build(): void {
+        const cx = GAME_WIDTH  / 2;
+        const cy = GAME_HEIGHT / 2;
+        const pw = 500;
+        const ph = 420;
+
+        // Dimming overlay
+        this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
+            .setScrollFactor(0).setDepth(DEPTH_PANEL - 1).setInteractive();
+
+        // Main container
+        this.container = this.scene.add.container(cx, cy).setScrollFactor(0).setDepth(DEPTH_PANEL + 1);
+
+        // Panel background
+        const bg = this.scene.add.rectangle(0, 0, pw, ph, COL_SLOT_BODY, 1)
+            .setStrokeStyle(3, COL_SLOT_TRIM, 1);
+        this.container.add(bg);
+
+        // Title
+        const title = this.scene.add.text(0, -ph / 2 + 22, '🎰  SLOT MACHINE', {
+            fontFamily: 'monospace', fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
+        }).setOrigin(0.5);
+        this.container.add(title);
+
+        const divider = this.scene.add.rectangle(0, -ph / 2 + 40, pw - 40, 1, COL_SLOT_TRIM, 0.6);
+        this.container.add(divider);
+
+        // Chips display
+        this.chipsText = this.scene.add.text(-pw / 2 + 20, -ph / 2 + 54, '', {
+            fontFamily: 'monospace', fontSize: '13px', color: '#2ecc71',
+        }).setOrigin(0, 0);
+        this.container.add(this.chipsText);
+
+        // Reel panel
+        const reelPanelY = -30;
+        const reelBg = this.scene.add.rectangle(0, reelPanelY, 340, 110, 0x080814, 1)
+            .setStrokeStyle(2, COL_SLOT_TRIM, 0.8);
+        this.container.add(reelBg);
+
+        // Three reels
+        const reelXs = [-110, 0, 110];
+        for (let i = 0; i < 3; i++) {
+            const reelFrame = this.scene.add.rectangle(reelXs[i], reelPanelY, 90, 90, 0x0d0d1e, 1)
+                .setStrokeStyle(1.5, COL_SLOT_TRIM, 0.6);
+            this.container.add(reelFrame);
+
+            const reel = this.scene.add.text(reelXs[i], reelPanelY, '🎰', {
+                fontFamily: 'monospace', fontSize: '42px',
+            }).setOrigin(0.5);
+            this.container.add(reel);
+            this.reelTexts.push(reel);
+        }
+
+        // Pay line indicator
+        const payLine = this.scene.add.rectangle(0, reelPanelY, 340, 3, COL_SLOT_TRIM, 0.4);
+        this.container.add(payLine);
+
+        // Result text
+        this.resultText = this.scene.add.text(0, reelPanelY + 72, '', {
+            fontFamily: 'monospace', fontSize: '15px', color: '#c9a84c',
+        }).setOrigin(0.5);
+        this.container.add(this.resultText);
+
+        // Bet section label
+        const betLabel = this.scene.add.text(0, ph / 2 - 150, 'BET', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#888888',
+        }).setOrigin(0.5);
+        this.container.add(betLabel);
+
+        // Bet amount buttons
+        const betBtnXs = [-90, -30, 30, 90];
+        BET_OPTIONS.forEach((amount, i) => {
+            const rect = this.scene.add.rectangle(betBtnXs[i], ph / 2 - 130, 52, 26, 0x1a1a3e, 1)
+                .setStrokeStyle(1, i === 1 ? COL_SLOT_TRIM : 0x444488, 1)
+                .setInteractive({ useHandCursor: true });
+            const label = this.scene.add.text(betBtnXs[i], ph / 2 - 130, `${amount}`, {
+                fontFamily: 'monospace', fontSize: '13px', color: i === 1 ? '#c9a84c' : '#8888bb',
+            }).setOrigin(0.5);
+
+            rect.on('pointerover', () => rect.setStrokeStyle(1, COL_SLOT_TRIM, 1));
+            rect.on('pointerout',  () => rect.setStrokeStyle(1, this.currentBet === amount ? COL_SLOT_TRIM : 0x444488, 1));
+            rect.on('pointerdown', () => {
+                this.currentBet = amount;
+                this.updateBetDisplay();
+            });
+
+            const btnContainer = this.scene.add.container(0, 0, [rect, label]);
+            this.container.add(btnContainer);
+            this.betBtns.push(btnContainer);
+        });
+
+        this.betText = this.scene.add.text(0, ph / 2 - 105, '', {
+            fontFamily: 'monospace', fontSize: '12px', color: '#aaaacc',
+        }).setOrigin(0.5);
+        this.container.add(this.betText);
+
+        // Spin button
+        this.spinBtn = this.scene.add.rectangle(0, ph / 2 - 74, 200, 40, 0x3a2a6a, 1)
+            .setStrokeStyle(2, COL_SLOT_TRIM, 1)
+            .setInteractive({ useHandCursor: true });
+
+        this.spinBtnLabel = this.scene.add.text(0, ph / 2 - 74, 'SPIN', {
+            fontFamily: 'monospace', fontSize: '16px', color: '#c9a84c', fontStyle: 'bold',
+        }).setOrigin(0.5);
+
+        this.spinBtn.on('pointerover', () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x4a3a8a); });
+        this.spinBtn.on('pointerout',  () => this.spinBtn.setFillStyle(0x3a2a6a));
+        this.spinBtn.on('pointerdown', () => this.spin());
+
+        this.container.add([this.spinBtn, this.spinBtnLabel]);
+
+        // Payout table hint
+        const payHint = this.scene.add.text(0, ph / 2 - 44, '7️⃣×3=50x  💎×3=20x  ⭐×3=10x  🍇×3=6x', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#555577',
+        }).setOrigin(0.5);
+        this.container.add(payHint);
+
+        // Close button
+        const closeRect = this.scene.add.rectangle(pw / 2 - 14, -ph / 2 + 14, 20, 20, 0x3a1e1e, 1)
+            .setStrokeStyle(1, 0x8a3a3a, 1)
+            .setInteractive({ useHandCursor: true });
+        const closeLabel = this.scene.add.text(pw / 2 - 14, -ph / 2 + 14, '✕', {
+            fontFamily: 'monospace', fontSize: '12px', color: '#e05050',
+        }).setOrigin(0.5);
+
+        closeRect.on('pointerover', () => closeRect.setFillStyle(0x5a2a2a));
+        closeRect.on('pointerout',  () => closeRect.setFillStyle(0x3a1e1e));
+        closeRect.on('pointerdown', () => this.close());
+
+        this.container.add([closeRect, closeLabel]);
+
+        // ESC to close
+        this.scene.input.keyboard!.once('keydown-ESC', () => this.close());
+
+        this.updateChipsDisplay();
+        this.updateBetDisplay();
+    }
+
+    private updateChipsDisplay(): void {
+        this.chipsText.setText(`◈ ${GameState.get().chips.toLocaleString()} chips`);
+    }
+
+    private updateBetDisplay(): void {
+        const chips = GameState.get().chips;
+        // Highlight selected bet
+        BET_OPTIONS.forEach((amount, i) => {
+            const btn = this.betBtns[i];
+            const rect = btn.list[0] as Phaser.GameObjects.Rectangle;
+            const label = btn.list[1] as Phaser.GameObjects.Text;
+            const selected = this.currentBet === amount;
+            rect.setStrokeStyle(1, selected ? COL_SLOT_TRIM : 0x444488, 1);
+            rect.setFillStyle(selected ? 0x2a2a5e : 0x1a1a3e);
+            label.setColor(selected ? '#c9a84c' : (chips >= amount ? '#8888bb' : '#445'));
+        });
+        this.betText.setText(`Bet: ${this.currentBet} chips`);
+    }
+
+    private spin(): void {
+        if (this.spinState !== 'idle') return;
+
+        const chips = GameState.get().chips;
+        if (chips < this.currentBet) {
+            this.showResult('Not enough chips!', '#e74c3c');
+            return;
+        }
+
+        GameState.addChips(-this.currentBet);
+        this.updateChipsDisplay();
+
+        this.spinState = 'spinning';
+        this.spinBtnLabel.setText('...');
+        this.resultText.setText('');
+        this.spinDone = [false, false, false];
+
+        // Stop each reel with increasing delay
+        const stopDelays = [600, 1050, 1500];
+
+        for (let i = 0; i < 3; i++) {
+            // Fast roll animation
+            const rollTimer = this.scene.time.addEvent({
+                delay: 80,
+                repeat: -1,
+                callback: () => {
+                    this.reelTexts[i].setText(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
+                },
+            });
+
+            // Stop reel after delay
+            this.scene.time.delayedCall(stopDelays[i], () => {
+                rollTimer.remove();
+                const final = weightedRandom();
+                this.reelValues[i] = final;
+                this.reelTexts[i].setText(final);
+                this.spinDone[i] = true;
+
+                if (this.spinDone.every(d => d)) {
+                    this.evalResult();
+                }
+            });
+
+            this.spinTimers.push(rollTimer);
+        }
+    }
+
+    private evalResult(): void {
+        this.spinState = 'result';
+        this.spinBtnLabel.setText('SPIN');
+        this.spinTimers = [];
+
+        const [a, b, c] = this.reelValues;
+
+        let payout = 0;
+        let msg = '';
+        let msgColor = '#c9a84c';
+
+        if (a === b && b === c) {
+            // Three of a kind
+            const mult = PAYOUTS[a] ?? 2;
+            payout = this.currentBet * mult;
+            msg = `THREE ${a}  +${payout} chips!`;
+            msgColor = '#2ecc71';
+        } else if (a === b || b === c || a === c) {
+            // Two of a kind — check cherry pair consolation
+            if (a === '🍒' || b === '🍒') {
+                payout = this.currentBet * CHERRY_PAIR_PAYOUT;
+                msg = `Cherry pair  +${payout} chips`;
+                msgColor = '#f0a040';
+            } else {
+                msg = 'No match — try again';
+                msgColor = '#888888';
+            }
+        } else {
+            msg = 'No match — try again';
+            msgColor = '#888888';
+        }
+
+        if (payout > 0) {
+            GameState.addChips(payout);
+            this.updateChipsDisplay();
+
+            // Win flash
+            this.scene.tweens.add({
+                targets: this.reelTexts,
+                scaleX: 1.15,
+                scaleY: 1.15,
+                yoyo: true,
+                duration: 150,
+                repeat: 2,
+            });
+        }
+
+        this.showResult(msg, msgColor);
+
+        this.scene.time.delayedCall(300, () => {
+            this.spinState = 'idle';
+            this.updateBetDisplay();
+        });
+    }
+
+    private showResult(msg: string, color: string): void {
+        this.resultText.setText(msg).setColor(color);
+    }
+
+    private close(): void {
+        // Clean up any running timers
+        this.spinTimers.forEach(t => t.remove());
+
+        this.overlay.destroy();
+        this.container.destroy();
+        this.onClose();
+    }
+}
