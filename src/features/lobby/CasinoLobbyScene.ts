@@ -28,8 +28,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     create(): void {
-        // Reset game state for fresh session
+        // Preserve the player name set in PreloadScene — only reset non-name fields
+        const savedName = GameState.get().displayName;
         GameState.reset();
+        if (savedName && savedName !== 'Guest') {
+            GameState.update({ displayName: savedName });
+        }
 
         this.graphics = this.add.graphics();
 
@@ -38,10 +42,10 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.buildLabels();
         this.buildEntranceFx();
 
-        // Avatar — spawn at entrance
+        // Avatar — spawn at entrance with the player's chosen name
         const spawnX = WORLD_W / 2;
         const spawnY = WORLD_H - 100;
-        this.avatar = new AvatarController(this, spawnX, spawnY, 'Guest');
+        this.avatar = new AvatarController(this, spawnX, spawnY, GameState.get().displayName);
         this.registerAvatarBlockers();
 
         // Camera — manual follow in update()
@@ -504,21 +508,23 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
     private showWelcomeBanner(): void {
         const cx = GAME_WIDTH / 2;
-        const cy = 70;
+        const cy = 72;
+        const name = GameState.get().displayName;
 
-        const bg = this.add.rectangle(cx, cy, 420, 48, 0x000000, 0.80)
+        const bg = this.add.rectangle(cx, cy, 480, 60, 0x000000, 0.85)
             .setScrollFactor(0).setDepth(DEPTH_HUD + 5);
         bg.setStrokeStyle(1, COL_TRIM, 0.8);
 
-        const text = this.add.text(cx, cy - 8, '★  Welcome to Slot City Casino  ★', {
+        const greeting = name !== 'Guest' ? `Welcome, ${name}!` : 'Welcome to Slot City Casino!';
+        const text = this.add.text(cx, cy - 12, `★  ${greeting}  ★`, {
             fontFamily: FONT, fontSize: '14px', color: '#c9a84c',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 6);
 
-        const sub = this.add.text(cx, cy + 10, 'WASD / Arrow keys to move  ·  E to interact  ·  ESC to close panels', {
+        const sub = this.add.text(cx, cy + 8, 'WASD / Arrow keys to move  ·  E to interact  ·  ESC to close panels', {
             fontFamily: FONT, fontSize: '10px', color: '#668866',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 6);
 
-        this.time.delayedCall(5500, () => {
+        this.time.delayedCall(6000, () => {
             this.tweens.add({
                 targets: [bg, text, sub],
                 alpha: 0,
@@ -528,18 +534,18 @@ export class CasinoLobbyScene extends Phaser.Scene {
         });
 
         // Persistent controls hint at bottom edge
-        const hintBg = this.add.rectangle(cx, GAME_HEIGHT - 14, 380, 20, 0x000000, 0.55)
+        const hintBg = this.add.rectangle(cx, GAME_HEIGHT - 14, 420, 20, 0x000000, 0.55)
             .setScrollFactor(0).setDepth(DEPTH_HUD + 1);
         hintBg.setStrokeStyle(0);
 
         const hint = this.add.text(cx, GAME_HEIGHT - 14,
-            'WASD / ↑↓←→ to move  ·  E to interact', {
+            'WASD / ↑↓←→ to move  ·  E to interact  ·  Slots: SPACE to spin  ·  Poker: F/C/R keys', {
             fontFamily: FONT, fontSize: '10px', color: '#446644',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2);
         hint.setAlpha(0);
 
         // Fade hint in after welcome banner fades
-        this.time.delayedCall(6500, () => {
+        this.time.delayedCall(7000, () => {
             this.tweens.add({ targets: [hintBg, hint], alpha: 1, duration: 500 });
         });
     }

@@ -53,6 +53,9 @@ export class SlotsPanel {
     private spinBtnLabel!: Phaser.GameObjects.Text;
     private betBtns: Phaser.GameObjects.Container[] = [];
     private payLine!: Phaser.GameObjects.Rectangle;
+    private escKey!: Phaser.Input.Keyboard.Key;
+    private spaceKey!: Phaser.Input.Keyboard.Key;
+    private freeChipsBtn: Phaser.GameObjects.Container | null = null;
 
     // State
     private spinState: SpinState = 'idle';
@@ -60,6 +63,7 @@ export class SlotsPanel {
     private reelValues: string[] = ['🎰', '🎰', '🎰'];
     private spinTimers: Phaser.Time.TimerEvent[] = [];
     private spinDone: boolean[] = [false, false, false];
+    private closed: boolean = false;
 
     // Session statistics
     private totalSpins: number = 0;
@@ -207,6 +211,12 @@ export class SlotsPanel {
             fontFamily: 'monospace', fontSize: '16px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
 
+        // SPACE key hint inside button (subtle)
+        const spaceHint = this.scene.add.text(80, ph / 2 - 74, '[SPACE]', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#554466',
+        }).setOrigin(0, 0.5);
+        this.container.add(spaceHint);
+
         this.spinBtn.on('pointerover', () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x4a3a8a); });
         this.spinBtn.on('pointerout',  () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x3a2a6a); });
         this.spinBtn.on('pointerdown', () => {
@@ -241,8 +251,12 @@ export class SlotsPanel {
 
         this.container.add([closeRect, closeLabel]);
 
-        // ESC to close
-        this.scene.input.keyboard!.once('keydown-ESC', () => this.close());
+        // ESC and SPACE keyboard shortcuts
+        this.escKey   = this.scene.input.keyboard!.addKey('ESC');
+        this.spaceKey = this.scene.input.keyboard!.addKey('SPACE');
+        // Use .on() for both so they're both cleanly destroyed in close()
+        this.escKey.on('down',   () => this.close());
+        this.spaceKey.on('down', () => { if (this.spinState === 'idle') this.spin(); });
 
         this.updateChipsDisplay();
         this.updateBetDisplay();
@@ -315,8 +329,8 @@ export class SlotsPanel {
                 },
             });
 
-            // Stop reel after delay
-            this.scene.time.delayedCall(stopDelays[i], () => {
+            // Stop reel after delay — store in spinTimers so close() can cancel it
+            const stopTimer = this.scene.time.delayedCall(stopDelays[i], () => {
                 rollTimer.remove();
                 const final = weightedRandom();
                 this.reelValues[i] = final;
@@ -328,7 +342,7 @@ export class SlotsPanel {
                 }
             });
 
-            this.spinTimers.push(rollTimer);
+            this.spinTimers.push(rollTimer, stopTimer);
         }
     }
 
@@ -422,20 +436,73 @@ export class SlotsPanel {
         this.showResult(msg, msgColor);
         this.updateStatsDisplay();
 
-        this.scene.time.delayedCall(500, () => {
+        const idleTimer = this.scene.time.delayedCall(500, () => {
             this.spinState = 'idle';
             this.updateBetDisplay();
+            this.checkLowChips();
         });
+        this.spinTimers.push(idleTimer);
     }
 
     private showResult(msg: string, color: string): void {
         this.resultText.setText(msg).setColor(color);
     }
 
+    private checkLowChips(): void {
+        const chips = GameState.get().chips;
+        const canAffordMin = chips >= BET_OPTIONS[0];
+
+        // Auto-reduce bet to the highest option the player can still afford
+        if (chips > 0 && chips < this.currentBet) {
+            const affordable = BET_OPTIONS.filter(b => b <= chips);
+            this.currentBet = affordable.length > 0
+                ? affordable[affordable.length - 1]   // highest affordable
+                : BET_OPTIONS[0];                      // fallback; spin() will block it
+            this.updateBetDisplay();
+        }
+
+        // Show free chips button when totally broke
+        if (!canAffordMin) {
+            this.showFreeChipsOffer();
+        }
+    }
+
+    private showFreeChipsOffer(): void {
+        if (this.freeChipsBtn) return;   // already shown
+
+        // Position below pay hints and above panel bottom edge
+        const rect = this.scene.add.rectangle(0, 215, 220, 26, 0x1a2a0a, 1)
+            .setStrokeStyle(1, 0x4a8a1a, 1)
+            .setInteractive({ useHandCursor: true });
+        const label = this.scene.add.text(0, 215, '🎁 Free 500 chips — Reload!', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#6acc30',
+        }).setOrigin(0.5);
+
+        rect.on('pointerover', () => rect.setFillStyle(0x2a4a10));
+        rect.on('pointerout',  () => rect.setFillStyle(0x1a2a0a));
+        rect.on('pointerdown', () => {
+            GameState.addChips(500);
+            this.currentBet = 25;
+            this.updateChipsDisplay();
+            this.updateBetDisplay();
+            this.showResult('🎁 500 free chips added!', '#6acc30');
+            this.freeChipsBtn?.destroy();
+            this.freeChipsBtn = null;
+        });
+
+        this.freeChipsBtn = this.scene.add.container(0, 0, [rect, label]);
+        this.container.add(this.freeChipsBtn);
+    }
+
     private close(): void {
-        // Clean up any running timers
+        if (this.closed) return;
+        this.closed = true;
+
+        // Cancel all running timers
         this.spinTimers.forEach(t => t.remove());
 
+        this.escKey.destroy();
+        this.spaceKey.destroy();
         this.overlay.destroy();
         this.container.destroy();
         this.onClose();
