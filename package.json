@@ -4,8 +4,10 @@
     "version": "1.0.0",
     "private": true,
     "scripts": {
-        "dev": "vite --config vite/config.dev.mjs",
-        "build": "vite build --config vite/config.prod.mjs"
+        "dev": "npm run dev --prefix slot-city/apps/game-client",
+        "build": "npm run build --prefix slot-city/apps/game-client",
+        "dev:full": "npm run dev --prefix slot-city",
+        "test": "npm run test --prefix slot-city"
     },
     "devDependencies": {
         "typescript": "~5.7.2",

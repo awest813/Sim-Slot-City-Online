@@ -44,7 +44,7 @@ export class PlayerAvatar {
   emoteLabel!: Phaser.GameObjects.Text;
   selectionCircle!: Phaser.GameObjects.Graphics;
 
-  private chatTimer?: ReturnType<typeof setTimeout>;
+  private chatTimer?: Phaser.Time.TimerEvent;
   private _direction: PlayerDirection = PlayerDirection.SOUTH;
   private _animState: PlayerAnimState = PlayerAnimState.IDLE;
   private walkTween?: Phaser.Tweens.Tween;
@@ -191,7 +191,7 @@ export class PlayerAvatar {
   }
 
   showChatBubble(message: string): void {
-    if (this.chatTimer) clearTimeout(this.chatTimer);
+    if (this.chatTimer) this.chatTimer.remove();
 
     this.chatText.setText(message);
     const padding = 6;
@@ -207,9 +207,10 @@ export class PlayerAvatar {
 
     this.chatBubble.setVisible(true);
 
-    this.chatTimer = setTimeout(() => {
+    this.chatTimer = this.scene.time.delayedCall(CHAT_DISPLAY_DURATION_MS, () => {
       this.chatBubble.setVisible(false);
-    }, CHAT_DISPLAY_DURATION_MS);
+      this.chatTimer = undefined;
+    });
   }
 
   showEmote(emote: EmoteType): void {
@@ -224,9 +225,9 @@ export class PlayerAvatar {
     const emoji = emoteMap[emote] ?? "❓";
     this.emoteLabel.setText(emoji);
 
-    setTimeout(() => {
+    this.scene.time.delayedCall(3000, () => {
       this.emoteLabel.setText("");
-    }, 3000);
+    });
   }
 
   setSeated(tileX: number, tileY: number): void {
@@ -237,7 +238,7 @@ export class PlayerAvatar {
   }
 
   destroy(): void {
-    if (this.chatTimer) clearTimeout(this.chatTimer);
+    if (this.chatTimer) this.chatTimer.remove();
     if (this.walkTween) this.walkTween.stop();
     this.container.destroy();
   }

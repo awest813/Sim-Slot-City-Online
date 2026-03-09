@@ -313,25 +313,25 @@ export class CasinoLobbyScene extends Phaser.Scene {
       const zone = this.add.zone(x, y, 64, 32).setInteractive({ cursor: "pointer" });
       zone.setDepth(getDepth(portal.tileX, portal.tileY) + 20);
       zone.on("pointerdown", () => this.enterRoom(portal.targetRoom));
+      const portalShape = [
+        { x: x, y: y - 16 },
+        { x: x + 32, y: y },
+        { x: x, y: y + 16 },
+        { x: x - 32, y: y },
+      ];
       zone.on("pointerover", () => {
         portalGraphics.clear();
         portalGraphics.fillStyle(0x0044aa, 0.9);
-        portalGraphics.fillPoints([
-          { x: x, y: y - 16 },
-          { x: x + 32, y: y },
-          { x: x, y: y + 16 },
-          { x: x - 32, y: y },
-        ], true);
+        portalGraphics.fillPoints(portalShape, true);
+        portalGraphics.lineStyle(2, 0x88ccff, 1);
+        portalGraphics.strokePoints(portalShape, true);
       });
       zone.on("pointerout", () => {
         portalGraphics.clear();
         portalGraphics.fillStyle(0x002255, 0.7);
-        portalGraphics.fillPoints([
-          { x: x, y: y - 16 },
-          { x: x + 32, y: y },
-          { x: x, y: y + 16 },
-          { x: x - 32, y: y },
-        ], true);
+        portalGraphics.fillPoints(portalShape, true);
+        portalGraphics.lineStyle(2, 0x4488ff, 1);
+        portalGraphics.strokePoints(portalShape, true);
       });
 
       // Animate portal
@@ -512,10 +512,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
   }
 
   private async enterRoom(roomType: RoomType): Promise<void> {
+    if (roomType === RoomType.BLACKJACK) {
+      this.showToast("🎲 Blackjack — Coming Soon!");
+      return;
+    }
+
     const sceneMap: Partial<Record<RoomType, string>> = {
       [RoomType.POKER]: "PokerRoomScene",
       [RoomType.BAR]: "BarRoomScene",
-      [RoomType.BLACKJACK]: "CasinoLobbyScene", // stub — not yet implemented
     };
 
     const sceneName = sceneMap[roomType];
@@ -524,6 +528,21 @@ export class CasinoLobbyScene extends Phaser.Scene {
       this.cleanup();
       this.scene.start(sceneName);
     }
+  }
+
+  private showToast(message: string): void {
+    const { width, height } = this.scale;
+    const toast = this.add.text(width / 2, height / 2, message, {
+      fontSize: "18px",
+      color: "#ffd700",
+      stroke: "#000000",
+      strokeThickness: 3,
+      fontFamily: "monospace",
+      backgroundColor: "#00000099",
+      padding: { x: 12, y: 8 },
+    }).setOrigin(0.5).setDepth(2000).setScrollFactor(0);
+
+    this.time.delayedCall(2000, () => toast.destroy());
   }
 
   private cleanup(): void {
