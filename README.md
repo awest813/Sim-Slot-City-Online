@@ -1,158 +1,183 @@
-# Phaser Vite TypeScript Template
+# Slot City 🎰
 
-This is a Phaser 3 project template that uses Vite for bundling. It supports hot-reloading for quick development workflow, includes TypeScript support and scripts to generate production-ready builds.
+> **A browser-based multiplayer isometric social casino — virtual chips only, no real money.**
 
-**[This Template is also available as a JavaScript version.](https://github.com/phaserjs/template-vite)**
+*The Sims Online meets neon Vegas in an isometric browser casino.*
 
-### Versions
+Players create accounts, walk their avatar through an isometric casino in real time, chat with others, sit at poker tables, join tournaments, and hang out at the bar/lounge — all powered by fictional in-game chips.
 
-This template has been updated for:
+---
 
-- [Phaser 3.90.0](https://github.com/phaserjs/phaser)
-- [Vite 6.3.1](https://github.com/vitejs/vite)
-- [TypeScript 5.7.2](https://github.com/microsoft/TypeScript)
+## What Is Slot City?
 
-![screenshot](screenshot.png)
+Slot City is a social MMO casino experience inspired by:
 
-## Requirements
+- **The Sims Online** — avatar-driven social spaces and emergent gameplay
+- **Habbo Hotel** — isometric rooms, furniture, and social gathering spots
+- **Club Penguin** — approachable community-first design with expressive characters
+- **PokerStars** — serious poker mechanics with clear game flow
+- **Retro neon Vegas** — visual warmth, energy, and glamour
 
-[Node.js](https://nodejs.org) is required to install dependencies and run scripts via `npm`.
+The game is a **social venue**, not a menu of disconnected mini-games. The casino itself is the content.
 
-## Available Commands
+---
 
-| Command | Description |
-|---------|-------------|
-| `npm install` | Install project dependencies |
-| `npm run dev` | Launch a development web server |
-| `npm run build` | Create a production build in the `dist` folder |
-| `npm run dev-nolog` | Launch a development web server without sending anonymous data (see "About log.js" below) |
-| `npm run build-nolog` | Create a production build in the `dist` folder without sending anonymous data (see "About log.js" below) |
+## Stack
 
-## Writing Code
+| Layer | Technology |
+|-------|-----------|
+| Game Client | Phaser 3 · TypeScript · Vite |
+| Web Shell | Next.js 15 App Router · TypeScript |
+| Multiplayer Server | Node.js · Colyseus 0.15 |
+| Database | PostgreSQL · Prisma ORM |
+| Shared Types | TypeScript monorepo package |
 
-After cloning the repo, run `npm install` from your project directory. Then, you can start the local development server by running `npm run dev`.
+---
 
-The local development server runs on `http://localhost:8080` by default. Please see the Vite documentation if you wish to change this, or add SSL support.
+## Project Structure
 
-Once the server is running you can edit any of the files in the `src` folder. Vite will automatically recompile your code and then reload the browser.
-
-## Template Project Structure
-
-We have provided a default project structure to get you started. This is as follows:
-
-## Template Project Structure
-
-We have provided a default project structure to get you started:
-
-| Path                         | Description                                                |
-|------------------------------|------------------------------------------------------------|
-| `index.html`                 | A basic HTML page to contain the game.                     |
-| `public/assets`              | Game sprites, audio, etc. Served directly at runtime.      |
-| `public/style.css`           | Global layout styles.                                      |
-| `src/main.ts`                | Application bootstrap.                                     |
-| `src/game`                   | Folder containing the game code.                           |
-| `src/game/main.ts`           | Game entry point: configures and starts the game.          |
-| `src/game/scenes`            | Folder with all Phaser game scenes.                        | 
-
-
-## Handling Assets
-
-Vite supports loading assets via JavaScript module `import` statements.
-
-This template provides support for both embedding assets and also loading them from a static folder. To embed an asset, you can import it at the top of the JavaScript file you are using it in:
-
-```js
-import logoImg from './assets/logo.png'
+```
+slot-city/                   ← main game monorepo
+  apps/
+    web/                     # Next.js dashboard (home, profile, leaderboard, tournaments)
+    game-client/             # Phaser 3 isometric casino game client
+    game-server/             # Colyseus authoritative multiplayer server
+  packages/
+    shared/                  # Shared TypeScript types, enums, constants, protocol
+  prisma/
+    schema.prisma            # PostgreSQL schema via Prisma
+  docs/                      # Architecture, vision, roadmap, art direction
 ```
 
-To load static files such as audio files, videos, etc place them into the `public/assets` folder. Then you can use this path in the Loader calls within Phaser:
+---
 
-```js
-preload ()
-{
-    //  This is an example of an imported bundled image.
-    //  Remember to import it at the top of this file
-    this.load.image('logo', logoImg);
+## Quick Start
 
-    //  This is an example of loading a static image
-    //  from the public/assets folder:
-    this.load.image('background', 'assets/bg.png');
-}
-```
+### Prerequisites
 
-When you issue the `npm run build` command, all static assets are automatically copied to the `dist/assets` folder.
+- Node.js 18+
+- PostgreSQL (local or remote)
+- npm 8+
 
-## Deploying to Production
-
-After you run the `npm run build` command, your code will be built into a single bundle and saved to the `dist` folder, along with any other assets your project imported, or stored in the public assets folder.
-
-In order to deploy your game, you will need to upload *all* of the contents of the `dist` folder to a public facing web server.
-
-## Customizing the Template
-
-### Vite
-
-If you want to customize your build, such as adding plugin (i.e. for loading CSS or fonts), you can modify the `vite/config.*.mjs` file for cross-project changes, or you can modify and/or create new configuration files and target them in specific npm tasks inside of `package.json`. Please see the [Vite documentation](https://vitejs.dev/) for more information.
-
-## About log.js
-
-If you inspect our node scripts you will see there is a file called `log.js`. This file makes a single silent API call to a domain called `gryzor.co`. This domain is owned by Phaser Studio Inc. The domain name is a homage to one of our favorite retro games.
-
-We send the following 3 pieces of data to this API: The name of the template being used (vue, react, etc). If the build was 'dev' or 'prod' and finally the version of Phaser being used.
-
-At no point is any personal data collected or sent. We don't know about your project files, device, browser or anything else. Feel free to inspect the `log.js` file to confirm this.
-
-Why do we do this? Because being open source means we have no visible metrics about which of our templates are being used. We work hard to maintain a large and diverse set of templates for Phaser developers and this is our small anonymous way to determine if that work is actually paying off, or not. In short, it helps us ensure we're building the tools for you.
-
-However, if you don't want to send any data, you can use these commands instead:
-
-Dev:
+### 1. Clone and install
 
 ```bash
-npm run dev-nolog
+git clone <repo-url>
+cd slot-city
+npm install
 ```
 
-Build:
+### 2. Configure environment
 
 ```bash
-npm run build-nolog
+cp .env.example .env
+# Edit .env — set DATABASE_URL and JWT_SECRET at minimum
 ```
 
-Or, to disable the log entirely, simply delete the file `log.js` and remove the call to it in the `scripts` section of `package.json`:
+### 3. Set up the database
 
-Before:
-
-```json
-"scripts": {
-    "dev": "node log.js dev & dev-template-script",
-    "build": "node log.js build & build-template-script"
-},
+```bash
+npm run db:migrate      # Run Prisma migrations
+npm run db:generate     # Generate Prisma client
 ```
 
-After:
+### 4. Start development servers
 
-```json
-"scripts": {
-    "dev": "dev-template-script",
-    "build": "build-template-script"
-},
+```bash
+npm run dev             # All three servers in parallel
+
+# Or individually:
+npm run dev:server      # Colyseus game server  → http://localhost:2567
+npm run dev:client      # Phaser game client   → http://localhost:3001
+npm run dev:web         # Next.js web shell    → http://localhost:3000
 ```
 
-Either of these will stop `log.js` from running. If you do decide to do this, please could you at least join our Discord and tell us which template you're using! Or send us a quick email. Either will be super-helpful, thank you.
+### 5. Open the game
 
-## Join the Phaser Community!
+| URL | Description |
+|-----|-------------|
+| http://localhost:3001 | Isometric game client |
+| http://localhost:3000 | Web shell (login, profile, leaderboard) |
+| http://localhost:2567/colyseus | Colyseus room monitor |
 
-We love to see what developers like you create with Phaser! It really motivates us to keep improving. So please join our community and show-off your work 😄
+Run `npm run db:studio` to open Prisma Studio at http://localhost:5555.
 
-**Visit:** The [Phaser website](https://phaser.io) and follow on [Phaser Twitter](https://twitter.com/phaser_)<br />
-**Play:** Some of the amazing games [#madewithphaser](https://twitter.com/search?q=%23madewithphaser&src=typed_query&f=live)<br />
-**Learn:** [API Docs](https://newdocs.phaser.io), [Support Forum](https://phaser.discourse.group/) and [StackOverflow](https://stackoverflow.com/questions/tagged/phaser-framework)<br />
-**Discord:** Join us on [Discord](https://discord.gg/phaser)<br />
-**Code:** 2000+ [Examples](https://labs.phaser.io)<br />
-**Read:** The [Phaser World](https://phaser.io/community/newsletter) Newsletter<br />
+---
 
-Created by [Phaser Studio](mailto:support@phaser.io). Powered by coffee, anime, pixels and love.
+## Running Tests
 
-The Phaser logo and characters are &copy; 2011 - 2025 Phaser Studio Inc.
+```bash
+npm run test            # Run all server-side tests
+```
 
-All rights reserved.
+Tests cover:
+
+- Chip economy service (`getBalance`, `addChips`, `removeChips`, `transferChips`)
+- Poker engine (deck creation, hand evaluation, winner determination)
+- Poker round manager (state transitions, blind posting, action processing)
+- Tournament manager (registration, start, elimination, blind progression)
+
+---
+
+## Environment Variables
+
+See `slot-city/.env.example` for the full list. Key variables:
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Secret for signing JWTs (change before production!) |
+| `PORT` | Game server port (default: `2567`) |
+| `CORS_ORIGIN` | Allowed CORS origin (default: `http://localhost:3000`) |
+
+---
+
+## Feature Status
+
+| Feature | Status |
+|---------|--------|
+| Account creation / login | ✅ Working |
+| Persistent chip balance | ✅ Working |
+| Isometric casino lobby | ✅ Working |
+| Player movement (keyboard + click-to-move) | ✅ Working |
+| Real-time multiplayer (see other players) | ✅ Working |
+| Room chat + emotes | ✅ Working |
+| Seating system | ✅ Working |
+| Room transitions (lobby → poker, bar, etc.) | ✅ Working |
+| Poker room | ✅ Working |
+| Bar / lounge room | ✅ Working |
+| Texas Hold'em engine (server-authoritative) | ✅ Working |
+| Tournament system (registration, blinds, elimination) | ✅ Working |
+| Leaderboard | ✅ Working |
+| Next.js web shell | ✅ Working |
+| Real sprite assets | 🔜 Placeholder graphics |
+| Blackjack gameplay | 🔜 Room skeleton only |
+| Slot machines | 🔜 Placeholder |
+
+---
+
+## Architecture Highlights
+
+- **Server-authoritative**: All chip changes, poker logic, and tournament state live on the server. The client never modifies balances or game outcomes.
+- **Isometric 2.5D**: Phaser renders a fixed-perspective casino world with depth sorting by tile position.
+- **Room-based multiplayer**: Colyseus rooms (`LobbyRoom`, `PokerTableRoom`, `BarRoom`, `BlackjackTableRoom`) sync player state in real time.
+- **Placeholder-first art**: All graphics are procedurally drawn using the Phaser Graphics API, ready to swap with real sprite sheets.
+
+See [`slot-city/docs/architecture.md`](slot-city/docs/architecture.md) for the full system design.
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`slot-city/docs/vision.md`](slot-city/docs/vision.md) | Product vision and player experience goals |
+| [`slot-city/docs/architecture.md`](slot-city/docs/architecture.md) | Full system architecture and technology choices |
+| [`slot-city/docs/roadmap.md`](slot-city/docs/roadmap.md) | Phase-by-phase development roadmap |
+| [`slot-city/docs/art-direction.md`](slot-city/docs/art-direction.md) | Visual style guide and asset pipeline |
+
+---
+
+## License
+
+For entertainment purposes only. No real money. No real gambling. All currency is fictional in-game currency.
