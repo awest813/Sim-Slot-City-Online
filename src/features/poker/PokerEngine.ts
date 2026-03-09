@@ -322,13 +322,19 @@ function advancePhase(state: PokerGameState): PokerGameState {
     const pending = buildActorQueue(players, startIdx, state.dealerIdx);
 
     const phaseLabel = phase.charAt(0).toUpperCase() + phase.slice(1);
-    return {
+    const nextState: PokerGameState = {
         ...state, deck, community, players, phase,
         currentBet: 0, minRaise: state.bigBlind,
         pendingActors: pending,
         activePlayerIdx: pending[0] ?? -1,
         statusMessage: `— ${phaseLabel} —`,
     };
+
+    // All remaining active players are all-in — run out remaining streets automatically.
+    // Bounded recursion: the switch above returns resolveShowdown() for the 'river' phase
+    // before reaching this check, so depth is at most 3 (preflop→flop, flop→turn, turn→river).
+    if (pending.length === 0) return advancePhase(nextState);
+    return nextState;
 }
 
 function resolveShowdown(state: PokerGameState): PokerGameState {
@@ -345,7 +351,11 @@ function resolveShowdown(state: PokerGameState): PokerGameState {
 
     const players = state.players.map(p => ({ ...p }));
     const share = Math.floor(state.pot / winners.length);
-    for (const w of winners) players.find(p => p.seatId === w.seatId)!.chips += share;
+    const remainder = state.pot % winners.length;
+    const playerBySeat = new Map(players.map(p => [p.seatId, p]));
+    winners.forEach((w, i) => {
+        playerBySeat.get(w.seatId)!.chips += share + (i === 0 ? remainder : 0);
+    });
 
     const handName = evalBestHand([...winners[0].holeCards, ...state.community]).name;
     const names = winners.map(w => w.name).join(' & ');

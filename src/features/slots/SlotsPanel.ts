@@ -520,6 +520,7 @@ export class SlotsPanel {
             this.currentBet = 25;
             this.updateChipsDisplay();
             this.updateBetDisplay();
+            this.updateStatsDisplay();
             this.showResult('🎁 500 free chips added!', '#6acc30');
             this.freeChipsBtn?.destroy();
             this.freeChipsBtn = null;
