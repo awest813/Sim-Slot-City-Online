@@ -7,41 +7,79 @@ import {
 
 interface DrinkOption {
     name: string;
-    cost: number;
+    baseCost: number;
     emoji: string;
     flavor: string;
     statusMsg: string;
+    bonusChips?: number;   // optional one-time chip award
+    oncePerSession?: boolean;
 }
 
-const DRINKS: DrinkOption[] = [
+const ALL_DRINKS: DrinkOption[] = [
     {
         name: 'Lucky Lemonade',
-        cost: 5,
+        baseCost: 5,
         emoji: '🍋',
         flavor: 'Tangy and bright — just like your luck tonight.',
         statusMsg: '★ Lucky Lemonade  |  A classic choice.',
     },
     {
-        name: 'High Roller Bourbon',
-        cost: 20,
-        emoji: '🥃',
-        flavor: 'Smooth. Expensive. Worth it.',
-        statusMsg: '★ High Roller Bourbon  |  The good stuff.',
+        name: 'Slot City Lager',
+        baseCost: 8,
+        emoji: '🍺',
+        flavor: 'Cold, crisp, and casino-brewed. A local favourite.',
+        statusMsg: '★ Slot City Lager  |  Down the hatch.',
     },
     {
         name: 'House Sparkling',
-        cost: 10,
+        baseCost: 10,
         emoji: '🥂',
         flavor: "The casino's complimentary vintage. Respectable.",
         statusMsg: '★ House Sparkling  |  Celebrate early.',
     },
     {
+        name: 'High Roller Bourbon',
+        baseCost: 20,
+        emoji: '🥃',
+        flavor: 'Smooth. Expensive. Worth it.',
+        statusMsg: '★ High Roller Bourbon  |  The good stuff.',
+    },
+    {
+        name: 'Lucky Shot',
+        baseCost: 25,
+        emoji: '🎯',
+        flavor: 'House special. One shot, one chance — +75 bonus chips!',
+        statusMsg: '★ Lucky Shot  |  Feeling lucky? +75◈ bonus!',
+        bonusChips: 75,
+        oncePerSession: true,
+    },
+    {
         name: 'Jackpot Juice',
-        cost: 0,
+        baseCost: 0,
         emoji: '🧃',
         flavor: 'On the house. Every guest gets one.',
         statusMsg: '★ Jackpot Juice  |  Free! Enjoy.',
     },
+];
+
+const BARTENDER_GREETINGS = [
+    '"What can I get for you tonight?"',
+    '"Welcome back — the usual?"',
+    '"Feeling lucky? Let me pour you something."',
+    '"The house always wins... but you can still enjoy a drink."',
+    '"Rough session? I\'ve got just the thing."',
+    '"Every winner started at the bar. Drink up!"',
+];
+
+const GAMBLING_TIPS = [
+    '💡 Tip: In slots, 7️⃣×3 pays 50× your bet. Chase the jackpot!',
+    '💡 Tip: In poker, F=Fold  C=Check/Call  R=Raise.',
+    '💡 Tip: Low on chips? Look for Free Chips buttons in-game.',
+    '💡 Tip: Cherry pairs pay 1× in slots — small wins add up!',
+    '💡 Tip: In poker, pocket Aces is the best starting hand.',
+    '💡 Tip: The slot machine pays back over time — stay patient!',
+    '💡 Tip: Min-raise early in poker — don\'t give your hand away.',
+    '💡 Tip: In poker, the dealer button rotates — position matters.',
 ];
 
 export class BarPanel {
@@ -51,19 +89,38 @@ export class BarPanel {
     private overlay!: Phaser.GameObjects.Rectangle;
     private container!: Phaser.GameObjects.Container;
     private chipsText!: Phaser.GameObjects.Text;
+    private drinkCountText!: Phaser.GameObjects.Text;
     private statusText!: Phaser.GameObjects.Text;
+    private escHandler!: () => void;
+    private closed = false;
+
+    // Session state
+    private drinksOrdered: number = 0;
+    private usedOnceItems: Set<string> = new Set();
+    private specialIdx: number;
 
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene = scene;
         this.onClose = onClose;
+        // Pick a random drink to be "today's special" (discounted by 50%, min cost 0)
+        this.specialIdx = Math.floor(Math.random() * ALL_DRINKS.length);
         this.build();
+    }
+
+    private get drinks(): DrinkOption[] {
+        return ALL_DRINKS.map((d, i) => ({
+            ...d,
+            baseCost: i === this.specialIdx && d.baseCost > 0
+                ? Math.floor(d.baseCost / 2)
+                : d.baseCost,
+        }));
     }
 
     private build(): void {
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
-        const pw = 460;
-        const ph = 380;
+        const pw = 480;
+        const ph = 480;
 
         this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
             .setScrollFactor(0).setDepth(DEPTH_PANEL - 1).setInteractive();
@@ -76,8 +133,8 @@ export class BarPanel {
         this.container.add(bg);
 
         // Wood grain stripes (visual texture)
-        for (let i = 0; i < 6; i++) {
-            const stripe = this.scene.add.rectangle(0, -ph / 2 + 50 + i * 56, pw - 4, 1, 0x2a1a08, 0.5);
+        for (let i = 0; i < 8; i++) {
+            const stripe = this.scene.add.rectangle(0, -ph / 2 + 48 + i * 52, pw - 4, 1, 0x2a1a08, 0.5);
             this.container.add(stripe);
         }
 
@@ -88,9 +145,10 @@ export class BarPanel {
         const divider = this.scene.add.rectangle(0, -ph / 2 + 40, pw - 40, 1, COL_TRIM, 0.5);
         this.container.add([title, divider]);
 
-        // Bartender greeting
-        const greet = this.scene.add.text(0, -ph / 2 + 56, '"What can I get for you tonight?"', {
-            fontFamily: 'monospace', fontSize: '12px', color: '#a08050',
+        // Rotating bartender greeting
+        const greeting = BARTENDER_GREETINGS[Math.floor(Math.random() * BARTENDER_GREETINGS.length)];
+        const greet = this.scene.add.text(0, -ph / 2 + 56, greeting, {
+            fontFamily: 'monospace', fontSize: '11px', color: '#a08050',
             fontStyle: 'italic',
         }).setOrigin(0.5);
         this.container.add(greet);
@@ -101,41 +159,91 @@ export class BarPanel {
         }).setOrigin(0, 0);
         this.container.add(this.chipsText);
 
+        // Drink counter (right side)
+        this.drinkCountText = this.scene.add.text(pw / 2 - 16, -ph / 2 + 74, '', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#6a5030',
+        }).setOrigin(1, 0);
+        this.container.add(this.drinkCountText);
+
+        // Today's Special banner
+        const specName = this.drinks[this.specialIdx].name;
+        const specBanner = this.scene.add.text(0, -ph / 2 + 90, `✨ Today's Special: ${specName} (half price!)`, {
+            fontFamily: 'monospace', fontSize: '10px', color: '#c9a84c',
+        }).setOrigin(0.5);
+        this.container.add(specBanner);
+
         // Drink buttons
-        const startY = -ph / 2 + 98;
-        const bh = 42;
-        const gap = 6;
+        const startY = -ph / 2 + 108;
+        const bh = 36;
+        const gap = 4;
+        const DISABLED_COLOR = 0x0d0804;
+        const PRESSED_COLOR  = 0x1a0c02;
 
-        DRINKS.forEach((drink, i) => {
+        this.drinks.forEach((drink, i) => {
             const by = startY + i * (bh + gap) + bh / 2;
+            const isSpecial = i === this.specialIdx;
 
-            const rect = this.scene.add.rectangle(0, by, pw - 60, bh, 0x2a1505, 1)
-                .setStrokeStyle(1, 0x5a3010, 1)
+            const baseColor  = isSpecial ? 0x2a2005 : 0x2a1505;
+            const hoverColor = isSpecial ? 0x4a3510 : 0x3a2010;
+            const borderCol  = isSpecial ? 0x9a7a10 : 0x5a3010;
+
+            const rect = this.scene.add.rectangle(0, by, pw - 60, bh, baseColor, 1)
+                .setStrokeStyle(isSpecial ? 2 : 1, borderCol, 1)
                 .setInteractive({ useHandCursor: true });
 
-            const nameLabel = this.scene.add.text(-pw / 2 + 50, by - 9, `${drink.emoji}  ${drink.name}`, {
-                fontFamily: 'monospace', fontSize: '13px', color: '#d4b070',
+            const nameLabel = this.scene.add.text(-pw / 2 + 46, by - 8, `${drink.emoji}  ${drink.name}`, {
+                fontFamily: 'monospace', fontSize: '12px',
+                color: isSpecial ? '#e0c060' : '#d4b070',
             }).setOrigin(0, 0.5);
 
-            const costLabel = this.scene.add.text(pw / 2 - 70, by, drink.cost === 0 ? 'FREE' : `${drink.cost}◈`, {
-                fontFamily: 'monospace', fontSize: '12px', color: drink.cost === 0 ? '#2ecc71' : '#c9a84c',
+            const costStr = drink.baseCost === 0 ? 'FREE' : `${drink.baseCost}◈`;
+            const costColor = drink.baseCost === 0 ? '#2ecc71' : (isSpecial ? '#e0c060' : '#c9a84c');
+            const costLabel = this.scene.add.text(pw / 2 - 62, by, costStr, {
+                fontFamily: 'monospace', fontSize: '11px', color: costColor,
             }).setOrigin(0.5);
 
-            const descLabel = this.scene.add.text(-pw / 2 + 50, by + 9, `"${drink.flavor}"`, {
-                fontFamily: 'monospace', fontSize: '10px', color: '#705030',
+            let descStr = `"${drink.flavor}"`;
+            if (drink.oncePerSession) descStr += '  [once/session]';
+            const descLabel = this.scene.add.text(-pw / 2 + 46, by + 9, descStr, {
+                fontFamily: 'monospace', fontSize: '9px', color: isSpecial ? '#907040' : '#705030',
                 fontStyle: 'italic',
             }).setOrigin(0, 0.5);
 
-            rect.on('pointerover', () => rect.setFillStyle(0x3a2010));
-            rect.on('pointerout',  () => rect.setFillStyle(0x2a1505));
-            rect.on('pointerdown', () => { rect.setFillStyle(0x1a0c02); this.orderDrink(drink); });
-            rect.on('pointerup',   () => rect.setFillStyle(0x3a2010));
+            rect.on('pointerover', () => {
+                if (!this.isDisabled(drink)) rect.setFillStyle(hoverColor);
+            });
+            rect.on('pointerout', () => {
+                rect.setFillStyle(this.isDisabled(drink) ? DISABLED_COLOR : baseColor);
+            });
+            rect.on('pointerdown', () => {
+                if (!this.isDisabled(drink)) {
+                    rect.setFillStyle(PRESSED_COLOR);
+                    this.orderDrink(drink, nameLabel, costLabel);
+                }
+            });
+            rect.on('pointerup', () => {
+                if (!this.isDisabled(drink)) rect.setFillStyle(hoverColor);
+            });
 
             this.container.add([rect, nameLabel, descLabel, costLabel]);
         });
 
+        // Gambling Tip button
+        const tipY = startY + ALL_DRINKS.length * (bh + gap) + bh / 2 + 6;
+        const tipRect = this.scene.add.rectangle(0, tipY, pw - 60, 26, 0x0a1a0a, 1)
+            .setStrokeStyle(1, 0x2a4a1a, 1)
+            .setInteractive({ useHandCursor: true });
+        const tipLabel = this.scene.add.text(0, tipY, '🎲  Ask for a gambling tip  (free)', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#3a7a3a',
+        }).setOrigin(0.5);
+        tipRect.on('pointerover', () => tipRect.setFillStyle(0x1a2a1a));
+        tipRect.on('pointerout',  () => tipRect.setFillStyle(0x0a1a0a));
+        tipRect.on('pointerdown', () => { tipRect.setFillStyle(0x081008); this.showGamblingTip(); });
+        tipRect.on('pointerup',   () => tipRect.setFillStyle(0x1a2a1a));
+        this.container.add([tipRect, tipLabel]);
+
         // Status message area
-        const statusY = ph / 2 - 62;
+        const statusY = ph / 2 - 68;
         const statusBg = this.scene.add.rectangle(0, statusY, pw - 40, 30, 0x0d0804, 0.8)
             .setStrokeStyle(1, 0x3a2010, 0.6);
         this.statusText = this.scene.add.text(0, statusY, 'Select a drink...', {
@@ -144,11 +252,11 @@ export class BarPanel {
         this.container.add([statusBg, this.statusText]);
 
         // Close button
-        const closeRect = this.scene.add.rectangle(0, ph / 2 - 26, 120, 28, 0x3a1e1e, 1)
+        const closeRect = this.scene.add.rectangle(0, ph / 2 - 28, 130, 28, 0x3a1e1e, 1)
             .setStrokeStyle(1, 0x8a3a3a, 1)
             .setInteractive({ useHandCursor: true });
-        const closeLabel = this.scene.add.text(0, ph / 2 - 26, 'Leave Bar', {
-            fontFamily: 'monospace', fontSize: '12px', color: '#e05050',
+        const closeLabel = this.scene.add.text(0, ph / 2 - 28, 'Leave Bar  [ESC]', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#e05050',
         }).setOrigin(0.5);
 
         closeRect.on('pointerover', () => closeRect.setFillStyle(0x5a2a2a));
@@ -158,39 +266,94 @@ export class BarPanel {
 
         this.container.add([closeRect, closeLabel]);
 
-        this.scene.input.keyboard!.once('keydown-ESC', () => this.close());
+        // ESC key — use .on() with a stored reference for clean removal
+        this.escHandler = () => this.close();
+        this.scene.input.keyboard!.on('keydown-ESC', this.escHandler);
 
         this.updateChips();
+        this.updateDrinkCount();
+    }
+
+    private isDisabled(drink: DrinkOption): boolean {
+        return !!(drink.oncePerSession && this.usedOnceItems.has(drink.name));
     }
 
     private updateChips(): void {
         this.chipsText.setText(`◈ ${GameState.get().chips.toLocaleString()} chips`);
     }
 
-    private orderDrink(drink: DrinkOption): void {
+    private updateDrinkCount(): void {
+        this.drinkCountText.setText(
+            this.drinksOrdered > 0
+                ? `🍹 ×${this.drinksOrdered} tonight`
+                : '',
+        );
+    }
+
+    private orderDrink(
+        drink: DrinkOption,
+        nameLabel: Phaser.GameObjects.Text,
+        _costLabel: Phaser.GameObjects.Text,
+    ): void {
+        if (this.isDisabled(drink)) return;
+
         const chips = GameState.get().chips;
-        if (drink.cost > chips) {
-            this.statusText.setText(`Need ${drink.cost - chips} more chips!`).setColor('#e74c3c');
+        if (drink.baseCost > chips) {
+            this.statusText.setText(`Need ${drink.baseCost - chips} more chips!`).setColor('#e74c3c');
             return;
         }
 
-        GameState.addChips(-drink.cost);
+        GameState.addChips(-drink.baseCost);
+
+        // Apply bonus chips if any
+        if (drink.bonusChips) {
+            GameState.addChips(drink.bonusChips);
+        }
+
+        if (drink.oncePerSession) {
+            this.usedOnceItems.add(drink.name);
+            nameLabel.setColor('#444444');
+        }
+
+        this.drinksOrdered++;
         this.updateChips();
-        this.statusText.setText(drink.statusMsg).setColor('#c9a84c');
+        this.updateDrinkCount();
+
+        const fullMsg = drink.bonusChips
+            ? `${drink.statusMsg}  +${drink.bonusChips}◈ bonus!`
+            : drink.statusMsg;
+        this.statusText.setText(fullMsg).setColor('#c9a84c');
 
         // Brief scale pop on status text
         this.scene.tweens.add({
             targets: this.statusText,
-            scaleX: 1.04,
-            scaleY: 1.04,
+            scaleX: 1.05,
+            scaleY: 1.05,
             yoyo: true,
-            duration: 100,
+            duration: 110,
+            ease: 'Sine.easeOut',
+            onComplete: () => { this.statusText.setScale(1); },
+        });
+    }
+
+    private showGamblingTip(): void {
+        const tip = GAMBLING_TIPS[Math.floor(Math.random() * GAMBLING_TIPS.length)];
+        this.statusText.setText(tip).setColor('#3a9a3a');
+        this.scene.tweens.add({
+            targets: this.statusText,
+            scaleX: 1.03,
+            scaleY: 1.03,
+            yoyo: true,
+            duration: 120,
             ease: 'Sine.easeOut',
             onComplete: () => { this.statusText.setScale(1); },
         });
     }
 
     private close(): void {
+        if (this.closed) return;
+        this.closed = true;
+        this.scene.input.keyboard!.off('keydown-ESC', this.escHandler);
         this.overlay.destroy();
         this.container.destroy();
         this.onClose();
