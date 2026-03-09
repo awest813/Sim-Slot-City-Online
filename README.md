@@ -16,16 +16,16 @@ This is a **working prototype**. The game client runs fully in the browser. The 
 
 | Feature | Status |
 |---------|--------|
-| Isometric casino lobby | ✅ Renders with floor, props, portals |
+| Name entry screen | ✅ Enter your player name on first load |
+| Isometric casino lobby | ✅ Renders with floor, zones, props |
 | Controllable avatar (WASD / arrow keys) | ✅ Works in solo mode |
 | Depth sorting | ✅ Avatar draws behind/in-front of props correctly |
 | **Slot machine minigame** | ✅ Fully playable — 3 reels, weighted symbols, real chip economy |
-| Local chip balance (localStorage) | ✅ Persists between sessions |
-| Play Solo button (no login required) | ✅ Skips auth entirely |
-| Hotspot interaction `[F]` near slot machines | ✅ Prompts and enters SlotsScene |
-| Login / Register UI | ✅ Renders; requires server to function |
-| Poker room | ✅ Scene exists, visuals render; requires server for gameplay |
-| Bar / lounge room | ✅ Scene exists, visuals render; requires server for gameplay |
+| **Texas Hold'em Poker** | ✅ Fully playable offline vs AI opponents — all betting rounds, showdown |
+| Bar & Lounge | ✅ Order drinks, chip economy |
+| Keyboard shortcuts | ✅ SPACE=spin, F/C/R=fold/call/raise in poker |
+| Free chip reload | ✅ Automatically offered when balance hits zero |
+| Local chip balance | ✅ Persists during session |
 
 ### What requires a running server
 
@@ -53,12 +53,11 @@ This is a **working prototype**. The game client runs fully in the browser. The 
 ## Quick Start — Solo Mode (No Server)
 
 ```bash
-cd slot-city/apps/game-client
 npm install
 npm run dev
 ```
 
-Open **http://localhost:3001** → click **[ Play Solo — No Server ]** → walk around the lobby → approach the slot machines → press **F** to play.
+Open **http://localhost:8080** → enter your name → click **Enter Casino** → walk around the lobby → approach the slot machines → press **E** to play.
 
 That's it. No database, no server, no environment variables needed.
 
@@ -146,30 +145,37 @@ AUDIT.md                     ← Repo truth audit (read this before making big c
 
 ## How to Play Slots
 
-1. Enter solo mode (no server needed) or log in normally
-2. Walk your avatar near the slot machine props in the top-left area of the lobby
-3. When `[F] Play Slots` appears, press **F**
-4. Select your bet (10 / 25 / 50 / 100 chips)
-5. Press **Space** or click **SPIN**
-6. Match symbols on the middle payline to win
+1. Walk your avatar near the slot machine props in the top-left area of the lobby
+2. When `Press E to play slots` appears, press **E**
+3. Select your bet (10 / 25 / 50 / 100 chips)
+4. Press **Space** or click **SPIN**
+5. Match symbols on the middle payline to win
 
 ### Paytable
 
 | Match | Payout |
 |-------|--------|
-| 🍒🍒🍒 | 5× bet |
-| 🍋🍋🍋 | 8× bet |
-| 🍊🍊🍊 | 10× bet |
-| 🔔🔔🔔 | 15× bet |
-| ⭐⭐⭐ | 25× bet |
-| 💎💎💎 | 40× bet |
-| 🎰🎰🎰 | 100× bet |
-| 🍒🍒 (two cherries) | 2× bet |
-| ⭐⭐ (two stars) | 3× bet |
-| 💎💎 (two gems) | 5× bet |
-| 🎰🎰 (two jackpots) | 10× bet |
+| 🍒🍒🍒 | 2× bet |
+| 🍋🍋🍋 | 3× bet |
+| 🍊🍊🍊 | 4× bet |
+| 🍇🍇🍇 | 6× bet |
+| ⭐⭐⭐ | 10× bet |
+| 💎💎💎 | 20× bet |
+| 7️⃣7️⃣7️⃣ | 50× bet |
+| 🍒🍒 (two cherries) | 1× bet (consolation) |
 
-Chip balance is saved to browser localStorage in solo mode.
+Chip balance is tracked in memory during the session.
+
+---
+
+## How to Play Poker
+
+1. Walk toward the green poker table in the top-right Poker Room
+2. When `Press E to join poker table` appears, press **E**
+3. Click an empty seat (costs 500 chips buy-in)
+4. Click **▶ DEAL HAND** to start
+5. Use the action buttons or keyboard shortcuts: **F** = Fold · **C** = Check/Call · **R** = Min-Raise
+6. ESC closes the table (refunds remaining chips)
 
 ---
 

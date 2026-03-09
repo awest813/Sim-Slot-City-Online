@@ -103,6 +103,10 @@ export class PokerPanel {
     private aiTimers: Phaser.Time.TimerEvent[] = [];
     private waitingForAI = false;
     private escKey!: Phaser.Input.Keyboard.Key;
+    private fKey!: Phaser.Input.Keyboard.Key;
+    private cKey!: Phaser.Input.Keyboard.Key;
+    private rKey!: Phaser.Input.Keyboard.Key;
+    private closed = false;
 
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene = scene;
@@ -228,6 +232,14 @@ export class PokerPanel {
 
         this.escKey = this.scene.input.keyboard!.addKey('ESC');
         this.escKey.once('down', () => this.close());
+
+        // Keyboard shortcuts for player actions (active only when it's the player's turn)
+        this.fKey = this.scene.input.keyboard!.addKey('F');
+        this.cKey = this.scene.input.keyboard!.addKey('C');
+        this.rKey = this.scene.input.keyboard!.addKey('R');
+        this.fKey.on('down', () => this.tryKeyAction('fold'));
+        this.cKey.on('down', () => this.tryKeyAction('check_call'));
+        this.rKey.on('down', () => this.tryKeyAction('raise_min'));
 
         this.updateChipsDisplay();
         this.showDealButton(false);
@@ -585,6 +597,12 @@ export class PokerPanel {
             r.on('pointerup',   () => r.setFillStyle(def.fill + 0x101010));
             this.actionArea.add([r, t]);
         });
+
+        // Keyboard shortcut hint
+        const hint = this.scene.add.text(0, 22, 'Keys: F=Fold  C=Check/Call  R=Min-Raise', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#445544',
+        }).setOrigin(0.5);
+        this.actionArea.add(hint);
     }
 
     private hidePlayerActions(): void {
@@ -596,6 +614,30 @@ export class PokerPanel {
         this.hidePlayerActions();
         this.game = processAction(this.game, action, raiseTotal);
         this.afterAction();
+    }
+
+    /** Keyboard-shortcut dispatcher — only fires when it's the player's turn. */
+    private tryKeyAction(type: 'fold' | 'check_call' | 'raise_min'): void {
+        if (!this.game || this.waitingForAI) return;
+        const activePlayer = this.game.players[this.game.activePlayerIdx];
+        if (!activePlayer || activePlayer.isAI || activePlayer.seatId !== this.playerSeatId) return;
+
+        const idx = this.game.players.findIndex(p => p.seatId === this.playerSeatId);
+        const toCall = callAmount(this.game, idx);
+        const canCheck = toCall === 0;
+
+        if (type === 'fold') {
+            this.playerAction('fold');
+        } else if (type === 'check_call') {
+            this.playerAction(canCheck ? 'check' : 'call');
+        } else if (type === 'raise_min') {
+            const raiseMin = this.game.currentBet + this.game.minRaise;
+            const player = this.game.players[idx];
+            const allInTotal = player.chips + player.roundBet;
+            if (player.chips > toCall) {
+                this.playerAction('raise', Math.min(raiseMin, allInTotal));
+            }
+        }
     }
 
     // ── Showdown ──────────────────────────────────────────────────────────────
@@ -616,7 +658,8 @@ export class PokerPanel {
             const gp = this.game.players.find(p => p.seatId === this.playerSeatId);
             if (!gp || gp.chips === 0) {
                 this.setStatus("You're out of chips! Leaving table.", '#e74c3c');
-                this.scene.time.delayedCall(1500, () => this.close());
+                const leaveTimer = this.scene.time.delayedCall(1500, () => this.close());
+                this.aiTimers.push(leaveTimer);
                 return;
             }
             this.setStatus('Press Deal for next hand.', '#6a8a6a');
@@ -748,6 +791,9 @@ export class PokerPanel {
     // ── Close ─────────────────────────────────────────────────────────────────
 
     private close(): void {
+        if (this.closed) return;
+        this.closed = true;
+
         this.aiTimers.forEach(t => t.remove());
 
         // Return remaining chips to GameState
@@ -760,6 +806,9 @@ export class PokerPanel {
         }
 
         this.escKey.destroy();
+        this.fKey.destroy();
+        this.cKey.destroy();
+        this.rKey.destroy();
         this.overlay.destroy();
         this.container.destroy();
         this.onClose();
