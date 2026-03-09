@@ -126,8 +126,7 @@ export class PokerPanel {
         const cy = GAME_HEIGHT / 2;
         const pw = PANEL_W, ph = PANEL_H;
 
-        // Record session starting chips
-        this.sessionStartChips = GameState.get().chips;
+        // sessionStartChips is recorded when the player actually buys in (see joinSeat)
 
         this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.78)
             .setScrollFactor(0).setDepth(DEPTH_PANEL - 1).setInteractive();
@@ -193,11 +192,14 @@ export class PokerPanel {
         }).setOrigin(0, 0.5);
         this.container.add(this.sessionText);
 
-        // Community card placeholder slots
+        // Community card placeholder slots — track in communityCardObjs so they are
+        // properly destroyed and replaced when updateCommunityCards() first runs.
         for (let i = 0; i < 5; i++) {
             const placeholder = this.scene.add.rectangle(COMM_XS[i], COMM_Y, 32, 44, 0x0d2a0d, 1)
                 .setStrokeStyle(1, 0x2a5a2a, 0.6);
-            this.container.add(placeholder);
+            const phContainer = this.scene.add.container(0, 0, [placeholder]);
+            this.communityCardObjs.push(phContainer);
+            this.container.add(phContainer);
         }
 
         // Seat buttons
@@ -405,6 +407,8 @@ export class PokerPanel {
         }
         this.playerSeatId = seatId;
         GameState.addChips(-BUY_IN);
+        // Track session P&L relative to the buy-in amount (not the pre-buy-in wallet balance)
+        this.sessionStartChips = BUY_IN;
         this.updateChipsDisplay();
         this.setStatus(`You joined Seat ${seatId + 1}. Press Deal to start!`, '#c9a84c');
         this.refreshAllSeats();
