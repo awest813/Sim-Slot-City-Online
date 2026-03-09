@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  chips        Int      @default(5000)
+  outfitId     String   @default("default") @map("outfit_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  tournamentEntries TournamentEntry[]
+  leaderboardEntry  LeaderboardEntry?
+  matchHistories    MatchHistory[]
+  sessions          Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Tournament {
+  id                    String           @id @default(cuid())
+  name                  String
+  buyIn                 Int              @map("buy_in")
+  maxPlayers            Int              @map("max_players")
+  prizePool             Int              @default(0) @map("prize_pool")
+  status                TournamentStatus @default(WAITING_FOR_PLAYERS)
+  blindIncreaseMinutes  Int              @default(15) @map("blind_increase_minutes")
+  startTime             DateTime?        @map("start_time")
+  endTime               DateTime?        @map("end_time")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  entries TournamentEntry[]
+
+  @@map("tournaments")
+}
+
+enum TournamentStatus {
+  WAITING_FOR_PLAYERS
+  STARTING
+  RUNNING
+  FINAL_TABLE
+  FINISHED
+}
+
+model TournamentEntry {
+  id           String   @id @default(cuid())
+  tournamentId String   @map("tournament_id")
+  userId       String   @map("user_id")
+  chips        Int      @default(0)
+  place        Int?
+  isEliminated Boolean  @default(false) @map("is_eliminated")
+  registeredAt DateTime @default(now()) @map("registered_at")
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@map("tournament_entries")
+}
+
+model MatchHistory {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  roomType    String   @map("room_type")
+  chipsWon    Int      @default(0) @map("chips_won")
+  chipsLost   Int      @default(0) @map("chips_lost")
+  result      String?
+  metadata    Json?
+  playedAt    DateTime @default(now()) @map("played_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("match_histories")
+}
+
+model LeaderboardEntry {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+  totalChipsWon   Int      @default(0) @map("total_chips_won")
+  tournamentWins  Int      @default(0) @map("tournament_wins")
+  gamesPlayed     Int      @default(0) @map("games_played")
+  bestFinish      Int?     @map("best_finish")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("leaderboard_entries")
+}
