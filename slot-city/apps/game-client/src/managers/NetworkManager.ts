@@ -122,6 +122,10 @@ class NetworkManager {
   }
 
   logout(): void {
+    if (this.currentRoom) {
+      this.currentRoom.leave().catch(() => {});
+      this.currentRoom = null;
+    }
     this.token = null;
     this.user = null;
     this.guestMode = false;
@@ -129,6 +133,7 @@ class NetworkManager {
   }
 
   async joinRoom(roomType: string): Promise<Colyseus.Room> {
+    if (this.guestMode) throw new Error("Server rooms are not available in Solo Mode");
     if (!this.token) throw new Error("Not authenticated");
 
     if (this.currentRoom) {
@@ -142,6 +147,7 @@ class NetworkManager {
   }
 
   async joinRoomById(roomId: string): Promise<Colyseus.Room> {
+    if (this.guestMode) throw new Error("Server rooms are not available in Solo Mode");
     if (!this.token) throw new Error("Not authenticated");
 
     if (this.currentRoom) {

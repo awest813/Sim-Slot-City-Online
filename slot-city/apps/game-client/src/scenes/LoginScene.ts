@@ -8,6 +8,8 @@ export class LoginScene extends Phaser.Scene {
   private passwordInput!: HTMLInputElement;
   private statusText!: Phaser.GameObjects.Text;
   private modeBtn!: Phaser.GameObjects.Text;
+  private formTitle!: Phaser.GameObjects.Text;
+  private submitBtn!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: "LoginScene" });
@@ -49,7 +51,7 @@ export class LoginScene extends Phaser.Scene {
       .strokeRoundedRect(panelX, panelY, 320, 260, 12);
 
     // Form title
-    this.add.text(width / 2, panelY + 24, "LOGIN", {
+    this.formTitle = this.add.text(width / 2, panelY + 24, "LOGIN", {
       fontSize: "18px",
       color: "#ffd700",
       fontFamily: "monospace",
@@ -60,7 +62,7 @@ export class LoginScene extends Phaser.Scene {
     this.passwordInput = this.createInput("password", "Password", width / 2, panelY + 130);
 
     // Submit button
-    const submitBtn = this.add.text(width / 2, panelY + 185, "[ LOGIN ]", {
+    this.submitBtn = this.add.text(width / 2, panelY + 185, "[ LOGIN ]", {
       fontSize: "18px",
       color: "#ffd700",
       stroke: "#000",
@@ -68,9 +70,9 @@ export class LoginScene extends Phaser.Scene {
       fontFamily: "monospace",
     }).setOrigin(0.5).setInteractive({ cursor: "pointer" });
 
-    submitBtn.on("pointerover", () => submitBtn.setColor("#ffffff"));
-    submitBtn.on("pointerout", () => submitBtn.setColor("#ffd700"));
-    submitBtn.on("pointerdown", () => this.handleSubmit());
+    this.submitBtn.on("pointerover", () => this.submitBtn.setColor("#ffffff"));
+    this.submitBtn.on("pointerout", () => this.submitBtn.setColor("#ffd700"));
+    this.submitBtn.on("pointerdown", () => this.handleSubmit());
 
     // Mode toggle
     this.modeBtn = this.add.text(width / 2, panelY + 225, "No account? Register →", {
@@ -216,10 +218,10 @@ export class LoginScene extends Phaser.Scene {
 
   private toggleMode(): void {
     this.mode = this.mode === "login" ? "register" : "login";
-    this.modeBtn.setText(
-      this.mode === "login" ? "No account? Register →" : "← Back to Login",
-    );
-    // Update form title
+    const isLogin = this.mode === "login";
+    this.modeBtn.setText(isLogin ? "No account? Register →" : "← Back to Login");
+    this.formTitle.setText(isLogin ? "LOGIN" : "REGISTER");
+    this.submitBtn.setText(isLogin ? "[ LOGIN ]" : "[ REGISTER ]");
     this.statusText.setText("");
   }
 
@@ -232,7 +234,9 @@ export class LoginScene extends Phaser.Scene {
       return;
     }
 
-    this.statusText.setColor("#aaaaaa").setText("Connecting...");
+    this.statusText.setColor("#aaaaaa").setText(
+      this.mode === "register" ? "Creating account..." : "Signing in...",
+    );
 
     try {
       if (this.mode === "register") {

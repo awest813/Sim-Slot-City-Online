@@ -77,6 +77,10 @@ export class PokerRoomScene extends Phaser.Scene {
       this.room = await networkManager.joinRoom(RoomType.POKER);
       this.setupRoomHandlers();
     } catch (err) {
+      const msg = networkManager.isGuestMode()
+        ? "Solo Mode — Poker requires a server. Return to Lobby and play Slots offline."
+        : "Could not connect to poker server. Check connection and try again.";
+      this.statusText.setText(msg).setColor("#ff8844");
       console.error("Failed to join poker room:", err);
     }
   }
@@ -395,20 +399,20 @@ export class PokerRoomScene extends Phaser.Scene {
       }
     }
 
-    // Update player seats
-    const players = (tableState.players as Map<string, PokerPlayerData>) ?? new Map();
-    for (const [, player] of players) {
+    // Update player seats — tableState.players is a Colyseus MapSchema (iterable as [key, value] pairs)
+    const playersMap = tableState.players as Map<string, PokerPlayerData> | null;
+    const playerList: PokerPlayerData[] = playersMap
+      ? Array.from(playersMap.values())
+      : [];
+
+    for (const player of playerList) {
       this.updateSeatDisplay(player, activePlayerSeat);
     }
 
     // Check if it's the human player's turn
-    let isMyTurn = false;
-    for (const [, player] of players) {
-      if (player.playerId === myPlayerId && player.seatIndex === activePlayerSeat) {
-        isMyTurn = true;
-        break;
-      }
-    }
+    const isMyTurn = playerList.some(
+      (p) => p.playerId === myPlayerId && p.seatIndex === activePlayerSeat,
+    );
 
     this.actionButtons.forEach((btn) => btn.setVisible(isMyTurn));
     if (!isMyTurn) this.hideRaisePanel();
@@ -420,11 +424,9 @@ export class PokerRoomScene extends Phaser.Scene {
       (gameState === PokerGameState.SHOWDOWN || gameState === PokerGameState.END_ROUND) &&
       lastWinnerId
     ) {
-      const winnerPlayer = players instanceof Map
-        ? [...players.values()].find((p) => p.playerId === lastWinnerId)
-        : undefined;
+      const winnerPlayer = playerList.find((p) => p.playerId === lastWinnerId);
       const winnerName = winnerPlayer ? winnerPlayer.username : lastWinnerId;
-      this.winnerText.setText(`🏆 ${winnerName} wins ${lastWinAmount}c!`);
+      this.winnerText.setText(`🏆 ${winnerName} wins ${lastWinAmount} chips!`);
       this.winnerText.setVisible(true);
       // Auto-hide after 4 seconds
       this.time.delayedCall(4000, () => this.winnerText.setVisible(false));

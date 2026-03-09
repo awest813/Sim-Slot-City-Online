@@ -106,6 +106,7 @@ export class SlotsScene extends Phaser.Scene {
 
     // Keyboard shortcuts
     this.input.keyboard?.on("keydown-SPACE", () => this.spinReels());
+    this.input.keyboard?.on("keydown-ENTER", () => this.spinReels());
     this.input.keyboard?.on("keydown-ESC",   () => this.returnToLobby());
   }
 
@@ -266,7 +267,7 @@ export class SlotsScene extends Phaser.Scene {
     g.lineStyle(3, 0xff4444, 1);
     g.strokeRoundedRect(cx - 90, y, 180, 46, 12);
 
-    this.spinBtn = this.add.text(cx, y + 23, "SPIN  [ Space ]", {
+    this.spinBtn = this.add.text(cx, y + 23, "SPIN  [ Space / Enter ]", {
       fontSize: "15px",
       color: "#ffffff",
       stroke: "#000000",
@@ -284,14 +285,14 @@ export class SlotsScene extends Phaser.Scene {
   private drawPaytable(cx: number, y: number): void {
     const entries = SYMBOLS.map(s => `${s.emoji}×3=${s.payout3}x`).join("  ");
     this.add.text(cx, y, entries, {
-      fontSize: "9px",
-      color: "#664488",
+      fontSize: "11px",
+      color: "#8855aa",
       fontFamily: "monospace",
     }).setOrigin(0.5);
 
-    this.add.text(cx, y + 14, "🍒×2=2x  ⭐×2=3x  💎×2=5x  🎰×2=10x  |  payline = middle row", {
-      fontSize: "9px",
-      color: "#443355",
+    this.add.text(cx, y + 16, "🍒×2=2x  ⭐×2=3x  💎×2=5x  🎰×2=10x  |  payline = middle row", {
+      fontSize: "10px",
+      color: "#554466",
       fontFamily: "monospace",
     }).setOrigin(0.5);
   }
@@ -332,6 +333,9 @@ export class SlotsScene extends Phaser.Scene {
 
     if (this.chips < this.bet) {
       this.showResult("Not enough chips!", false);
+      // Flash chip counter red to draw attention
+      this.chipsText.setColor("#ff4444");
+      this.time.delayedCall(600, () => this.chipsText.setColor("#ffd700"));
       return;
     }
 
@@ -350,10 +354,10 @@ export class SlotsScene extends Phaser.Scene {
     );
 
     // Build full 3-row final state per reel (payline = middle row)
-    const finalRows: number[][] = paylineSymbols.map(mid => [
-      this.strips[0][Math.floor(Math.random() * this.strips[0].length)],
+    const finalRows: number[][] = paylineSymbols.map((mid, r) => [
+      this.strips[r][Math.floor(Math.random() * this.strips[r].length)],
       mid,
-      this.strips[0][Math.floor(Math.random() * this.strips[0].length)],
+      this.strips[r][Math.floor(Math.random() * this.strips[r].length)],
     ]);
 
     const STOP_DELAYS = [900, 1400, 1900]; // ms; staggered reel stop
@@ -430,7 +434,7 @@ export class SlotsScene extends Phaser.Scene {
       this.chips += winAmount;
       this.updateChipsDisplay();
       localStore.adjustChips(winAmount);
-      this.flashWin(payline[1] === 6 /* jackpot */);
+      this.flashWin(SYMBOLS[payline[1]].name === "jackpot");
     }
 
     this.showResult(msg, winAmount > 0);

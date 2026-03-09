@@ -40,6 +40,9 @@ export class BarRoomScene extends Phaser.Scene {
       this.room = await networkManager.joinRoom(RoomType.BAR);
       this.setupRoomHandlers();
     } catch (err) {
+      if (networkManager.isGuestMode()) {
+        this.tournamentBoard.setText("Solo Mode — no live tournaments");
+      }
       console.error("Failed to join bar room:", err);
     }
   }
@@ -159,7 +162,7 @@ export class BarRoomScene extends Phaser.Scene {
       fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 15);
 
-    this.tournamentBoard = this.add.text(x, y - 48, "Loading...", {
+    this.tournamentBoard = this.add.text(x, y - 48, "No active tournaments", {
       fontSize: "6px",
       color: "#aaaaaa",
       fontFamily: "monospace",
