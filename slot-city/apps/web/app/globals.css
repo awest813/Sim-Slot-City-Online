@@ -1,0 +1,127 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Courier New', monospace;
+  background: #0a0a1a;
+  color: #ffffff;
+  min-height: 100vh;
+}
+
+a {
+  color: #4488ff;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #88bbff;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.card {
+  background: #111133;
+  border: 1px solid #334488;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 24px;
+  background: #1a1a4e;
+  border: 1px solid #4488ff;
+  color: #4488ff;
+  font-family: monospace;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  background: #4488ff;
+  color: #ffffff;
+}
+
+.btn-gold {
+  border-color: #ffd700;
+  color: #ffd700;
+}
+
+.btn-gold:hover {
+  background: #ffd700;
+  color: #000000;
+}
+
+nav {
+  background: #050515;
+  border-bottom: 1px solid #1a1a4e;
+  padding: 12px 0;
+}
+
+nav .nav-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+nav .logo {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffd700;
+  margin-right: auto;
+}
+
+.chip {
+  display: inline-block;
+  background: #1a3300;
+  border: 1px solid #44aa00;
+  color: #88ff44;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #1a1a4e;
+}
+
+th {
+  color: #888888;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+tr:hover td {
+  background: #0d0d2e;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.badge-green { background: #0a3300; color: #44ff88; border: 1px solid #228844; }
+.badge-yellow { background: #332200; color: #ffd700; border: 1px solid #886600; }
+.badge-blue { background: #001133; color: #4488ff; border: 1px solid #224488; }
+.badge-gray { background: #1a1a1a; color: #888888; border: 1px solid #333; }

@@ -1,0 +1,10 @@
+{
+  "preset": "ts-jest",
+  "testEnvironment": "node",
+  "roots": ["<rootDir>/src"],
+  "testMatch": ["**/*.test.ts", "**/*.spec.ts"],
+  "collectCoverageFrom": ["src/**/*.ts", "!src/index.ts"],
+  "moduleNameMapper": {
+    "^@slot-city/shared$": "<rootDir>/../../packages/shared/src/index.ts"
+  }
+}

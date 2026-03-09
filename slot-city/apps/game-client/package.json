@@ -1,0 +1,20 @@
+{
+  "name": "@slot-city/game-client",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite --config vite.config.ts --port 3001",
+    "build": "tsc && vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts"
+  },
+  "dependencies": {
+    "@slot-city/shared": "*",
+    "colyseus.js": "^0.15.0",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "~5.7.2",
+    "vite": "^6.3.1"
+  }
+}

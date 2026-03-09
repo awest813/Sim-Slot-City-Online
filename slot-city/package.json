@@ -1,0 +1,28 @@
+{
+  "name": "slot-city",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:client": "npm run dev --workspace=apps/game-client",
+    "dev:server": "npm run dev --workspace=apps/game-server",
+    "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/web && npm run build --workspace=apps/game-client && npm run build --workspace=apps/game-server",
+    "test": "npm run test --workspace=apps/game-server",
+    "db:migrate": "npx prisma migrate dev --schema=prisma/schema.prisma",
+    "db:generate": "npx prisma generate --schema=prisma/schema.prisma",
+    "db:studio": "npx prisma studio --schema=prisma/schema.prisma"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prisma": "^5.22.0",
+    "typescript": "~5.7.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
+  }
+}
