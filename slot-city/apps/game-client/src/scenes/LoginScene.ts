@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { networkManager } from "../managers/NetworkManager";
+import { localStore } from "../store/LocalStore";
 
 export class LoginScene extends Phaser.Scene {
   private mode: "login" | "register" = "login";
@@ -84,6 +85,72 @@ export class LoginScene extends Phaser.Scene {
     this.statusText = this.add.text(width / 2, panelY + 250, "", {
       fontSize: "11px",
       color: "#ff4444",
+      fontFamily: "monospace",
+    }).setOrigin(0.5);
+
+    // ── Solo / Offline Mode ──────────────────────────────────────
+    const dividerY = panelY + 300;
+    this.add.text(width / 2, dividerY, "────── or ──────", {
+      fontSize: "11px",
+      color: "#333355",
+      fontFamily: "monospace",
+    }).setOrigin(0.5);
+
+    this.add.text(width / 2, dividerY + 22, "Play without an account:", {
+      fontSize: "11px",
+      color: "#888888",
+      fontFamily: "monospace",
+    }).setOrigin(0.5);
+
+    // Guest name input
+    const saved = localStore.load();
+    const guestInput = document.createElement("input");
+    guestInput.type = "text";
+    guestInput.placeholder = "Enter a name…";
+    guestInput.value = saved.username !== "Guest" ? saved.username : "";
+    guestInput.maxLength = 20;
+    guestInput.style.cssText = `
+      position: absolute;
+      left: ${width / 2 - 90}px;
+      top: ${dividerY + 42}px;
+      width: 180px;
+      height: 28px;
+      background: #0d0d2e;
+      border: 1px solid #334488;
+      color: #ffffff;
+      font-family: monospace;
+      font-size: 13px;
+      padding: 2px 8px;
+      outline: none;
+      border-radius: 4px;
+      box-sizing: border-box;
+    `;
+    guestInput.addEventListener("focus", () => { guestInput.style.borderColor = "#aa00ff"; });
+    guestInput.addEventListener("blur",  () => { guestInput.style.borderColor = "#334488"; });
+    document.body.appendChild(guestInput);
+    // Track for cleanup
+    (this as unknown as { _guestInput: HTMLInputElement })._guestInput = guestInput;
+
+    const soloBtn = this.add.text(width / 2, dividerY + 86, "[ Play Solo — No Server ]", {
+      fontSize: "13px",
+      color: "#aa00ff",
+      stroke: "#000",
+      strokeThickness: 2,
+      fontFamily: "monospace",
+    }).setOrigin(0.5).setInteractive({ cursor: "pointer" });
+
+    soloBtn.on("pointerover", () => soloBtn.setColor("#ff00ff"));
+    soloBtn.on("pointerout",  () => soloBtn.setColor("#aa00ff"));
+    soloBtn.on("pointerdown", () => {
+      const name = guestInput.value.trim() || "Guest";
+      networkManager.setGuestUser(name);
+      this.cleanupAllInputs();
+      this.scene.start("CasinoLobbyScene");
+    });
+
+    this.add.text(width / 2, dividerY + 108, "5,000 chips · no persistence · no multiplayer", {
+      fontSize: "9px",
+      color: "#333355",
       fontFamily: "monospace",
     }).setOrigin(0.5);
 
@@ -173,7 +240,7 @@ export class LoginScene extends Phaser.Scene {
       } else {
         await networkManager.login(username, password);
       }
-      this.cleanup();
+      this.cleanupAllInputs();
       this.scene.start("CasinoLobbyScene");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error";
@@ -190,7 +257,15 @@ export class LoginScene extends Phaser.Scene {
     }
   }
 
-  shutdown(): void {
+  private cleanupAllInputs(): void {
     this.cleanup();
+    const gi = (this as unknown as { _guestInput?: HTMLInputElement })._guestInput;
+    if (gi?.parentNode) {
+      document.body.removeChild(gi);
+    }
+  }
+
+  shutdown(): void {
+    this.cleanupAllInputs();
   }
 }
