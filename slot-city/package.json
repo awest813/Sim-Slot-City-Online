@@ -12,6 +12,7 @@
     "dev:client": "npm run dev --workspace=apps/game-client",
     "dev:server": "npm run dev --workspace=apps/game-server",
     "build": "npm run build --workspace=packages/shared && npm run build --workspace=apps/web && npm run build --workspace=apps/game-client && npm run build --workspace=apps/game-server",
+    "pretest": "npm run build --workspace=packages/shared",
     "test": "npm run test --workspace=apps/game-server",
     "db:migrate": "npx prisma migrate dev --schema=prisma/schema.prisma",
     "db:generate": "npx prisma generate --schema=prisma/schema.prisma",
