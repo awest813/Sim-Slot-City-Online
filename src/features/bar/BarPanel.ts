@@ -128,7 +128,8 @@ export class BarPanel {
 
             rect.on('pointerover', () => rect.setFillStyle(0x3a2010));
             rect.on('pointerout',  () => rect.setFillStyle(0x2a1505));
-            rect.on('pointerdown', () => this.orderDrink(drink));
+            rect.on('pointerdown', () => { rect.setFillStyle(0x1a0c02); this.orderDrink(drink); });
+            rect.on('pointerup',   () => rect.setFillStyle(0x3a2010));
 
             this.container.add([rect, nameLabel, descLabel, costLabel]);
         });
@@ -152,7 +153,8 @@ export class BarPanel {
 
         closeRect.on('pointerover', () => closeRect.setFillStyle(0x5a2a2a));
         closeRect.on('pointerout',  () => closeRect.setFillStyle(0x3a1e1e));
-        closeRect.on('pointerdown', () => this.close());
+        closeRect.on('pointerdown', () => { closeRect.setFillStyle(0x2a0a0a); this.close(); });
+        closeRect.on('pointerup',   () => closeRect.setFillStyle(0x5a2a2a));
 
         this.container.add([closeRect, closeLabel]);
 
@@ -168,7 +170,7 @@ export class BarPanel {
     private orderDrink(drink: DrinkOption): void {
         const chips = GameState.get().chips;
         if (drink.cost > chips) {
-            this.statusText.setText('Not enough chips!').setColor('#e74c3c');
+            this.statusText.setText(`Need ${drink.cost - chips} more chips!`).setColor('#e74c3c');
             return;
         }
 
@@ -176,14 +178,15 @@ export class BarPanel {
         this.updateChips();
         this.statusText.setText(drink.statusMsg).setColor('#c9a84c');
 
-        // Flash
+        // Brief scale pop on status text
         this.scene.tweens.add({
             targets: this.statusText,
-            alpha: 0,
+            scaleX: 1.04,
+            scaleY: 1.04,
             yoyo: true,
-            duration: 120,
-            repeat: 1,
-            onComplete: () => this.statusText.setAlpha(1),
+            duration: 100,
+            ease: 'Sine.easeOut',
+            onComplete: () => { this.statusText.setScale(1); },
         });
     }
 

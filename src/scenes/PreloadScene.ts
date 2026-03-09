@@ -24,7 +24,7 @@ export class PreloadScene extends Phaser.Scene {
 
         // Progress bar
         const barW = 320;
-        const barH = 12;
+        const barH = 20;
         const barX = cx - barW / 2;
         const barY = cy + 20;
 
@@ -39,7 +39,7 @@ export class PreloadScene extends Phaser.Scene {
             bar.fillRect(barX + 1, barY + 1, Math.max(0, (barW - 2) * v), barH - 2);
         });
 
-        this.add.text(cx, barY + 26, 'Loading...', {
+        this.add.text(cx, barY + barH + 14, 'Preparing casino floor...', {
             fontFamily: 'monospace', fontSize: '11px', color: '#666666',
         }).setOrigin(0.5);
 

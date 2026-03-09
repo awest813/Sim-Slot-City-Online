@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { INTERACT_RADIUS, DEPTH_OVERLAY, COL_UI_BG, COL_UI_BORDER, TEXT_SM } from '../../game/constants';
+import { INTERACT_RADIUS, DEPTH_OVERLAY, COL_UI_BORDER, TEXT_SM } from '../../game/constants';
 
 export interface Hotspot {
     id: string;
@@ -25,26 +25,29 @@ export class InteractionSystem {
     }
 
     private buildPromptUI(): void {
-        const pw = 220;
-        const ph = 28;
+        const pw = 240;
+        const ph = 32;
         const px = this.scene.scale.width / 2;
         const py = this.scene.scale.height - 52;
 
-        this.promptBg = this.scene.add.rectangle(px, py, pw, ph, COL_UI_BG, 0.92)
+        this.promptBg = this.scene.add.rectangle(px, py, pw, ph, 0x000000, 0.85)
             .setScrollFactor(0)
             .setDepth(DEPTH_OVERLAY)
-            .setVisible(false);
+            .setVisible(false)
+            .setAlpha(0);
 
         this.promptBg.setStrokeStyle(1, COL_UI_BORDER, 1);
 
         this.promptText = this.scene.add.text(px, py, '', {
             ...TEXT_SM,
-            color: '#c9a84c',
+            color: '#e8d48a',
+            fontSize: '12px',
         })
             .setOrigin(0.5)
             .setScrollFactor(0)
             .setDepth(DEPTH_OVERLAY + 1)
-            .setVisible(false);
+            .setVisible(false)
+            .setAlpha(0);
     }
 
     register(hotspot: Hotspot): void {
@@ -76,9 +79,23 @@ export class InteractionSystem {
                 this.promptText.setText(nearest.label);
                 this.promptBg.setVisible(true);
                 this.promptText.setVisible(true);
+                this.scene.tweens.add({
+                    targets: [this.promptBg, this.promptText],
+                    alpha: 1,
+                    duration: 180,
+                    ease: 'Sine.easeOut',
+                });
             } else {
-                this.promptBg.setVisible(false);
-                this.promptText.setVisible(false);
+                this.scene.tweens.add({
+                    targets: [this.promptBg, this.promptText],
+                    alpha: 0,
+                    duration: 160,
+                    ease: 'Sine.easeIn',
+                    onComplete: () => {
+                        this.promptBg.setVisible(false);
+                        this.promptText.setVisible(false);
+                    },
+                });
             }
         }
 

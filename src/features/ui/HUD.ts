@@ -19,6 +19,7 @@ export class HUD {
     private chipsText!: Phaser.GameObjects.Text;
     private zoneText!: Phaser.GameObjects.Text;
     private unsub!: () => void;
+    private prevChips: number = -1;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
@@ -63,13 +64,25 @@ export class HUD {
             .setOrigin(1, 0.5);
 
         this.unsub = GameState.subscribe(s => this.refresh(s));
-        this.refresh(GameState.get());
+        const initial = GameState.get();
+        this.prevChips = initial.chips;
+        this.refresh(initial);
     }
 
     private refresh(s: PlayerState): void {
         this.nameText.setText(`★ ${s.displayName}`);
         this.chipsText.setText(`◈ ${s.chips.toLocaleString()} chips`);
         this.zoneText.setText(ZONE_LABELS[s.zone] ?? s.zone);
+
+        // Flash chip counter green on gain, red on loss, then restore
+        if (this.prevChips >= 0 && s.chips !== this.prevChips) {
+            const flashColor = s.chips > this.prevChips ? '#2ecc71' : '#e74c3c';
+            this.chipsText.setColor(flashColor);
+            this.scene.time.delayedCall(600, () => {
+                this.chipsText.setColor('#2ecc71');
+            });
+        }
+        this.prevChips = s.chips;
     }
 
     destroy(): void {
