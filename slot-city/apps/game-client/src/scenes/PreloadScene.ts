@@ -48,7 +48,13 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   async create(): Promise<void> {
-    // Attempt to restore session
+    // If already in guest mode (e.g. returning from SlotsScene), skip validation
+    if (networkManager.getUser()) {
+      this.scene.start("CasinoLobbyScene");
+      return;
+    }
+
+    // Attempt to restore server session from saved token
     const user = await networkManager.validateSession();
 
     if (user) {

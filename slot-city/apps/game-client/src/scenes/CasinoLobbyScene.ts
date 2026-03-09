@@ -5,12 +5,21 @@ import { MovementController } from "../systems/MovementController";
 import { isoToScreen, getDepth } from "../systems/IsoRenderer";
 import { ChatUI } from "../ui/ChatUI";
 import { RoomType, PlayerState, ChatMessage, EmoteType, PlayerDirection } from "@slot-city/shared";
+import { localStore } from "../store/LocalStore";
 
 interface RoomPortal {
   tileX: number;
   tileY: number;
   targetRoom: RoomType;
   label: string;
+}
+
+interface Hotspot {
+  tileX: number;
+  tileY: number;
+  radius: number;
+  promptLabel: string;
+  action: () => void;
 }
 
 const LOBBY_LAYOUT = {
@@ -33,6 +42,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
   private usernameText!: Phaser.GameObjects.Text;
   private connectionStatus!: Phaser.GameObjects.Text;
   private tileGraphics!: Phaser.GameObjects.Graphics;
+  private hotspots: Hotspot[] = [];
+  private interactPrompt!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: "CasinoLobbyScene" });
@@ -45,10 +56,43 @@ export class CasinoLobbyScene extends Phaser.Scene {
       return;
     }
 
+    // Sync chip count from local store if in guest mode (e.g. returning from SlotsScene)
+    if (networkManager.isGuestMode()) {
+      networkManager.syncChipsFromStore();
+      user.chips = localStore.load().chips;
+    }
+
     this.cameras.main.setBackgroundColor(0x0a0a1a);
     this.drawLobbyLayout();
     this.drawPortals();
     this.createHUD(user.username, user.chips);
+    this.setupHotspots();
+
+    // Always create local avatar + movement — works fully offline
+    this.localAvatar = new PlayerAvatar(this, {
+      playerId: user.id,
+      username: user.username,
+      tileX: 8,
+      tileY: 10,
+      isLocalPlayer: true,
+      outfitId: user.outfitId ?? "default",
+    });
+
+    this.movementController = new MovementController(this, this.localAvatar, (msg) => {
+      // Only forward to server if we have a live room connection
+      if (this.room) networkManager.sendMessage(msg);
+    });
+
+    // Floating interact prompt (hidden until near a hotspot)
+    this.interactPrompt = this.add.text(0, 0, "", {
+      fontSize: "12px",
+      color: "#ffd700",
+      stroke: "#000000",
+      strokeThickness: 2,
+      fontFamily: "monospace",
+      backgroundColor: "#00000099",
+      padding: { x: 6, y: 3 },
+    }).setOrigin(0.5, 1).setDepth(1100).setVisible(false);
 
     this.chatUI = new ChatUI(this, {
       x: 10,
@@ -57,25 +101,28 @@ export class CasinoLobbyScene extends Phaser.Scene {
       height: 150,
     });
 
-    this.connectionStatus = this.add.text(10, 10, "Connecting...", {
+    const statusMsg = networkManager.isGuestMode() ? "✈ Solo Mode" : "Connecting...";
+    this.connectionStatus = this.add.text(10, 10, statusMsg, {
       fontSize: "10px",
-      color: "#888888",
+      color: networkManager.isGuestMode() ? "#aa00ff" : "#888888",
       fontFamily: "monospace",
     }).setScrollFactor(0).setDepth(1000);
 
-    try {
-      this.room = await networkManager.joinRoom(RoomType.LOBBY);
-      this.setupRoomHandlers();
-      this.connectionStatus.setText("✅ Connected to Lobby").setColor("#44ff88");
-    } catch (err) {
-      console.error("Failed to join lobby:", err);
-      this.connectionStatus.setText("❌ Connection failed").setColor("#ff4444");
+    // Attempt server connection (non-blocking; solo mode still fully works without it)
+    if (!networkManager.isGuestMode()) {
+      try {
+        this.room = await networkManager.joinRoom(RoomType.LOBBY);
+        this.setupRoomHandlers();
+        this.connectionStatus.setText("✅ Connected to Lobby").setColor("#44ff88");
+      } catch (err) {
+        console.error("Failed to join lobby:", err);
+        this.connectionStatus.setText("✈ Offline Mode").setColor("#888888");
+      }
     }
 
     // Keyboard shortcuts
-    this.input.keyboard?.on("keydown-ESC", () => {
-      this.chatUI?.blur();
-    });
+    this.input.keyboard?.on("keydown-F", () => this.tryInteract());
+    this.input.keyboard?.on("keydown-ESC", () => this.chatUI?.blur());
   }
 
   private drawLobbyLayout(): void {
@@ -339,6 +386,51 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(501);
   }
 
+  private setupHotspots(): void {
+    this.hotspots = [
+      {
+        // Slot machine area: props at tiles [4,2] to [7,2]; interact from in front
+        tileX: 5,
+        tileY: 4,
+        radius: 2,
+        promptLabel: "[F] Play Slots",
+        action: () => this.scene.start("SlotsScene"),
+      },
+    ];
+  }
+
+  private tryInteract(): void {
+    if (!this.localAvatar) return;
+    const ax = this.localAvatar.tileX;
+    const ay = this.localAvatar.tileY;
+    for (const hotspot of this.hotspots) {
+      const dist = Math.abs(ax - hotspot.tileX) + Math.abs(ay - hotspot.tileY);
+      if (dist <= hotspot.radius) {
+        hotspot.action();
+        return;
+      }
+    }
+  }
+
+  private updateInteractPrompt(): void {
+    if (!this.localAvatar) return;
+    const ax = this.localAvatar.tileX;
+    const ay = this.localAvatar.tileY;
+
+    for (const hotspot of this.hotspots) {
+      const dist = Math.abs(ax - hotspot.tileX) + Math.abs(ay - hotspot.tileY);
+      if (dist <= hotspot.radius) {
+        const { x, y } = isoToScreen(ax, ay);
+        this.interactPrompt
+          .setPosition(x, y - 60)
+          .setText(hotspot.promptLabel)
+          .setVisible(true);
+        return;
+      }
+    }
+    this.interactPrompt.setVisible(false);
+  }
+
   private setupRoomHandlers(): void {
     if (!this.room) return;
     const user = networkManager.getUser()!;
@@ -346,18 +438,10 @@ export class CasinoLobbyScene extends Phaser.Scene {
     // Listen for state changes
     this.room.state.players.onAdd((player: PlayerState, playerId: string) => {
       if (playerId === user.id) {
-        this.localAvatar = new PlayerAvatar(this, {
-          playerId,
-          username: player.username,
-          tileX: player.pos?.tileX ?? 8,
-          tileY: player.pos?.tileY ?? 10,
-          isLocalPlayer: true,
-          outfitId: player.outfitId ?? "default",
-        });
-
-        this.movementController = new MovementController(this, this.localAvatar, (msg) => {
-          networkManager.sendMessage(msg);
-        });
+        // Local avatar already created; just snap to server-authoritative position
+        if (this.localAvatar && player.pos) {
+          this.localAvatar.moveTo(player.pos.tileX, player.pos.tileY);
+        }
       } else {
         const avatar = new PlayerAvatar(this, {
           playerId,
@@ -424,18 +508,19 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     this.movementController?.update(_time, delta);
+    this.updateInteractPrompt();
   }
 
   private async enterRoom(roomType: RoomType): Promise<void> {
     const sceneMap: Partial<Record<RoomType, string>> = {
       [RoomType.POKER]: "PokerRoomScene",
       [RoomType.BAR]: "BarRoomScene",
-      [RoomType.BLACKJACK]: "CasinoLobbyScene", // placeholder
+      [RoomType.BLACKJACK]: "CasinoLobbyScene", // stub — not yet implemented
     };
 
     const sceneName = sceneMap[roomType];
     if (sceneName) {
-      await networkManager.leaveRoom();
+      if (this.room) await networkManager.leaveRoom();
       this.cleanup();
       this.scene.start(sceneName);
     }

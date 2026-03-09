@@ -3,6 +3,7 @@ import { BootScene } from "./scenes/BootScene";
 import { PreloadScene } from "./scenes/PreloadScene";
 import { LoginScene } from "./scenes/LoginScene";
 import { CasinoLobbyScene } from "./scenes/CasinoLobbyScene";
+import { SlotsScene } from "./scenes/SlotsScene";
 import { PokerRoomScene } from "./scenes/PokerRoomScene";
 import { BarRoomScene } from "./scenes/BarRoomScene";
 
@@ -12,7 +13,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 768,
   parent: "game-container",
   backgroundColor: "#0a0a1a",
-  scene: [BootScene, PreloadScene, LoginScene, CasinoLobbyScene, PokerRoomScene, BarRoomScene],
+  scene: [BootScene, PreloadScene, LoginScene, CasinoLobbyScene, SlotsScene, PokerRoomScene, BarRoomScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

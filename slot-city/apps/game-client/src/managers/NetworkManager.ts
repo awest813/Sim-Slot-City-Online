@@ -1,6 +1,7 @@
 import Colyseus from "colyseus.js";
 import { SERVER_URL, API_URL } from "../config/constants";
 import { ClientMessage } from "@slot-city/shared";
+import { localStore } from "../store/LocalStore";
 
 export interface AuthUser {
   id: string;
@@ -19,6 +20,7 @@ class NetworkManager {
   private currentRoom: Colyseus.Room | null = null;
   private token: string | null = null;
   private user: AuthUser | null = null;
+  private guestMode = false;
 
   init(): void {
     this.client = new Colyseus.Client(SERVER_URL);
@@ -27,6 +29,34 @@ class NetworkManager {
       this.token = savedToken;
     }
   }
+
+  // ─── Guest / Offline Mode ─────────────────────────────────────────────────
+
+  /** Enter solo mode: sets a local user without hitting the server. */
+  setGuestUser(username: string): void {
+    const saved = localStore.load();
+    localStore.setUsername(username);
+    this.user = {
+      id: "local_player",
+      username,
+      chips: saved.chips,
+      outfitId: "default",
+    };
+    this.guestMode = true;
+  }
+
+  isGuestMode(): boolean {
+    return this.guestMode;
+  }
+
+  /** Re-read chips from localStore into the in-memory user. Call after any scene that modifies chips locally. */
+  syncChipsFromStore(): void {
+    if (this.guestMode && this.user) {
+      this.user.chips = localStore.load().chips;
+    }
+  }
+
+  // ─── Auth ─────────────────────────────────────────────────────────────────
 
   getToken(): string | null {
     return this.token;
@@ -37,7 +67,7 @@ class NetworkManager {
   }
 
   isLoggedIn(): boolean {
-    return !!this.token;
+    return !!this.token || this.guestMode;
   }
 
   async register(username: string, password: string): Promise<AuthResult> {
@@ -73,6 +103,7 @@ class NetworkManager {
   }
 
   async validateSession(): Promise<AuthUser | null> {
+    if (this.guestMode) return this.user;
     if (!this.token) return null;
     try {
       const response = await fetch(`${API_URL}/auth/me`, {
@@ -93,6 +124,7 @@ class NetworkManager {
   logout(): void {
     this.token = null;
     this.user = null;
+    this.guestMode = false;
     localStorage.removeItem("slot_city_token");
   }
 
