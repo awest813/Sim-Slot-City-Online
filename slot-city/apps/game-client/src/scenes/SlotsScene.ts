@@ -64,6 +64,9 @@ export class SlotsScene extends Phaser.Scene {
   private chips = 0;
   private bet = DEFAULT_BET;
   private spinning = false;
+  private sessionStart = 0;   // chips at scene start
+  private spinsThisSession = 0;
+  private winsThisSession  = 0;
 
   // Reel data
   private strips: number[][] = [];
@@ -73,9 +76,11 @@ export class SlotsScene extends Phaser.Scene {
 
   // UI objects
   private chipsText!: Phaser.GameObjects.Text;
+  private sessionText!: Phaser.GameObjects.Text;
   private resultText!: Phaser.GameObjects.Text;
   private spinBtn!: Phaser.GameObjects.Text;
   private betButtons: Phaser.GameObjects.Text[] = [];
+  private topUpBtn!: Phaser.GameObjects.Container;
 
   constructor() {
     super({ key: "SlotsScene" });
@@ -90,6 +95,7 @@ export class SlotsScene extends Phaser.Scene {
       networkManager.syncChipsFromStore();
       this.chips = localStore.load().chips;
     }
+    this.sessionStart = this.chips;
 
     this.strips = Array.from({ length: REEL_COUNT }, () => buildReelStrip());
 
@@ -103,11 +109,14 @@ export class SlotsScene extends Phaser.Scene {
     this.drawBackground(width, height);
     this.drawCabinet(width / 2, height / 2 - 10);
     this.createHUD(width, height);
+    this.buildTopUpButton(width / 2, height / 2 + 220);
 
     // Keyboard shortcuts
     this.input.keyboard?.on("keydown-SPACE", () => this.spinReels());
     this.input.keyboard?.on("keydown-ENTER", () => this.spinReels());
     this.input.keyboard?.on("keydown-ESC",   () => this.returnToLobby());
+
+    this.updateTopUpVisibility();
   }
 
   // ─── Background ─────────────────────────────────────────────────────────────
@@ -317,13 +326,72 @@ export class SlotsScene extends Phaser.Scene {
       fontFamily: "monospace",
     }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(501);
 
-    this.add.text(width - 16, 10, "[ Lobby ]  [ Esc ]", {
+    this.add.text(width - 16, 10, "[ Lobby ]  Esc", {
       fontSize: "12px",
       color: "#4488ff",
       fontFamily: "monospace",
     }).setOrigin(1, 0).setScrollFactor(0).setDepth(501)
       .setInteractive({ cursor: "pointer" })
       .on("pointerdown", () => this.returnToLobby());
+
+    // Session P&L (bottom-right corner)
+    this.sessionText = this.add.text(width - 16, height - 12, "", {
+      fontSize: "10px",
+      color: "#555577",
+      fontFamily: "monospace",
+    }).setOrigin(1, 1).setScrollFactor(0).setDepth(501);
+    this.updateSessionText();
+  }
+
+  // ─── Top-up button (shown when chips < min bet) ──────────────────────────────
+
+  private buildTopUpButton(cx: number, y: number): void {
+    const bg = this.add.graphics();
+    bg.fillStyle(0x002200, 0.9);
+    bg.fillRoundedRect(-130, -18, 260, 36, 8);
+    bg.lineStyle(2, 0x44ff44, 0.8);
+    bg.strokeRoundedRect(-130, -18, 260, 36, 8);
+
+    const lbl = this.add.text(0, 0, "💸 Add 1,000 Chips  [ T ]", {
+      fontSize: "13px", color: "#44ff88", fontFamily: "monospace",
+    }).setOrigin(0.5);
+
+    const zone = this.add.zone(0, 0, 260, 36).setInteractive({ cursor: "pointer" });
+    zone.on("pointerdown", () => this.doTopUp());
+
+    this.topUpBtn = this.add.container(cx, y, [bg, lbl, zone]);
+    this.topUpBtn.setScrollFactor(0).setDepth(510);
+
+    this.input.keyboard?.on("keydown-T", () => this.doTopUp());
+  }
+
+  private doTopUp(): void {
+    const ADD = 1000;
+    this.chips += ADD;
+    localStore.adjustChips(ADD);
+    this.updateChipsDisplay();
+    this.updateTopUpVisibility();
+    this.showResult(`+${ADD.toLocaleString()} chips added!`, true);
+    this.time.delayedCall(1500, () => {
+      if (this.resultText.text === `+${ADD.toLocaleString()} chips added!`) {
+        this.resultText.setText("");
+      }
+    });
+  }
+
+  private updateTopUpVisibility(): void {
+    if (!this.topUpBtn) return;
+    this.topUpBtn.setVisible(this.chips < BET_OPTIONS[0]);
+  }
+
+  private updateSessionText(): void {
+    if (!this.sessionText) return;
+    const pnl = this.chips - this.sessionStart;
+    const sign = pnl >= 0 ? "+" : "";
+    const col = pnl >= 0 ? "#44aa44" : "#aa4444";
+    this.sessionText.setText(
+      `Session: ${this.spinsThisSession} spins | ${this.winsThisSession} wins | P&L: ${sign}${pnl.toLocaleString()}`
+    ).setColor(col);
   }
 
   // ─── Spin logic ──────────────────────────────────────────────────────────────
@@ -332,17 +400,19 @@ export class SlotsScene extends Phaser.Scene {
     if (this.spinning) return;
 
     if (this.chips < this.bet) {
-      this.showResult("Not enough chips!", false);
-      // Flash chip counter red to draw attention
+      this.showResult("Not enough chips! Press T to top up.", false);
       this.chipsText.setColor("#ff4444");
-      this.time.delayedCall(600, () => this.chipsText.setColor("#ffd700"));
+      this.time.delayedCall(800, () => this.chipsText.setColor("#ffd700"));
+      this.updateTopUpVisibility();
       return;
     }
 
     // Deduct bet
     this.chips -= this.bet;
+    this.spinsThisSession++;
     this.updateChipsDisplay();
     localStore.adjustChips(-this.bet);
+    this.updateTopUpVisibility();
 
     this.spinning = true;
     this.spinBtn.setAlpha(0.5);
@@ -431,12 +501,15 @@ export class SlotsScene extends Phaser.Scene {
     }
 
     if (winAmount > 0) {
+      this.winsThisSession++;
       this.chips += winAmount;
       this.updateChipsDisplay();
       localStore.adjustChips(winAmount);
       this.flashWin(SYMBOLS[payline[1]].name === "jackpot");
     }
 
+    this.updateTopUpVisibility();
+    this.updateSessionText();
     this.showResult(msg, winAmount > 0);
   }
 
