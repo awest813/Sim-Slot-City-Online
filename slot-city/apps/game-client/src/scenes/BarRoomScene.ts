@@ -4,6 +4,7 @@ import { PlayerAvatar } from "../systems/PlayerAvatar";
 import { MovementController } from "../systems/MovementController";
 import { isoToScreen, getDepth } from "../systems/IsoRenderer";
 import { ChatUI } from "../ui/ChatUI";
+import { localStore } from "../store/LocalStore";
 import { RoomType, PlayerState, ChatMessage, PlayerDirection } from "@slot-city/shared";
 
 export class BarRoomScene extends Phaser.Scene {
@@ -13,6 +14,8 @@ export class BarRoomScene extends Phaser.Scene {
   private movementController: MovementController | null = null;
   private chatUI: ChatUI | null = null;
   private tournamentBoard!: Phaser.GameObjects.Text;
+  private chipsText!: Phaser.GameObjects.Text;
+  private modeText!: Phaser.GameObjects.Text;
 
   constructor() {
     super({ key: "BarRoomScene" });
@@ -25,9 +28,15 @@ export class BarRoomScene extends Phaser.Scene {
       return;
     }
 
+    // Sync chip count from store in guest mode
+    if (networkManager.isGuestMode()) {
+      networkManager.syncChipsFromStore();
+      user.chips = localStore.load().chips;
+    }
+
     this.cameras.main.setBackgroundColor(0x1a0a05);
     this.drawBarRoom();
-    this.createHUD(user.username);
+    this.createHUD(user.username, user.chips);
 
     this.chatUI = new ChatUI(this, {
       x: 10,
@@ -36,13 +45,33 @@ export class BarRoomScene extends Phaser.Scene {
       height: 140,
     });
 
+    // Always create local avatar & movement — works 100% offline
+    this.localAvatar = new PlayerAvatar(this, {
+      playerId: user.id,
+      username: user.username,
+      tileX: 8,
+      tileY: 7,
+      isLocalPlayer: true,
+      outfitId: user.outfitId ?? "default",
+    });
+
+    this.movementController = new MovementController(this, this.localAvatar, (msg) => {
+      if (this.room) networkManager.sendMessage(msg);
+    });
+
+    if (networkManager.isGuestMode()) {
+      this.tournamentBoard.setText("No live tournaments (Solo Mode)");
+      this.modeText?.setText("✈ Solo Mode").setColor("#aa00ff");
+      return; // Skip server connection in guest mode
+    }
+
     try {
       this.room = await networkManager.joinRoom(RoomType.BAR);
       this.setupRoomHandlers();
+      this.modeText?.setText("✅ Connected").setColor("#44ff88");
     } catch (err) {
-      if (networkManager.isGuestMode()) {
-        this.tournamentBoard.setText("Solo Mode — no live tournaments");
-      }
+      this.tournamentBoard.setText("No live tournaments (offline)");
+      this.modeText?.setText("✈ Offline").setColor("#888888");
       console.error("Failed to join bar room:", err);
     }
   }
@@ -76,7 +105,7 @@ export class BarRoomScene extends Phaser.Scene {
     // Tournament display board
     this.drawTournamentDisplay(g, 13, 3);
 
-    // Back button
+    // Back button (just below HUD bar)
     this.add.text(16, 46, "← Back to Lobby", {
       fontSize: "12px",
       color: "#4488ff",
@@ -84,12 +113,7 @@ export class BarRoomScene extends Phaser.Scene {
     }).setScrollFactor(0).setDepth(502).setInteractive({ cursor: "pointer" })
       .on("pointerdown", () => this.returnToLobby());
 
-    // Room title
-    this.add.text(width / 2, 10, "🍸 The Lucky Lounge", {
-      fontSize: "13px",
-      color: "#ffaa44",
-      fontFamily: "monospace",
-    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(501);
+    this.input.keyboard?.on("keydown-ESC", () => this.returnToLobby());
   }
 
   private drawBarCounter(g: Phaser.GameObjects.Graphics, tx: number, ty: number): void {
@@ -172,7 +196,7 @@ export class BarRoomScene extends Phaser.Scene {
     g.setDepth(getDepth(tx, ty) * 10 + 5);
   }
 
-  private createHUD(username: string): void {
+  private createHUD(username: string, chips: number): void {
     const { width } = this.scale;
 
     this.add.graphics()
@@ -185,6 +209,25 @@ export class BarRoomScene extends Phaser.Scene {
       color: "#ffffff",
       fontFamily: "monospace",
     }).setScrollFactor(0).setDepth(501);
+
+    this.chipsText = this.add.text(200, 10, `💰 ${chips.toLocaleString()} chips`, {
+      fontSize: "13px",
+      color: "#ffd700",
+      fontFamily: "monospace",
+    }).setScrollFactor(0).setDepth(501);
+
+    this.modeText = this.add.text(width - 16, 10, "Connecting...", {
+      fontSize: "10px",
+      color: "#888888",
+      fontFamily: "monospace",
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(501);
+
+    // Back button (placed at y=46 to not overlap mode text)
+    this.add.text(width / 2, 10, "🍸 The Lucky Lounge", {
+      fontSize: "13px",
+      color: "#ffaa44",
+      fontFamily: "monospace",
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(501);
   }
 
   private setupRoomHandlers(): void {
@@ -193,16 +236,10 @@ export class BarRoomScene extends Phaser.Scene {
 
     this.room.state.players?.onAdd((player: PlayerState, playerId: string) => {
       if (playerId === user.id) {
-        this.localAvatar = new PlayerAvatar(this, {
-          playerId,
-          username: player.username,
-          tileX: player.pos?.tileX ?? 8,
-          tileY: player.pos?.tileY ?? 5,
-          isLocalPlayer: true,
-        });
-        this.movementController = new MovementController(this, this.localAvatar, (msg) => {
-          networkManager.sendMessage(msg);
-        });
+        // Local avatar already created offline — just snap to server position
+        if (this.localAvatar && player.pos) {
+          this.localAvatar.moveTo(player.pos.tileX, player.pos.tileY);
+        }
       } else {
         this.remoteAvatars.set(playerId, new PlayerAvatar(this, {
           playerId,

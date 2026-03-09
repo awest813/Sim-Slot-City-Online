@@ -26,9 +26,9 @@ const LOBBY_LAYOUT = {
   width: 20,
   height: 20,
   portals: [
-    { tileX: 16, tileY: 5, targetRoom: RoomType.POKER, label: "🃏 Poker Room" },
-    { tileX: 16, tileY: 12, targetRoom: RoomType.BAR, label: "🍸 Lucky Lounge" },
-    { tileX: 3, tileY: 8, targetRoom: RoomType.BLACKJACK, label: "🎲 Blackjack" },
+    { tileX: 16, tileY: 5,  targetRoom: RoomType.POKER,     label: "🃏 Poker Room"    },
+    { tileX: 16, tileY: 12, targetRoom: RoomType.BAR,       label: "🍸 Lucky Lounge"  },
+    { tileX: 3,  tileY: 8,  targetRoom: RoomType.BLACKJACK, label: "🎰 Slot Machines"  },
   ] as RoomPortal[],
 };
 
@@ -107,6 +107,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
       color: networkManager.isGuestMode() ? "#aa00ff" : "#888888",
       fontFamily: "monospace",
     }).setScrollFactor(0).setDepth(1000);
+
+    // Help hint at bottom
+    this.add.text(width / 2, this.scale.height - 12, "WASD / Arrows: move  |  F: interact  |  Click portals to enter rooms", {
+      fontSize: "9px",
+      color: "#334455",
+      fontFamily: "monospace",
+    }).setOrigin(0.5, 1).setScrollFactor(0).setDepth(1000);
 
     // Attempt server connection (non-blocking; solo mode still fully works without it)
     if (!networkManager.isGuestMode()) {
@@ -393,8 +400,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
         tileX: 5,
         tileY: 4,
         radius: 2,
-        promptLabel: "[F] Play Slots",
-        action: () => this.scene.start("SlotsScene"),
+        promptLabel: "[ F ] Play Slot Machines",
+        action: () => { this.cleanup(); this.scene.start("SlotsScene"); },
       },
     ];
   }
@@ -512,13 +519,24 @@ export class CasinoLobbyScene extends Phaser.Scene {
   }
 
   private async enterRoom(roomType: RoomType): Promise<void> {
+    // BLACKJACK portal re-routed to Slots (Blackjack not yet implemented)
     if (roomType === RoomType.BLACKJACK) {
-      this.showToast("🎲 Blackjack — Coming Soon!");
+      if (this.room) await networkManager.leaveRoom();
+      this.cleanup();
+      this.scene.start("SlotsScene");
+      return;
+    }
+
+    // Poker: use offline scene for guest/solo mode, server scene when connected
+    if (roomType === RoomType.POKER) {
+      const sceneName = networkManager.isGuestMode() ? "OfflinePokerScene" : "PokerRoomScene";
+      if (this.room) await networkManager.leaveRoom();
+      this.cleanup();
+      this.scene.start(sceneName);
       return;
     }
 
     const sceneMap: Partial<Record<RoomType, string>> = {
-      [RoomType.POKER]: "PokerRoomScene",
       [RoomType.BAR]: "BarRoomScene",
     };
 
