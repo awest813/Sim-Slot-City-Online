@@ -10,7 +10,7 @@ import {
     createGame, dealHand, processAction,
     activeSeatId, callAmount,
     cardLabel, isRed,
-    Card,
+    Card, evalBestHand,
 } from './PokerEngine';
 import { getAIDecision } from './PokerAI';
 
@@ -95,6 +95,7 @@ export class PokerPanel {
     private communityCardObjs: Phaser.GameObjects.Container[] = [];
     private playerHandArea!: Phaser.GameObjects.Container;
     private playerHandCards: Phaser.GameObjects.Container[] = [];
+    private handStrengthText!: Phaser.GameObjects.Text;
     private actionArea!: Phaser.GameObjects.Container;
 
     private game!: PokerGameState;
@@ -194,7 +195,10 @@ export class PokerPanel {
         const handLabel = this.scene.add.text(0, -20, 'YOUR HAND', {
             fontFamily: 'monospace', fontSize: '9px', color: '#4a7a4a',
         }).setOrigin(0.5);
-        this.playerHandArea.add(handLabel);
+        this.handStrengthText = this.scene.add.text(0, 30, '', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#c9a84c',
+        }).setOrigin(0.5);
+        this.playerHandArea.add([handLabel, this.handStrengthText]);
         this.container.add(this.playerHandArea);
         this.playerHandArea.setVisible(false);
 
@@ -230,6 +234,21 @@ export class PokerPanel {
     }
 
     // ── Seat Buttons ──────────────────────────────────────────────────────────
+
+    /** Returns 'D', 'SB', or 'BB' if this seat holds that role this hand, else ''. */
+    private getPositionBadge(seatId: number): string {
+        if (!this.game || this.game.phase === 'waiting') return '';
+        const players = this.game.players;
+        const n = players.length;
+        if (n < 2) return '';
+        const di = this.game.dealerIdx;
+        const si = n === 2 ? di : (di + 1) % n;
+        const bi = (si + 1) % n;
+        if (players[di]?.seatId === seatId) return 'D';
+        if (players[si]?.seatId === seatId) return 'SB';
+        if (players[bi]?.seatId === seatId) return 'BB';
+        return '';
+    }
 
     private buildSeatBtn(
         sc: SeatConfig,
@@ -291,6 +310,22 @@ export class PokerPanel {
         }).setOrigin(0.5);
 
         const btn = this.scene.add.container(x, y, [rect, topLabel, midLabel, botLabel]);
+
+        // Dealer / blind position badge
+        const badge = this.getPositionBadge(sc.id);
+        if (badge) {
+            const badgeColors: Record<string, { fill: number; text: string }> = {
+                D:  { fill: 0xc9a84c, text: '#0a0a0a' },
+                SB: { fill: 0x3a5a8a, text: '#c0d8ff' },
+                BB: { fill: 0x3a8a3a, text: '#c0ffc0' },
+            };
+            const bc = badgeColors[badge];
+            const badgeRect = this.scene.add.rectangle(46, -22, 22, 14, bc.fill, 1).setStrokeStyle(0);
+            const badgeText = this.scene.add.text(46, -22, badge, {
+                fontFamily: 'monospace', fontSize: '9px', color: bc.text, fontStyle: 'bold',
+            }).setOrigin(0.5);
+            btn.add([badgeRect, badgeText]);
+        }
 
         // Clickable only for empty non-AI seats while not in a game
         if (!sc.aiName && !isYou && !this.game) {
@@ -389,6 +424,13 @@ export class PokerPanel {
         base.dealerIdx   = prevDealerIdx;
         this.game = dealHand(base);
 
+        // Guard: dealHand may fail if still not enough eligible players
+        if (this.game.phase === 'waiting') {
+            this.setStatus(this.game.statusMessage, '#e74c3c');
+            this.scene.time.delayedCall(2200, () => this.close());
+            return;
+        }
+
         this.showDealButton(false);
         this.playerHandArea.setVisible(true);
         this.refreshAllSeats();
@@ -451,6 +493,7 @@ export class PokerPanel {
         this.updatePot();
         this.updatePhaseLabel();
         this.updateChipsDisplay();
+        this.updateHandStrength();
         this.setStatus(this.game.statusMessage, '#c9a84c');
         this.scheduleNextAction();
     }
@@ -463,46 +506,78 @@ export class PokerPanel {
         const idx = this.game.players.findIndex(p => p.seatId === this.playerSeatId);
         if (idx < 0) return;
 
-        const toCall  = callAmount(this.game, idx);
-        const canCheck = toCall === 0;
-        const player  = this.game.players[idx];
+        const toCall        = callAmount(this.game, idx);
+        const canCheck      = toCall === 0;
+        const player        = this.game.players[idx];
+        const availableChips = player.chips; // chips the player still has in stack
+        const allInTotal    = availableChips + player.roundBet; // total bet amount if going all-in
 
         type BtnDef = { label: string; fill: number; stroke: number; text: string; cb: () => void };
-        const btns: BtnDef[] = [
+
+        // ── Fold + check/call (call is labeled ALL IN when player can't fully cover) ──
+        const row1: BtnDef[] = [
             {
                 label: 'FOLD', fill: 0x3a0a0a, stroke: 0x8a2a2a, text: '#e05050',
                 cb: () => this.playerAction('fold'),
             },
             {
-                label: canCheck ? 'CHECK' : `CALL ${toCall}◈`,
+                label: canCheck
+                    ? 'CHECK'
+                    : (toCall >= availableChips ? `ALL IN ${availableChips}◈` : `CALL ${toCall}◈`),
                 fill: 0x0a2a0a, stroke: 0x2a8a2a, text: '#50e050',
                 cb: () => this.playerAction(canCheck ? 'check' : 'call'),
             },
         ];
 
+        // ── Raise presets: min, 2×, all-in ──
         const raiseMin = this.game.currentBet + this.game.minRaise;
-        if (player.chips > toCall && raiseMin > this.game.currentBet) {
-            btns.push({
-                label: `RAISE ${raiseMin}◈`,
-                fill: 0x2a1a0a, stroke: 0x8a6a2a, text: '#e0c050',
-                cb: () => this.playerAction('raise', raiseMin),
-            });
+        const raise2x  = this.game.currentBet + this.game.minRaise * 2;
+        const canRaise = availableChips > toCall && raiseMin > this.game.currentBet;
+
+        if (canRaise) {
+            // Min raise — only when the player has more chips than needed for min raise
+            if (raiseMin < allInTotal) {
+                row1.push({
+                    label: `MIN ${raiseMin}◈`,
+                    fill: 0x2a1a0a, stroke: 0x8a6a2a, text: '#e0c050',
+                    cb: () => this.playerAction('raise', raiseMin),
+                });
+            }
+            // 2× raise — only when raise2x is affordable without going all-in and distinct from min
+            if (raise2x > raiseMin && raise2x < allInTotal) {
+                row1.push({
+                    label: `2× ${raise2x}◈`,
+                    fill: 0x2a1a0a, stroke: 0x7a5a1a, text: '#d0b040',
+                    cb: () => this.playerAction('raise', raise2x),
+                });
+            }
+            // All-in — always offer when going all-in would be at least a partial raise
+            if (allInTotal > this.game.currentBet) {
+                row1.push({
+                    label: `ALL IN ${availableChips}◈`,
+                    fill: 0x3a0a2a, stroke: 0x9a2a7a, text: '#e050c0',
+                    cb: () => this.playerAction('raise', allInTotal),
+                });
+            }
         }
 
-        const spacing = 130;
-        const startX  = -((btns.length - 1) * spacing) / 2;
+        const ACTION_AREA_WIDTH  = 520;
+        const MAX_BTN_SPACING    = 130;
+        const spacing = Math.min(MAX_BTN_SPACING, ACTION_AREA_WIDTH / Math.max(row1.length, 1));
+        const startX  = -((row1.length - 1) * spacing) / 2;
 
         const turnBanner = this.scene.add.text(0, -22, '— YOUR TURN —', {
             fontFamily: 'monospace', fontSize: '10px', color: '#c9a84c',
         }).setOrigin(0.5);
         this.actionArea.add(turnBanner);
 
-        btns.forEach((def, i) => {
+        row1.forEach((def, i) => {
             const bx = startX + i * spacing;
-            const r  = this.scene.add.rectangle(bx, 0, 118, 30, def.fill, 1)
+            const w  = Math.min(118, spacing - 12);
+            const r  = this.scene.add.rectangle(bx, 0, w, 30, def.fill, 1)
                 .setStrokeStyle(1, def.stroke, 1).setInteractive({ useHandCursor: true });
             const t  = this.scene.add.text(bx, 0, def.label, {
-                fontFamily: 'monospace', fontSize: '11px', color: def.text,
+                fontFamily: 'monospace', fontSize: '10px', color: def.text,
             }).setOrigin(0.5);
             r.on('pointerover', () => r.setFillStyle(def.fill + 0x101010));
             r.on('pointerout',  () => r.setFillStyle(def.fill));
@@ -550,6 +625,8 @@ export class PokerPanel {
             this.clearCommunityCards();
             this.handNumText.setText('');
             this.potText.setText('');
+            this.phaseText.setText('');
+            this.handStrengthText.setText('');
         });
         this.aiTimers.push(t);
     }
@@ -624,6 +701,18 @@ export class PokerPanel {
     }
 
     // ── Display helpers ───────────────────────────────────────────────────────
+
+    private updateHandStrength(): void {
+        if (!this.game || this.playerSeatId === null) {
+            this.handStrengthText.setText(''); return;
+        }
+        const player = this.game.players.find(p => p.seatId === this.playerSeatId);
+        if (!player || player.folded || player.holeCards.length < 2 || this.game.community.length === 0) {
+            this.handStrengthText.setText(''); return;
+        }
+        const { name } = evalBestHand([...player.holeCards, ...this.game.community]);
+        this.handStrengthText.setText(name);
+    }
 
     private updatePot(): void {
         if (!this.game || this.game.pot === 0) { this.potText.setText(''); return; }
