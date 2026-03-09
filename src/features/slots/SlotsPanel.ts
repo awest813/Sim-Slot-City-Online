@@ -20,7 +20,7 @@ const PAYOUTS: Record<string, number> = {
     '💎': 20,
     '7️⃣': 50,
 };
-// Two-of-a-kind cherry = small consolation
+// Two-of-a-kind cherry = small consolation (only when the pair IS cherries)
 const CHERRY_PAIR_PAYOUT = 1;
 
 function weightedRandom(): string {
@@ -48,9 +48,11 @@ export class SlotsPanel {
     private resultText!: Phaser.GameObjects.Text;
     private chipsText!: Phaser.GameObjects.Text;
     private betText!: Phaser.GameObjects.Text;
+    private statsText!: Phaser.GameObjects.Text;
     private spinBtn!: Phaser.GameObjects.Rectangle;
     private spinBtnLabel!: Phaser.GameObjects.Text;
     private betBtns: Phaser.GameObjects.Container[] = [];
+    private payLine!: Phaser.GameObjects.Rectangle;
 
     // State
     private spinState: SpinState = 'idle';
@@ -58,6 +60,11 @@ export class SlotsPanel {
     private reelValues: string[] = ['🎰', '🎰', '🎰'];
     private spinTimers: Phaser.Time.TimerEvent[] = [];
     private spinDone: boolean[] = [false, false, false];
+
+    // Session statistics
+    private totalSpins: number = 0;
+    private totalWon: number = 0;
+    private totalWagered: number = 0;
 
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene = scene;
@@ -68,8 +75,8 @@ export class SlotsPanel {
     private build(): void {
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
-        const pw = 500;
-        const ph = 420;
+        const pw = 520;
+        const ph = 460;
 
         // Dimming overlay
         this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
@@ -119,8 +126,8 @@ export class SlotsPanel {
         }
 
         // Pay line indicator
-        const payLine = this.scene.add.rectangle(0, reelPanelY, 340, 3, COL_SLOT_TRIM, 0.4);
-        this.container.add(payLine);
+        this.payLine = this.scene.add.rectangle(0, reelPanelY, 340, 3, COL_SLOT_TRIM, 0.4);
+        this.container.add(this.payLine);
 
         // Result text
         this.resultText = this.scene.add.text(0, reelPanelY + 72, '', {
@@ -128,11 +135,40 @@ export class SlotsPanel {
         }).setOrigin(0.5);
         this.container.add(this.resultText);
 
-        // Bet section label
-        const betLabel = this.scene.add.text(0, ph / 2 - 150, 'BET', {
-            fontFamily: 'monospace', fontSize: '11px', color: '#888888',
+        // Session stats
+        this.statsText = this.scene.add.text(0, reelPanelY + 91, '', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#888888',
         }).setOrigin(0.5);
+        this.container.add(this.statsText);
+
+        // Bet section label
+        const betLabel = this.scene.add.text(-90, ph / 2 - 150, 'BET:', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#888888',
+        }).setOrigin(0, 0.5);
         this.container.add(betLabel);
+
+        // Max Bet shortcut button
+        const maxBetRect = this.scene.add.rectangle(pw / 2 - 56, ph / 2 - 150, 72, 24, 0x1e1e3a, 1)
+            .setStrokeStyle(1, 0x4444aa, 1)
+            .setInteractive({ useHandCursor: true });
+        const maxBetLabel = this.scene.add.text(pw / 2 - 56, ph / 2 - 150, 'MAX BET', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#8888cc',
+        }).setOrigin(0.5);
+        maxBetRect.on('pointerover', () => maxBetRect.setStrokeStyle(1, COL_SLOT_TRIM, 1));
+        maxBetRect.on('pointerout',  () => maxBetRect.setStrokeStyle(1, 0x4444aa, 1));
+        maxBetRect.on('pointerdown', () => {
+            const chips = GameState.get().chips;
+            let newBet = BET_OPTIONS[0];  // fallback to minimum option
+            for (let i = BET_OPTIONS.length - 1; i >= 0; i--) {
+                if (chips >= BET_OPTIONS[i]) {
+                    newBet = BET_OPTIONS[i];
+                    break;
+                }
+            }
+            this.currentBet = newBet;
+            this.updateBetDisplay();
+        });
+        this.container.add([maxBetRect, maxBetLabel]);
 
         // Bet amount buttons
         const betBtnXs = [-90, -30, 30, 90];
@@ -210,10 +246,22 @@ export class SlotsPanel {
 
         this.updateChipsDisplay();
         this.updateBetDisplay();
+        this.updateStatsDisplay();
     }
 
     private updateChipsDisplay(): void {
         this.chipsText.setText(`◈ ${GameState.get().chips.toLocaleString()} chips`);
+    }
+
+    private updateStatsDisplay(): void {
+        if (this.totalSpins === 0) {
+            this.statsText.setText('');
+            return;
+        }
+        const net = this.totalWon - this.totalWagered;
+        const netStr = net >= 0 ? `+${net}` : `${net}`;
+        const netColor = net >= 0 ? '#2ecc71' : '#e74c3c';
+        this.statsText.setText(`Spins: ${this.totalSpins}  ·  Net: ${netStr}◈`).setColor(netColor);
     }
 
     private updateBetDisplay(): void {
@@ -242,6 +290,8 @@ export class SlotsPanel {
         }
 
         GameState.addChips(-this.currentBet);
+        this.totalSpins++;
+        this.totalWagered += this.currentBet;
         this.updateChipsDisplay();
 
         this.spinState = 'spinning';
@@ -295,16 +345,24 @@ export class SlotsPanel {
         let payout = 0;
         let msg = '';
         let msgColor = '#c9a84c';
+        let isJackpot = false;
 
         if (a === b && b === c) {
             // Three of a kind
             const mult = PAYOUTS[a] ?? 2;
             payout = this.currentBet * mult;
-            msg = `3×${a} JACKPOT!  +${payout}◈`;
+            isJackpot = a === '7️⃣';
+            msg = isJackpot
+                ? `★ JACKPOT! 7️⃣×3  +${payout}◈ ★`
+                : `3×${a}  +${payout}◈`;
             msgColor = '#2ecc71';
         } else if (a === b || b === c || a === c) {
-            // Two of a kind — check cherry pair consolation
-            if (a === '🍒' || b === '🍒') {
+            // Two of a kind — cherry pair consolation only when the pair IS cherries
+            const cherryPair =
+                (a === b && a === '🍒') ||
+                (b === c && b === '🍒') ||
+                (a === c && a === '🍒');
+            if (cherryPair) {
                 payout = this.currentBet * CHERRY_PAIR_PAYOUT;
                 msg = `Cherry pair!  +${payout}◈`;
                 msgColor = '#f0a040';
@@ -318,21 +376,51 @@ export class SlotsPanel {
         }
 
         if (payout > 0) {
+            this.totalWon += payout;
             GameState.addChips(payout);
             this.updateChipsDisplay();
 
-            // Win flash
-            this.scene.tweens.add({
-                targets: this.reelTexts,
-                scaleX: 1.15,
-                scaleY: 1.15,
-                yoyo: true,
-                duration: 150,
-                repeat: 2,
-            });
+            if (isJackpot) {
+                // Jackpot: bigger, repeated flash + payline glow
+                this.scene.tweens.add({
+                    targets: this.reelTexts,
+                    scaleX: 1.35,
+                    scaleY: 1.35,
+                    yoyo: true,
+                    duration: 120,
+                    repeat: 5,
+                });
+                this.scene.tweens.add({
+                    targets: this.payLine,
+                    alpha: 0,
+                    yoyo: true,
+                    duration: 80,
+                    repeat: 8,
+                    onComplete: () => { this.payLine.setAlpha(0.4); },
+                });
+            } else {
+                // Standard win flash
+                this.scene.tweens.add({
+                    targets: this.reelTexts,
+                    scaleX: 1.15,
+                    scaleY: 1.15,
+                    yoyo: true,
+                    duration: 150,
+                    repeat: 2,
+                });
+                this.scene.tweens.add({
+                    targets: this.payLine,
+                    alpha: 1,
+                    yoyo: true,
+                    duration: 120,
+                    repeat: 3,
+                    onComplete: () => { this.payLine.setAlpha(0.4); },
+                });
+            }
         }
 
         this.showResult(msg, msgColor);
+        this.updateStatsDisplay();
 
         this.scene.time.delayedCall(500, () => {
             this.spinState = 'idle';
