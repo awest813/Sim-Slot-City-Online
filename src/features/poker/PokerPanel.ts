@@ -108,6 +108,11 @@ export class PokerPanel {
     private rKey!: Phaser.Input.Keyboard.Key;
     private closed = false;
 
+    // Session tracking
+    private sessionStartChips: number = 0;
+    private handsPlayed: number = 0;
+    private sessionText!: Phaser.GameObjects.Text;
+
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene = scene;
         this.onClose = onClose;
@@ -120,6 +125,9 @@ export class PokerPanel {
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
         const pw = PANEL_W, ph = PANEL_H;
+
+        // Record session starting chips
+        this.sessionStartChips = GameState.get().chips;
 
         this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.78)
             .setScrollFactor(0).setDepth(DEPTH_PANEL - 1).setInteractive();
@@ -178,6 +186,12 @@ export class PokerPanel {
             fontFamily: 'monospace', fontSize: '10px', color: '#888866',
         }).setOrigin(0.5).setScrollFactor(0);
         this.container.add(this.aiThinkingText);
+
+        // Session stats (shown after at least one hand)
+        this.sessionText = this.scene.add.text(-pw / 2 + 16, ph / 2 - 22, '', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#4a6a4a',
+        }).setOrigin(0, 0.5);
+        this.container.add(this.sessionText);
 
         // Community card placeholder slots
         for (let i = 0; i < 5; i++) {
@@ -445,6 +459,7 @@ export class PokerPanel {
 
         this.showDealButton(false);
         this.playerHandArea.setVisible(true);
+        this.handsPlayed++;
         this.refreshAllSeats();
         this.updateCommunityCards();
         this.updatePot();
@@ -777,11 +792,27 @@ export class PokerPanel {
     }
 
     private updateChipsDisplay(): void {
+        let currentChips = GameState.get().chips;
         if (this.game && this.playerSeatId !== null) {
             const p = this.game.players.find(pl => pl.seatId === this.playerSeatId);
-            if (p) { this.chipsText.setText(`◈ ${p.chips}`); return; }
+            if (p) {
+                currentChips = p.chips;
+                this.chipsText.setText(`◈ ${p.chips}`);
+            } else {
+                this.chipsText.setText(`◈ ${currentChips}`);
+            }
+        } else {
+            this.chipsText.setText(`◈ ${currentChips}`);
         }
-        this.chipsText.setText(`◈ ${GameState.get().chips}`);
+        this.updateSessionDisplay(currentChips);
+    }
+
+    private updateSessionDisplay(currentChips: number): void {
+        if (this.handsPlayed === 0) { this.sessionText.setText(''); return; }
+        const net = currentChips - this.sessionStartChips;
+        const netStr = net >= 0 ? `+${net}◈` : `${net}◈`;
+        const netColor = net >= 0 ? '#2ecc71' : '#e74c3c';
+        this.sessionText.setText(`Session: ${netStr}  ·  Hands: ${this.handsPlayed}`).setColor(netColor);
     }
 
     private setStatus(msg: string, color: string): void {

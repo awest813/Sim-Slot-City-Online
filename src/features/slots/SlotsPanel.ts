@@ -69,6 +69,8 @@ export class SlotsPanel {
     private totalSpins: number = 0;
     private totalWon: number = 0;
     private totalWagered: number = 0;
+    private winStreak: number = 0;
+    private maxWinStreak: number = 0;
 
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene = scene;
@@ -275,7 +277,13 @@ export class SlotsPanel {
         const net = this.totalWon - this.totalWagered;
         const netStr = net >= 0 ? `+${net}` : `${net}`;
         const netColor = net >= 0 ? '#2ecc71' : '#e74c3c';
-        this.statsText.setText(`Spins: ${this.totalSpins}  ·  Net: ${netStr}◈`).setColor(netColor);
+        let streakStr = '';
+        if (this.winStreak >= 3) {
+            streakStr = `  🔥 ${this.winStreak}`;
+        } else if (this.maxWinStreak >= 3) {
+            streakStr = `  best:${this.maxWinStreak}`;
+        }
+        this.statsText.setText(`Spins: ${this.totalSpins}  ·  Net: ${netStr}◈${streakStr}`).setColor(netColor);
     }
 
     private updateBetDisplay(): void {
@@ -348,10 +356,10 @@ export class SlotsPanel {
 
     private evalResult(): void {
         this.spinState = 'result';
-        // Restore spin button to active style
-        this.spinBtn.setFillStyle(0x3a2a6a);
-        this.spinBtn.setStrokeStyle(2, COL_SLOT_TRIM, 1);
-        this.spinBtnLabel.setText('SPIN').setColor('#c9a84c');
+        // Keep button visually disabled during post-eval cooldown
+        this.spinBtn.setFillStyle(0x1a1a3a);
+        this.spinBtn.setStrokeStyle(2, 0x555577, 0.6);
+        this.spinBtnLabel.setText('SPIN').setColor('#666688');
         this.spinTimers = [];
 
         const [a, b, c] = this.reelValues;
@@ -391,8 +399,11 @@ export class SlotsPanel {
 
         if (payout > 0) {
             this.totalWon += payout;
+            this.winStreak++;
+            if (this.winStreak > this.maxWinStreak) this.maxWinStreak = this.winStreak;
             GameState.addChips(payout);
             this.updateChipsDisplay();
+            this.showChipDelta(`+${payout}◈`, '#2ecc71');
 
             if (isJackpot) {
                 // Jackpot: bigger, repeated flash + payline glow
@@ -431,6 +442,9 @@ export class SlotsPanel {
                     onComplete: () => { this.payLine.setAlpha(0.4); },
                 });
             }
+        } else {
+            this.winStreak = 0;
+            this.showChipDelta(`-${this.currentBet}◈`, '#e74c3c');
         }
 
         this.showResult(msg, msgColor);
@@ -438,10 +452,31 @@ export class SlotsPanel {
 
         const idleTimer = this.scene.time.delayedCall(500, () => {
             this.spinState = 'idle';
+            // Restore spin button to active style now that cooldown is done
+            this.spinBtn.setFillStyle(0x3a2a6a);
+            this.spinBtn.setStrokeStyle(2, COL_SLOT_TRIM, 1);
+            this.spinBtnLabel.setColor('#c9a84c');
             this.updateBetDisplay();
             this.checkLowChips();
         });
         this.spinTimers.push(idleTimer);
+    }
+
+    /** Show a brief floating chip gain/loss indicator near the reels. */
+    private showChipDelta(text: string, color: string): void {
+        const reelPanelY = -30;
+        const delta = this.scene.add.text(0, reelPanelY - 54, text, {
+            fontFamily: 'monospace', fontSize: '16px', color, fontStyle: 'bold',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_PANEL + 5);
+        this.container.add(delta);
+        this.scene.tweens.add({
+            targets: delta,
+            y: reelPanelY - 82,
+            alpha: 0,
+            duration: 900,
+            ease: 'Cubic.easeOut',
+            onComplete: () => delta.destroy(),
+        });
     }
 
     private showResult(msg: string, color: string): void {
