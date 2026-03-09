@@ -3,6 +3,7 @@ import { BaseRoom } from "./BaseRoom";
 import { BaseRoomState, PlayerSchema } from "../models/RoomStateSchemas";
 import { PokerTableState, PokerPlayerSchema, CardSchema } from "../models/PokerSchema";
 import { PokerRoundManager } from "../systems/PokerRoundManager";
+import { getAIAction } from "../systems/PokerAI";
 import { RoomType, PokerGameState, MsgPokerAction } from "@slot-city/shared";
 import { PrismaClient } from "@prisma/client";
 import { ChipEconomyService } from "../services/ChipEconomyService";
@@ -16,10 +17,17 @@ class PokerRoomState extends BaseRoomState {
 const prisma = new PrismaClient();
 const economy = new ChipEconomyService(prisma);
 
+const AI_NAMES = ["Ada", "Blaze", "Clyde", "Dex", "Eve", "Felix"];
+const AI_STARTING_CHIPS = 2000;
+const AI_ACTION_DELAY_MS = 1500;
+
 export class PokerTableRoom extends BaseRoom<PokerRoomState> {
   maxClients = 6;
   private roundManager!: PokerRoundManager;
   private startTimer: NodeJS.Timeout | null = null;
+  private aiTimers: Map<string, NodeJS.Timeout> = new Map();
+  private lastWinnerId = "";
+  private lastWinAmount = 0;
   private readonly MIN_BUY_IN = 500;
   private readonly MAX_BUY_IN = 5000;
   private readonly ROUND_START_DELAY_MS = 5000;
@@ -46,10 +54,15 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
       this.syncPokerState();
       if (event.type === "WINNER_DECLARED") {
         const { playerId, amount } = event.data as { playerId: string; amount: number };
+        this.lastWinnerId = playerId;
+        this.lastWinAmount = amount;
         this.handleChipWin(playerId, amount);
       }
       if (event.type === "ROUND_ENDED") {
         this.scheduleNextRound();
+      }
+      if (event.type === "STATE_CHANGED") {
+        this.scheduleAIActionIfNeeded();
       }
     });
 
@@ -61,11 +74,16 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
       this.handlePokerAction(playerId, message);
     });
 
+    // Spawn AI bots to fill the table so the game can start immediately
+    this.spawnAIPlayers();
+
     console.log(`[PokerTableRoom] Created: ${this.roomId}`);
   }
 
   onDispose(): void {
     if (this.startTimer) clearTimeout(this.startTimer);
+    for (const timer of this.aiTimers.values()) clearTimeout(timer);
+    this.aiTimers.clear();
     console.log(`[PokerTableRoom] Disposed: ${this.roomId}`);
   }
 
@@ -92,6 +110,7 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
           isFolded: false,
           isAllIn: false,
           isActive: false,
+          isAI: false,
         });
 
         // Deduct buy-in from player server chips
@@ -128,7 +147,11 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
   }
 
   private handleChipWin(playerId: string, amount: number): void {
-    economy.recordMatchResult(playerId, "poker", amount, 0, "win").catch(console.error);
+    // Only record economy result for human players
+    const player = this.roundManager.getState().players.get(playerId);
+    if (player && !player.isAI) {
+      economy.recordMatchResult(playerId, "poker", amount, 0, "win").catch(console.error);
+    }
   }
 
   private checkAndStartRound(): void {
@@ -152,11 +175,16 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
     setTimeout(() => {
       const state = this.roundManager.getState();
       if (state.gameState === PokerGameState.END_ROUND) {
-        // Check for busted players
+        // Check for busted players (human players only; AI gets rechipped)
         for (const [playerId, player] of state.players) {
           if (player.chips <= 0) {
-            this.roundManager.removePlayer(playerId);
-            this.state.table.players.delete(playerId);
+            if (player.isAI) {
+              // Restock AI chips so the game continues
+              player.chips = AI_STARTING_CHIPS;
+            } else {
+              this.roundManager.removePlayer(playerId);
+              this.state.table.players.delete(playerId);
+            }
           }
         }
         if (this.roundManager.canStartRound()) {
@@ -172,6 +200,62 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
       }
     }, 5000);
   }
+
+  // ─── AI Management ────────────────────────────────────────────────────────
+
+  private spawnAIPlayers(): void {
+    // Add 3 AI bots so the game has enough players to start right away
+    const count = 3;
+    for (let i = 0; i < count; i++) {
+      const seatIndex = this.findEmptySeatIndex();
+      if (seatIndex < 0) break;
+      const aiId = `ai-${this.roomId}-${i}`;
+      this.roundManager.addPlayer({
+        playerId: aiId,
+        username: AI_NAMES[i % AI_NAMES.length],
+        chips: AI_STARTING_CHIPS,
+        seatIndex,
+        holeCards: [],
+        currentBet: 0,
+        totalBetInRound: 0,
+        isFolded: false,
+        isAllIn: false,
+        isActive: false,
+        isAI: true,
+      });
+      this.updatePokerPlayer(aiId);
+    }
+    this.checkAndStartRound();
+  }
+
+  private scheduleAIActionIfNeeded(): void {
+    const aiPlayer = this.roundManager.getActiveAIPlayer();
+    if (!aiPlayer) return;
+
+    const playerId = aiPlayer.playerId;
+    // Prevent duplicate timers for the same player
+    if (this.aiTimers.has(playerId)) return;
+
+    const timer = setTimeout(() => {
+      this.aiTimers.delete(playerId);
+      const currentAI = this.roundManager.getActiveAIPlayer();
+      // Re-validate that it's still this AI's turn
+      if (!currentAI || currentAI.playerId !== playerId) return;
+
+      const state = this.roundManager.getState();
+      const decision = getAIAction(currentAI, state);
+      console.log(
+        `[PokerTableRoom] AI ${currentAI.username} decides: ${decision.action}` +
+          (decision.amount ? ` (${decision.amount})` : ""),
+      );
+      this.roundManager.processAction(playerId, decision.action, decision.amount);
+      this.syncPokerState();
+    }, AI_ACTION_DELAY_MS);
+
+    this.aiTimers.set(playerId, timer);
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   private findEmptySeatIndex(): number {
     const usedSeats = new Set(
@@ -201,6 +285,7 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
     schema.isFolded = roundPlayer.isFolded;
     schema.isAllIn = roundPlayer.isAllIn;
     schema.isActive = roundPlayer.isActive;
+    schema.isAI = roundPlayer.isAI ?? false;
   }
 
   private syncPokerState(): void {
@@ -214,6 +299,8 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
     this.state.table.activePlayerSeat = rState.activePlayerSeat;
     this.state.table.smallBlind = rState.smallBlind;
     this.state.table.bigBlind = rState.bigBlind;
+    this.state.table.lastWinnerId = this.lastWinnerId;
+    this.state.table.lastWinAmount = this.lastWinAmount;
 
     // Sync community cards
     this.state.table.communityCards.splice(0, this.state.table.communityCards.length);
@@ -230,3 +317,4 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
     }
   }
 }
+

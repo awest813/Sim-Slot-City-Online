@@ -17,6 +17,7 @@ export class PokerPlayerSchema extends Schema {
   @type("boolean") isAllIn: boolean = false;
   @type("boolean") isActive: boolean = false;
   @type("boolean") isConnected: boolean = true;
+  @type("boolean") isAI: boolean = false;
 }
 
 export class PokerTableState extends Schema {
@@ -35,4 +36,6 @@ export class PokerTableState extends Schema {
   @type("number") smallBlind: number = 25;
   @type("number") bigBlind: number = 50;
   @type("number") maxSeats: number = 6;
+  @type("string") lastWinnerId: string = "";
+  @type("number") lastWinAmount: number = 0;
 }
