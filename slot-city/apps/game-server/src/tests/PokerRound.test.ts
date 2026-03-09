@@ -143,6 +143,52 @@ describe("PokerRoundManager", () => {
     });
   });
 
+  describe("AI player support", () => {
+    it("should identify an active AI player on their turn", () => {
+      manager.addPlayer({ ...makePlayer("human", 0), isAI: false });
+      manager.addPlayer({ ...makePlayer("ai-1", 1), isAI: true });
+      manager.startRound();
+
+      const state = manager.getState();
+      const activeSeat = state.activePlayerSeat;
+      const activePlayer = Array.from(state.players.values()).find(
+        (p) => p.seatIndex === activeSeat,
+      );
+      const aiActive = manager.getActiveAIPlayer();
+
+      if (activePlayer?.isAI) {
+        expect(aiActive).toBeDefined();
+        expect(aiActive?.playerId).toBe(activePlayer.playerId);
+      } else {
+        expect(aiActive).toBeUndefined();
+      }
+    });
+
+    it("should return undefined for getActiveAIPlayer when human is active", () => {
+      manager.addPlayer({ ...makePlayer("human", 0), isAI: false });
+      manager.addPlayer({ ...makePlayer("ai-1", 1), isAI: true });
+      manager.startRound();
+
+      const state = manager.getState();
+      const activeSeat = state.activePlayerSeat;
+      const activePlayer = Array.from(state.players.values()).find(
+        (p) => p.seatIndex === activeSeat,
+      );
+
+      if (!activePlayer?.isAI) {
+        expect(manager.getActiveAIPlayer()).toBeUndefined();
+      }
+    });
+
+    it("should have isAI field on PokerPlayer", () => {
+      const p = makePlayer("ai-test", 2);
+      p.isAI = true;
+      manager.addPlayer(p);
+      const stored = manager.getState().players.get("ai-test");
+      expect(stored?.isAI).toBe(true);
+    });
+  });
+
   describe("blind levels", () => {
     it("should update blind level", () => {
       manager.setBlindLevel(3);

@@ -12,6 +12,7 @@ export interface PokerPlayer {
   isFolded: boolean;
   isAllIn: boolean;
   isActive: boolean;
+  isAI?: boolean;
 }
 
 export interface PokerRoundState {
@@ -98,6 +99,15 @@ export class PokerRoundManager {
 
   getPlayerCount(): number {
     return this.state.players.size;
+  }
+
+  /** Returns the active-seat player if they are an AI, otherwise undefined. */
+  getActiveAIPlayer(): PokerPlayer | undefined {
+    const player = this.getPlayerBySeat(this.state.activePlayerSeat);
+    if (player && player.isAI && !player.isFolded && !player.isAllIn) {
+      return player;
+    }
+    return undefined;
   }
 
   canStartRound(): boolean {

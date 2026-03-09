@@ -5,15 +5,51 @@ import { isoToScreen, getDepth } from "../systems/IsoRenderer";
 import { ChatUI } from "../ui/ChatUI";
 import { RoomType, PokerGameState, PlayerState, ChatMessage } from "@slot-city/shared";
 
+// Seat positions relative to table center (screen coordinates)
+const SEAT_OFFSETS = [
+  { x: -90, y: 12 },
+  { x: -60, y: -24 },
+  { x: 0,   y: -32 },
+  { x: 60,  y: -24 },
+  { x: 90,  y: 12 },
+  { x: 0,   y: 44 },
+];
+
+const CARD_SUITS: Record<string, string> = { S: "♠", H: "♥", D: "♦", C: "♣" };
+const SUIT_COLORS: Record<string, string> = { S: "#ffffff", H: "#ff6666", D: "#ff6666", C: "#ffffff" };
+
+function cardLabel(rank: string, suit: string): string {
+  return `${rank}${CARD_SUITS[suit] ?? suit}`;
+}
+
+interface PokerPlayerData {
+  playerId: string;
+  username: string;
+  chips: number;
+  seatIndex: number;
+  currentBet: number;
+  isFolded: boolean;
+  isAllIn: boolean;
+  isActive: boolean;
+  isAI: boolean;
+}
+
 export class PokerRoomScene extends Phaser.Scene {
   private room: Awaited<ReturnType<typeof networkManager.joinRoom>> | null = null;
   private localAvatar: PlayerAvatar | null = null;
   private remoteAvatars: Map<string, PlayerAvatar> = new Map();
   private chatUI: ChatUI | null = null;
-  private pokerHUD!: Phaser.GameObjects.Container;
   private statusText!: Phaser.GameObjects.Text;
   private potText!: Phaser.GameObjects.Text;
   private actionButtons: Phaser.GameObjects.Text[] = [];
+  private communityCardTexts: Phaser.GameObjects.Text[] = [];
+  private seatLabels: Map<number, Phaser.GameObjects.Text> = new Map();
+  private seatBetLabels: Map<number, Phaser.GameObjects.Text> = new Map();
+  private winnerText!: Phaser.GameObjects.Text;
+  private raisePanel!: Phaser.GameObjects.Container;
+  private raiseInput: HTMLInputElement | null = null;
+  private tableCenterX = 0;
+  private tableCenterY = 0;
 
   constructor() {
     super({ key: "PokerRoomScene" });
@@ -46,7 +82,7 @@ export class PokerRoomScene extends Phaser.Scene {
   }
 
   private drawPokerRoom(): void {
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     const g = this.add.graphics();
 
     // Floor
@@ -86,22 +122,24 @@ export class PokerRoomScene extends Phaser.Scene {
 
   private drawPokerTable(g: Phaser.GameObjects.Graphics, tx: number, ty: number): void {
     const { x, y } = isoToScreen(tx, ty);
+    this.tableCenterX = x;
+    this.tableCenterY = y;
 
     // Table surface
     g.fillStyle(0x115511, 1);
-    g.fillEllipse(x, y + 10, 200, 80);
+    g.fillEllipse(x, y + 10, 220, 90);
     g.lineStyle(4, 0x553300, 1);
-    g.strokeEllipse(x, y + 10, 200, 80);
+    g.strokeEllipse(x, y + 10, 220, 90);
 
     // Felt highlight
     g.fillStyle(0x1a7a1a, 0.5);
-    g.fillEllipse(x, y + 8, 180, 70);
+    g.fillEllipse(x, y + 8, 200, 80);
 
     // Community cards area
     g.fillStyle(0x0d5a0d, 0.8);
-    g.fillRect(x - 60, y - 4, 120, 24);
+    g.fillRect(x - 65, y - 6, 130, 26);
     g.lineStyle(1, 0x228822, 0.8);
-    g.strokeRect(x - 60, y - 4, 120, 24);
+    g.strokeRect(x - 65, y - 6, 130, 26);
 
     this.add.text(x, y + 8, "Community Cards", {
       fontSize: "7px",
@@ -109,35 +147,50 @@ export class PokerRoomScene extends Phaser.Scene {
       fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 20);
 
-    // Pot display
-    this.add.text(x, y - 14, "💰 POT: 0", {
+    // Community card slots (5 placeholders)
+    for (let i = 0; i < 5; i++) {
+      const cx = x - 48 + i * 24;
+      const cardText = this.add.text(cx, y - 1, "--", {
+        fontSize: "8px",
+        color: "#444444",
+        fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 25);
+      this.communityCardTexts.push(cardText);
+    }
+
+    // Pot display placeholder (updated via syncPokerState)
+    this.add.text(x, y - 16, "💰 POT: 0", {
       fontSize: "9px",
       color: "#ffd700",
       fontFamily: "monospace",
     }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 20);
 
     // Seat positions
-    const seatPositions = [
-      { x: x - 90, y: y + 12 },
-      { x: x - 60, y: y - 24 },
-      { x: x, y: y - 32 },
-      { x: x + 60, y: y - 24 },
-      { x: x + 90, y: y + 12 },
-      { x: x, y: y + 44 },
-    ];
-
     for (let i = 0; i < 6; i++) {
-      const sp = seatPositions[i];
-      g.fillStyle(0x553300, 1);
-      g.fillEllipse(sp.x, sp.y, 28, 14);
-      g.lineStyle(1, 0x884400, 1);
-      g.strokeEllipse(sp.x, sp.y, 28, 14);
+      const off = SEAT_OFFSETS[i];
+      const sx = x + off.x;
+      const sy = y + off.y;
 
-      this.add.text(sp.x, sp.y, `${i + 1}`, {
+      g.fillStyle(0x553300, 1);
+      g.fillEllipse(sx, sy, 34, 18);
+      g.lineStyle(1, 0x884400, 1);
+      g.strokeEllipse(sx, sy, 34, 18);
+
+      // Seat label (player name / seat #)
+      const label = this.add.text(sx, sy - 1, `${i + 1}`, {
         fontSize: "7px",
         color: "#888888",
         fontFamily: "monospace",
-      }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 25);
+      }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 26);
+      this.seatLabels.set(i, label);
+
+      // Bet label below seat
+      const betLabel = this.add.text(sx, sy + 14, "", {
+        fontSize: "6px",
+        color: "#ffd700",
+        fontFamily: "monospace",
+      }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 26);
+      this.seatBetLabels.set(i, betLabel);
     }
 
     g.setDepth(getDepth(tx, ty) * 10 + 5);
@@ -164,16 +217,25 @@ export class PokerRoomScene extends Phaser.Scene {
       fontFamily: "monospace",
     }).setScrollFactor(0).setDepth(501);
 
+    // Winner banner (hidden initially)
+    this.winnerText = this.add.text(width / 2, height / 2 - 30, "", {
+      fontSize: "22px",
+      color: "#ffd700",
+      stroke: "#000000",
+      strokeThickness: 4,
+      fontFamily: "monospace",
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(510).setVisible(false);
+
     // Action buttons (hidden until player's turn)
-    const actions = [
-      { label: "FOLD", color: "#ff4444", action: "fold" },
+    const actionDefs = [
+      { label: "FOLD",  color: "#ff4444", action: "fold"  },
       { label: "CHECK", color: "#4488ff", action: "check" },
-      { label: "CALL", color: "#44ff88", action: "call" },
+      { label: "CALL",  color: "#44ff88", action: "call"  },
       { label: "RAISE", color: "#ffaa00", action: "raise" },
     ];
 
-    actions.forEach((act, i) => {
-      const btn = this.add.text(width / 2 - 200 + i * 110, height - 40, `[ ${act.label} ]`, {
+    actionDefs.forEach((act, i) => {
+      const btn = this.add.text(width / 2 - 180 + i * 120, height - 40, `[ ${act.label} ]`, {
         fontSize: "14px",
         color: act.color,
         stroke: "#000",
@@ -183,14 +245,93 @@ export class PokerRoomScene extends Phaser.Scene {
         .setVisible(false);
 
       btn.on("pointerdown", () => {
-        networkManager.sendMessage({
-          type: "POKER_ACTION",
-          action: act.action as "fold" | "check" | "call" | "raise",
-        });
+        if (act.action === "raise") {
+          this.showRaisePanel();
+        } else {
+          networkManager.sendMessage({
+            type: "POKER_ACTION",
+            action: act.action as "fold" | "check" | "call",
+          });
+        }
       });
 
       this.actionButtons.push(btn);
     });
+
+    // Raise panel (hidden initially)
+    this.createRaisePanel();
+  }
+
+  private createRaisePanel(): void {
+    const { width, height } = this.scale;
+    const panelX = width / 2;
+    const panelY = height - 90;
+
+    const bg = this.add.graphics()
+      .fillStyle(0x1a1a2e, 0.95)
+      .fillRoundedRect(-100, -22, 200, 44, 6)
+      .lineStyle(1, 0xffaa00, 1)
+      .strokeRoundedRect(-100, -22, 200, 44, 6);
+
+    const label = this.add.text(-94, -16, "Raise to:", {
+      fontSize: "10px", color: "#ffaa00", fontFamily: "monospace",
+    });
+
+    const confirmBtn = this.add.text(55, -8, "[OK]", {
+      fontSize: "13px", color: "#44ff88", fontFamily: "monospace",
+    }).setInteractive({ cursor: "pointer" });
+
+    const cancelBtn = this.add.text(82, -8, "[X]", {
+      fontSize: "13px", color: "#ff4444", fontFamily: "monospace",
+    }).setInteractive({ cursor: "pointer" });
+
+    confirmBtn.on("pointerdown", () => {
+      const val = parseInt(this.raiseInput?.value ?? "0", 10);
+      if (!isNaN(val) && val > 0) {
+        networkManager.sendMessage({ type: "POKER_ACTION", action: "raise", amount: val });
+      }
+      this.hideRaisePanel();
+    });
+
+    cancelBtn.on("pointerdown", () => this.hideRaisePanel());
+
+    this.raisePanel = this.add.container(panelX, panelY, [bg, label, confirmBtn, cancelBtn]);
+    this.raisePanel.setScrollFactor(0).setDepth(520).setVisible(false);
+  }
+
+  private showRaisePanel(): void {
+    this.raisePanel.setVisible(true);
+
+    // Create a native HTML input for the raise amount
+    if (!this.raiseInput) {
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.style.cssText = [
+        "position:fixed",
+        `left:${this.scale.width / 2 - 30}px`,
+        `top:${this.scale.height - 106}px`,
+        "width:55px",
+        "background:#0d1b2a",
+        "color:#fff",
+        "border:1px solid #ffaa00",
+        "font-size:12px",
+        "padding:2px 4px",
+        "z-index:1000",
+      ].join(";");
+      document.body.appendChild(input);
+      this.raiseInput = input;
+    }
+    this.raiseInput.value = "";
+    this.raiseInput.style.display = "block";
+    this.raiseInput.focus();
+  }
+
+  private hideRaisePanel(): void {
+    this.raisePanel.setVisible(false);
+    if (this.raiseInput) {
+      this.raiseInput.style.display = "none";
+    }
   }
 
   private setupRoomHandlers(): void {
@@ -223,22 +364,98 @@ export class PokerRoomScene extends Phaser.Scene {
     });
 
     this.room.state.table?.onChange((tableState: Record<string, unknown>) => {
-      const gameState = tableState.gameState as PokerGameState;
-      const pot = tableState.pot as number;
-
-      this.statusText.setText(`State: ${gameState}`);
-      this.potText.setText(`💰 POT: ${pot}`);
-
-      const activePlayerSeat = tableState.activePlayerSeat as number;
-      const isMyTurn = Array.from(this.room!.state.table?.players?.values() ?? [])
-        .some((p: Record<string, unknown>) => p.playerId === user.id && (p.seatIndex as number) === activePlayerSeat);
-
-      this.actionButtons.forEach((btn) => btn.setVisible(isMyTurn));
+      this.onTableStateChange(tableState, user.id);
     });
 
     this.room.state.recentMessages?.onAdd((msg: ChatMessage) => {
       this.chatUI?.addMessage(msg);
     });
+  }
+
+  private onTableStateChange(tableState: Record<string, unknown>, myPlayerId: string): void {
+    const gameState = tableState.gameState as PokerGameState;
+    const pot = tableState.pot as number;
+    const activePlayerSeat = tableState.activePlayerSeat as number;
+
+    this.statusText.setText(`State: ${gameState}`);
+    this.potText.setText(`💰 POT: ${pot}`);
+
+    // Update community cards
+    const communityCards = (tableState.communityCards as Array<{ rank: string; suit: string }>) ?? [];
+    for (let i = 0; i < 5; i++) {
+      const ct = this.communityCardTexts[i];
+      if (!ct) continue;
+      if (i < communityCards.length) {
+        const c = communityCards[i];
+        ct.setText(cardLabel(c.rank, c.suit));
+        ct.setColor(SUIT_COLORS[c.suit] ?? "#ffffff");
+      } else {
+        ct.setText("--");
+        ct.setColor("#444444");
+      }
+    }
+
+    // Update player seats
+    const players = (tableState.players as Map<string, PokerPlayerData>) ?? new Map();
+    for (const [, player] of players) {
+      this.updateSeatDisplay(player, activePlayerSeat);
+    }
+
+    // Check if it's the human player's turn
+    let isMyTurn = false;
+    for (const [, player] of players) {
+      if (player.playerId === myPlayerId && player.seatIndex === activePlayerSeat) {
+        isMyTurn = true;
+        break;
+      }
+    }
+
+    this.actionButtons.forEach((btn) => btn.setVisible(isMyTurn));
+    if (!isMyTurn) this.hideRaisePanel();
+
+    // Show winner banner on SHOWDOWN / END_ROUND
+    const lastWinnerId = tableState.lastWinnerId as string;
+    const lastWinAmount = tableState.lastWinAmount as number;
+    if (
+      (gameState === PokerGameState.SHOWDOWN || gameState === PokerGameState.END_ROUND) &&
+      lastWinnerId
+    ) {
+      const winnerPlayer = players instanceof Map
+        ? [...players.values()].find((p) => p.playerId === lastWinnerId)
+        : undefined;
+      const winnerName = winnerPlayer ? winnerPlayer.username : lastWinnerId;
+      this.winnerText.setText(`🏆 ${winnerName} wins ${lastWinAmount}c!`);
+      this.winnerText.setVisible(true);
+      // Auto-hide after 4 seconds
+      this.time.delayedCall(4000, () => this.winnerText.setVisible(false));
+    }
+  }
+
+  private updateSeatDisplay(player: PokerPlayerData, activeSeat: number): void {
+    const label = this.seatLabels.get(player.seatIndex);
+    const betLabel = this.seatBetLabels.get(player.seatIndex);
+    if (!label) return;
+
+    const isActive = player.seatIndex === activeSeat && !player.isFolded;
+    const isFolded = player.isFolded;
+    const isAllIn = player.isAllIn;
+
+    let nameColor = player.isAI ? "#aaaaff" : "#ffff88";
+    if (isFolded) nameColor = "#555555";
+    if (isActive) nameColor = "#ffffff";
+
+    let statusSuffix = "";
+    if (isFolded) statusSuffix = " F";
+    else if (isAllIn) statusSuffix = " ALL-IN";
+    else if (isActive) statusSuffix = " ◄";
+
+    label.setText(`${player.username}${statusSuffix}\n${player.chips}c`);
+    label.setColor(nameColor);
+    label.setFontSize(6);
+
+    if (betLabel) {
+      betLabel.setText(player.currentBet > 0 ? `bet:${player.currentBet}` : "");
+    }
   }
 
   update(_time: number, _delta: number): void {}
@@ -254,6 +471,10 @@ export class PokerRoomScene extends Phaser.Scene {
     this.remoteAvatars.forEach((a) => a.destroy());
     this.remoteAvatars.clear();
     this.chatUI?.destroy();
+    if (this.raiseInput) {
+      document.body.removeChild(this.raiseInput);
+      this.raiseInput = null;
+    }
   }
 
   shutdown(): void {
