@@ -14,7 +14,7 @@ import { AvatarController } from '../../core/systems/AvatarController';
 import { InteractionSystem } from '../../core/systems/InteractionSystem';
 import { HUD } from '../ui/HUD';
 import { SlotsPanel } from '../slots/SlotsPanel';
-import { BarPanel } from '../bar/BarPanel';
+import { BarPanel, resetBarSession } from '../bar/BarPanel';
 import { PokerPanel } from '../poker/PokerPanel';
 
 export class CasinoLobbyScene extends Phaser.Scene {
@@ -34,6 +34,10 @@ export class CasinoLobbyScene extends Phaser.Scene {
         if (savedName && savedName !== 'Guest') {
             GameState.update({ displayName: savedName });
         }
+
+        // Reset per-session bar bonuses (e.g. Lucky Shot) so a new game session
+        // starts fresh but bonuses don't carry across bar reopens.
+        resetBarSession();
 
         this.graphics = this.add.graphics();
 
