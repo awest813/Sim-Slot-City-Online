@@ -2,26 +2,31 @@
 import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
-    COL_UI_BG, COL_UI_BORDER,
+    COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_UI_BORDER_DIM, COL_TRIM,
+    FONT, ANIM_MED, PANEL_RADIUS,
 } from '../../game/constants';
 
 export interface ButtonConfig {
-    label: string;
-    color?: number;
+    label:      string;
+    color?:     number;
     hoverColor?: number;
-    disabled?: boolean;
-    onClick: () => void;
+    disabled?:  boolean;
+    onClick:    () => void;
 }
 
 export class Panel {
-    protected scene: Phaser.Scene;
+    protected scene:     Phaser.Scene;
     protected container!: Phaser.GameObjects.Container;
-    private overlay!: Phaser.GameObjects.Rectangle;
-    private bg!: Phaser.GameObjects.Rectangle;
-    protected contentY: number = 60;   // current Y cursor inside panel
-    private escCloseHandler: (() => void) | null = null;
+    private   overlay!:   Phaser.GameObjects.Rectangle;
+    private   panelGfx!:  Phaser.GameObjects.Graphics;
+    protected contentY = 60;       // current Y cursor inside panel (relative to container center)
+    private   escCloseHandler: (() => void) | null = null;
 
-    constructor(scene: Phaser.Scene, protected w: number = 440, protected h: number = 360) {
+    constructor(
+        scene: Phaser.Scene,
+        protected w = 440,
+        protected h = 360,
+    ) {
         this.scene = scene;
         this.buildBase();
     }
@@ -30,38 +35,88 @@ export class Panel {
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
 
-        // Dim overlay
-        this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.7)
+        // ── Dim overlay ────────────────────────────────────────────────────
+        this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.72)
             .setScrollFactor(0)
             .setDepth(DEPTH_PANEL - 1)
             .setInteractive();   // block clicks behind panel
+        this.overlay.setAlpha(0);
+        this.scene.tweens.add({ targets: this.overlay, alpha: 1, duration: ANIM_MED, ease: 'Sine.easeOut' });
 
-        // Panel background
-        this.bg = this.scene.add.rectangle(cx, cy, this.w, this.h, COL_UI_BG, 1)
+        // ── Panel graphics (bg + border via Graphics for rounded rect) ─────
+        this.panelGfx = this.scene.add.graphics()
             .setScrollFactor(0)
-            .setDepth(DEPTH_PANEL)
-            .setStrokeStyle(2, COL_UI_BORDER, 1);
+            .setDepth(DEPTH_PANEL);
 
+        this.drawPanelBg();
+
+        // ── Content container ──────────────────────────────────────────────
         this.container = this.scene.add.container(cx, cy)
             .setScrollFactor(0)
             .setDepth(DEPTH_PANEL + 1);
+
+        // Entrance animation — scale up from slightly smaller + fade in
+        this.container.setAlpha(0);
+        this.container.setScale(0.93);
+        this.scene.tweens.add({
+            targets: this.container,
+            alpha:   1,
+            scaleX:  1,
+            scaleY:  1,
+            duration: ANIM_MED,
+            ease: 'Back.Out',
+        });
+    }
+
+    private drawPanelBg(): void {
+        const cx = GAME_WIDTH  / 2;
+        const cy = GAME_HEIGHT / 2;
+        const g  = this.panelGfx;
+        g.clear();
+
+        const px = cx - this.w / 2;
+        const py = cy - this.h / 2;
+
+        // Outer shadow
+        g.fillStyle(0x000000, 0.5);
+        g.fillRoundedRect(px + 4, py + 5, this.w, this.h, PANEL_RADIUS + 1);
+
+        // Main background
+        g.fillStyle(COL_UI_BG, 1);
+        g.fillRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
+
+        // Top header band
+        g.fillStyle(COL_UI_BG2, 1);
+        g.fillRoundedRect(px, py, this.w, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
+
+        // Gold border
+        g.lineStyle(1.5, COL_UI_BORDER, 0.85);
+        g.strokeRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
+
+        // Inner thin border for depth
+        g.lineStyle(1, COL_UI_BORDER_DIM, 0.25);
+        g.strokeRoundedRect(px + 3, py + 3, this.w - 6, this.h - 6, PANEL_RADIUS - 1);
+
+        // Gold top accent line
+        g.lineStyle(2, COL_TRIM, 0.6);
+        g.lineBetween(px + PANEL_RADIUS, py + 52, px + this.w - PANEL_RADIUS, py + 52);
     }
 
     addTitle(text: string): void {
-        const title = this.scene.add.text(0, -this.h / 2 + 22, text, {
-            fontFamily: 'monospace', fontSize: '18px', color: '#c9a84c', fontStyle: 'bold',
+        const title = this.scene.add.text(0, -this.h / 2 + 26, text, {
+            fontFamily: FONT, fontSize: '18px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
 
-        // Divider line
-        const line = this.scene.add.rectangle(0, -this.h / 2 + 38, this.w - 40, 1, COL_UI_BORDER, 0.5);
-
-        this.container.add([title, line]);
-        this.contentY = -this.h / 2 + 58;
+        this.container.add(title);
+        this.contentY = -this.h / 2 + 64;
     }
 
-    addText(text: string, style: Phaser.Types.GameObjects.Text.TextStyle = {}): Phaser.GameObjects.Text {
+    addText(
+        text: string,
+        style: Phaser.Types.GameObjects.Text.TextStyle = {},
+    ): Phaser.GameObjects.Text {
         const t = this.scene.add.text(0, this.contentY, text, {
-            fontFamily: 'monospace', fontSize: '13px', color: '#f0e6d3',
+            fontFamily: FONT, fontSize: '13px', color: '#e8dcc8',
             wordWrap: { width: this.w - 60 },
             align: 'center',
             ...style,
@@ -74,30 +129,53 @@ export class Panel {
     addButton(cfg: ButtonConfig, fullWidth = false): Phaser.GameObjects.Container {
         const bw = fullWidth ? this.w - 60 : 160;
         const bh = 34;
-        const baseFill  = cfg.disabled ? 0x1a1a1a : (cfg.color ?? 0x2a5f2a);
-        const hoverFill = cfg.disabled ? 0x1a1a1a : (cfg.hoverColor ?? 0x3a7f3a);
-        const pressFill = cfg.disabled ? 0x1a1a1a : Math.max(0, (cfg.color ?? 0x2a5f2a) - 0x101010);
+        const baseFill  = cfg.disabled ? 0x1a1a1a : (cfg.color ?? 0x1a5028);
+        const hoverFill = cfg.disabled ? 0x1a1a1a : (cfg.hoverColor ?? lighten(baseFill));
+        const pressFill = cfg.disabled ? 0x1a1a1a : darken(baseFill);
+        const r = 4;
 
-        const rect = this.scene.add.rectangle(0, this.contentY + bh / 2, bw, bh, baseFill, 1)
-            .setStrokeStyle(1, cfg.disabled ? 0x444444 : COL_UI_BORDER, cfg.disabled ? 0.4 : 0.8)
-            .setInteractive({ useHandCursor: !cfg.disabled });
+        // Use Graphics for rounded button background
+        const gfx = this.scene.add.graphics();
+        const by = this.contentY + bh / 2;
 
-        const label = this.scene.add.text(0, this.contentY + bh / 2, cfg.label, {
-            fontFamily: 'monospace', fontSize: '13px',
+        const drawBtn = (fill: number, hover = false): void => {
+            gfx.clear();
+            // Shadow
+            gfx.fillStyle(0x000000, 0.3);
+            gfx.fillRoundedRect(-bw / 2 + 1, by - bh / 2 + 2, bw, bh, r);
+            // Fill
+            gfx.fillStyle(fill, 1);
+            gfx.fillRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
+            // Top highlight
+            if (!cfg.disabled) {
+                gfx.fillStyle(0xffffff, 0.05);
+                gfx.fillRoundedRect(-bw / 2 + 2, by - bh / 2 + 2, bw - 4, bh / 2 - 2, { tl: r - 1, tr: r - 1, bl: 0, br: 0 });
+            }
+            // Border
+            const bCol = cfg.disabled ? 0x333333 : COL_UI_BORDER;
+            const bAlpha = cfg.disabled ? 0.3 : hover ? 0.9 : 0.65;
+            gfx.lineStyle(1, bCol, bAlpha);
+            gfx.strokeRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
+        };
+
+        drawBtn(baseFill);
+
+        const hitRect = this.scene.add.rectangle(0, by, bw, bh, 0x000000, 0)
+            .setInteractive(cfg.disabled ? undefined as any : { useHandCursor: true });
+
+        const label = this.scene.add.text(0, by, cfg.label, {
+            fontFamily: FONT, fontSize: '12px',
             color: cfg.disabled ? '#555555' : '#f0e6d3',
         }).setOrigin(0.5);
 
         if (!cfg.disabled) {
-            rect.on('pointerover', () => rect.setFillStyle(hoverFill));
-            rect.on('pointerout',  () => rect.setFillStyle(baseFill));
-            rect.on('pointerdown', () => {
-                rect.setFillStyle(pressFill);
-                cfg.onClick();
-            });
-            rect.on('pointerup', () => rect.setFillStyle(hoverFill));
+            hitRect.on('pointerover',  () => drawBtn(hoverFill, true));
+            hitRect.on('pointerout',   () => drawBtn(baseFill,  false));
+            hitRect.on('pointerdown',  () => { drawBtn(pressFill, false); cfg.onClick(); });
+            hitRect.on('pointerup',    () => drawBtn(hoverFill, true));
         }
 
-        const btn = this.scene.add.container(0, 0, [rect, label]);
+        const btn = this.scene.add.container(0, 0, [gfx, hitRect, label]);
         this.container.add(btn);
         this.contentY += bh + 10;
         return btn;
@@ -107,29 +185,41 @@ export class Panel {
         this.contentY += h;
     }
 
+    /**
+     * Adds a styled close button anchored to the bottom-center of the panel,
+     * and wires the ESC key to the same callback.
+     */
     addCloseButton(onClose: () => void): void {
-        const bw = 100;
-        const bh = 30;
-        const by = this.h / 2 - 24;
+        const bw  = 110;
+        const bh  = 30;
+        const by  = this.h / 2 - 22;
+        const r   = 4;
 
-        const rect = this.scene.add.rectangle(0, by, bw, bh, 0x3a1e1e, 1)
-            .setStrokeStyle(1, 0x8a3a3a, 1)
+        const gfx = this.scene.add.graphics();
+        const drawClose = (hover: boolean): void => {
+            gfx.clear();
+            gfx.fillStyle(hover ? 0x5c2020 : 0x3a1818, 1);
+            gfx.fillRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
+            gfx.lineStyle(1, hover ? 0xaa3a3a : 0x7a2a2a, 0.9);
+            gfx.strokeRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
+        };
+        drawClose(false);
+
+        const hitRect = this.scene.add.rectangle(0, by, bw, bh, 0x000000, 0)
             .setInteractive({ useHandCursor: true });
 
-        const label = this.scene.add.text(0, by, 'Close', {
-            fontFamily: 'monospace', fontSize: '12px', color: '#e05050',
+        const label = this.scene.add.text(0, by, '✕  Close', {
+            fontFamily: FONT, fontSize: '12px', color: '#dd5050',
         }).setOrigin(0.5);
 
-        rect.on('pointerover', () => rect.setFillStyle(0x5a2a2a));
-        rect.on('pointerout',  () => rect.setFillStyle(0x3a1e1e));
-        rect.on('pointerdown', () => { rect.setFillStyle(0x2a0a0a); onClose(); });
-        rect.on('pointerup',   () => rect.setFillStyle(0x5a2a2a));
+        hitRect.on('pointerover',  () => { drawClose(true);  label.setColor('#ff6060'); });
+        hitRect.on('pointerout',   () => { drawClose(false); label.setColor('#dd5050'); });
+        hitRect.on('pointerdown',  () => onClose());
 
-        // ESC key — store reference so destroy() can remove the listener
         this.escCloseHandler = onClose;
         this.scene.input.keyboard!.on('keydown-ESC', onClose);
 
-        this.container.add([rect, label]);
+        this.container.add([gfx, hitRect, label]);
     }
 
     destroy(): void {
@@ -138,7 +228,23 @@ export class Panel {
             this.escCloseHandler = null;
         }
         this.overlay.destroy();
-        this.bg.destroy();
+        this.panelGfx.destroy();
         this.container.destroy();
     }
+}
+
+// ── Color helpers ─────────────────────────────────────────────────────────────
+
+function lighten(hex: number, amount = 32): number {
+    const r = Math.min(255, ((hex >> 16) & 0xff) + amount);
+    const g = Math.min(255, ((hex >>  8) & 0xff) + amount);
+    const b = Math.min(255, ( hex        & 0xff) + amount);
+    return (r << 16) | (g << 8) | b;
+}
+
+function darken(hex: number, amount = 20): number {
+    const r = Math.max(0, ((hex >> 16) & 0xff) - amount);
+    const g = Math.max(0, ((hex >>  8) & 0xff) - amount);
+    const b = Math.max(0, ( hex        & 0xff) - amount);
+    return (r << 16) | (g << 8) | b;
 }
