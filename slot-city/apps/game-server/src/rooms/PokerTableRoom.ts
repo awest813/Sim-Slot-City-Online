@@ -91,7 +91,7 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
     return { tileX: 10, tileY: 8 };
   }
 
-  protected onPlayerJoined(client: Client, player: PlayerSchema): void {
+  protected async onPlayerJoined(client: Client, player: PlayerSchema): Promise<void> {
     // Auto-assign seat for new players with buy-in
     const seatIndex = this.findEmptySeatIndex();
     if (seatIndex >= 0) {
@@ -113,8 +113,17 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
           isAI: false,
         });
 
-        // Deduct buy-in from player server chips
-        economy.removeChips(player.id, buyInActual).catch(console.error);
+        // Await the chip deduction so the DB is updated before we proceed;
+        // this prevents a race where the player could leave before the write
+        // completes and receive a double refund.
+        try {
+          await economy.removeChips(player.id, buyInActual);
+        } catch (err) {
+          // If deduction fails (e.g. stale balance), remove player and bail out
+          this.roundManager.removePlayer(player.id);
+          console.error("[PokerTableRoom] Buy-in chip deduction failed:", err);
+          return;
+        }
         player.chips -= buyInActual;
 
         this.updatePokerPlayer(player.id);
@@ -161,6 +170,8 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
         this.startTimer = null;
         if (this.roundManager.canStartRound()) {
           try {
+            this.lastWinnerId = "";
+            this.lastWinAmount = 0;
             this.roundManager.startRound();
             this.syncPokerState();
           } catch (err) {
@@ -189,6 +200,8 @@ export class PokerTableRoom extends BaseRoom<PokerRoomState> {
         }
         if (this.roundManager.canStartRound()) {
           try {
+            this.lastWinnerId = "";
+            this.lastWinAmount = 0;
             this.roundManager.startRound();
             this.syncPokerState();
           } catch (err) {

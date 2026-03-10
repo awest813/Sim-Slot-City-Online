@@ -23,6 +23,7 @@ export class HUD {
     private freeChipsBtn!: Phaser.GameObjects.Container;
     private unsub!: () => void;
     private prevChips: number = -1;
+    private chipFlashTimer: Phaser.Time.TimerEvent | null = null;
 
     constructor(scene: Phaser.Scene) {
         this.scene = scene;
@@ -97,11 +98,17 @@ export class HUD {
         this.chipsText.setText(`◈ ${s.chips.toLocaleString()} chips`);
         this.zoneText.setText(ZONE_LABELS[s.zone] ?? s.zone);
 
-        // Flash chip counter green on gain, red on loss, then restore
+        // Flash chip counter green on gain, red on loss, then restore.
+        // Cancel any in-flight flash timer so rapid changes don't stack.
         if (this.prevChips >= 0 && s.chips !== this.prevChips) {
             const flashColor = s.chips > this.prevChips ? '#2ecc71' : '#e74c3c';
             this.chipsText.setColor(flashColor);
-            this.scene.time.delayedCall(600, () => {
+            if (this.chipFlashTimer) {
+                this.chipFlashTimer.remove();
+                this.chipFlashTimer = null;
+            }
+            this.chipFlashTimer = this.scene.time.delayedCall(600, () => {
+                this.chipFlashTimer = null;
                 this.chipsText.setColor('#2ecc71');
             });
         }
@@ -115,6 +122,10 @@ export class HUD {
 
     destroy(): void {
         this.unsub();
+        if (this.chipFlashTimer) {
+            this.chipFlashTimer.remove();
+            this.chipFlashTimer = null;
+        }
         this.bg.destroy();
         this.nameText.destroy();
         this.chipsText.destroy();
