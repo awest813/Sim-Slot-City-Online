@@ -111,7 +111,7 @@ export class PokerRoundManager {
   /** Returns the active-seat player if they are an AI, otherwise undefined. */
   getActiveAIPlayer(): PokerPlayer | undefined {
     const player = this.getPlayerBySeat(this.state.activePlayerSeat);
-    if (player && player.isAI && !player.isFolded && !player.isAllIn) {
+    if (player && player.isAI && player.isActive && !player.isFolded && !player.isAllIn) {
       return player;
     }
     return undefined;

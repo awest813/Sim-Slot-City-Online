@@ -34,7 +34,11 @@ function generateToken(userId: string): string {
 }
 
 export function verifyToken(token: string): { userId: string } {
-  return jwt.verify(token, JWT_SECRET) as { userId: string };
+  const decoded = jwt.verify(token, JWT_SECRET) as Record<string, unknown>;
+  if (typeof decoded.userId !== "string" || !decoded.userId) {
+    throw new Error("Invalid token: missing userId");
+  }
+  return { userId: decoded.userId };
 }
 
 // POST /auth/register

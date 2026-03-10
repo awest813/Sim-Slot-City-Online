@@ -470,7 +470,8 @@ export class PokerPanel {
         // Guard: dealHand may fail if still not enough eligible players
         if (this.game.phase === 'waiting') {
             this.setStatus(this.game.statusMessage, '#e74c3c');
-            this.scene.time.delayedCall(2200, () => this.close());
+            const t = this.scene.time.delayedCall(2200, () => this.close());
+            this.aiTimers.push(t);
             return;
         }
 

@@ -311,6 +311,10 @@ export class SlotsPanel {
             return;
         }
 
+        // Clear any stale (already-fired) timer references from the previous spin
+        // so the array doesn't grow unboundedly over many spins.
+        this.spinTimers = [];
+
         GameState.addChips(-this.currentBet);
         this.totalSpins++;
         this.totalWagered += this.currentBet;
