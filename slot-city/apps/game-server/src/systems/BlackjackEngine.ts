@@ -227,9 +227,15 @@ export function dealHands(state: BJServerState): BJServerState {
   [deck, dc2] = drawOne(deck);
   dealerHand = [...dealerHand, dc2];
 
-  // Resolve any immediate blackjacks
+  const dealerBJ = isBlackjack(dealerHand);
+
+  // Resolve any immediate blackjacks (player BJ + dealer BJ = push)
   const resolvedPlayers = updatedPlayers.map(p => {
     if (p.bet > 0 && isBlackjack(p.hand)) {
+      if (dealerBJ) {
+        // Both have blackjack → push: return the bet, no bonus
+        return { ...p, result: "push" as BlackjackResult, chips: p.chips + p.bet, hasActed: true };
+      }
       const payout = p.bet + Math.floor(p.bet * 1.5);
       return { ...p, result: "blackjack" as BlackjackResult, chips: p.chips + payout, hasActed: true };
     }

@@ -99,6 +99,23 @@ export function deal(state: BlackjackState, bet: number): BlackjackState {
     const dealerHand: Card[] = [c2, c4];
 
     const playerBJ = isBlackjack(playerHand);
+    const dealerBJ = isBlackjack(dealerHand);
+
+    // Both have blackjack → push (return bet, no 1.5× bonus)
+    if (playerBJ && dealerBJ) {
+        return {
+            ...state,
+            deck,
+            playerHand,
+            dealerHand,
+            bet,
+            phase:          'result',
+            result:         'push',
+            dealerRevealed: true,
+            handsPlayed:    state.handsPlayed + 1,
+            sessionPushes:  state.sessionPushes + 1,
+        };
+    }
 
     return {
         ...state,
