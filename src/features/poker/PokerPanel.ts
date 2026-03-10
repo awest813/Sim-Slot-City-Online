@@ -101,6 +101,7 @@ export class PokerPanel {
     private game!: PokerGameState;
     private playerSeatId: number | null = null;
     private aiTimers: Phaser.Time.TimerEvent[] = [];
+    private turnTween: Phaser.Tweens.Tween | null = null;
     private waitingForAI = false;
     private escKey!: Phaser.Input.Keyboard.Key;
     private fKey!: Phaser.Input.Keyboard.Key;
@@ -334,6 +335,8 @@ export class PokerPanel {
         let midStr = '', midColor = '#888888';
         if (folded) {
             midStr = 'FOLDED'; midColor = '#553333';
+        } else if (gamePlayer?.allIn) {
+            midStr = `ALL IN`; midColor = '#cc44cc';
         } else if (gamePlayer) {
             midStr = `${gamePlayer.chips}◈`; midColor = '#c9a84c';
         } else if (isAIConf) {
@@ -632,7 +635,7 @@ export class PokerPanel {
         this.actionArea.add(turnBg);
         this.actionArea.add(turnBanner);
         // Subtle pulse on the banner to draw player attention
-        this.scene.tweens.add({
+        this.turnTween = this.scene.tweens.add({
             targets: turnBanner,
             alpha: 0.5,
             yoyo: true,
@@ -663,6 +666,10 @@ export class PokerPanel {
     }
 
     private hidePlayerActions(): void {
+        if (this.turnTween) {
+            this.turnTween.stop();
+            this.turnTween = null;
+        }
         this.actionArea.removeAll(true);
     }
 
