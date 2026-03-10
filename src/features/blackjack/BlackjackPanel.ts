@@ -32,6 +32,7 @@ export class BlackjackPanel {
     private overlay!:    Phaser.GameObjects.Rectangle;
     private container!:  Phaser.GameObjects.Container;
     private escKey!:     Phaser.Input.Keyboard.Key;
+    private spaceKey!:   Phaser.Input.Keyboard.Key;
 
     // Dynamic display groups (rebuilt on each hand redraw)
     private dealerCardObjs: Phaser.GameObjects.GameObject[] = [];
@@ -50,6 +51,7 @@ export class BlackjackPanel {
     private actionBtns: Phaser.GameObjects.Container[] = [];
     private doubleBtn:  Phaser.GameObjects.Container | null = null;
     private newHandBtn: Phaser.GameObjects.Container | null = null;
+    private freeBtn:    Phaser.GameObjects.Container | null = null;
 
     // State
     private bjState!:      BlackjackState;
@@ -150,6 +152,12 @@ export class BlackjackPanel {
         this.escKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
         this.escKey.on('down', () => this.close());
 
+        // ── SPACE key (deal / next hand shortcut) ─────────────────────────────
+        this.spaceKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        this.spaceKey.on('down', () => {
+            if (this.bjState.phase === 'betting') this.startHand();
+        });
+
         // Build bet-selection UI
         this.buildBetUI();
 
@@ -242,7 +250,11 @@ export class BlackjackPanel {
         if (this.currentBet > chips) {
             // Find the largest affordable bet
             const max = BET_OPTIONS.slice().reverse().find(o => o <= chips);
-            if (!max) { this.close(); return; }
+            if (!max) {
+                // Can't afford even the minimum bet — offer free chips
+                this.offerFreeChips();
+                return;
+            }
             this.currentBet = max;
         }
 
@@ -254,7 +266,7 @@ export class BlackjackPanel {
         this.showPhaseUI();
         this.refreshDisplay();
 
-        // Resolve immediately if the hand ended on deal (player BJ, or both BJ → push)
+        // Auto-resolve when the deal immediately ends the hand (player BJ, or BJ push)
         if (this.bjState.phase === 'result') {
             this.resolveResult();
         }
@@ -263,6 +275,7 @@ export class BlackjackPanel {
     private doHit(): void {
         if (this.bjState.phase !== 'playing') return;
         this.bjState = hit(this.bjState);
+        this.showPhaseUI();     // hides double button once player has 3+ cards
         this.refreshDisplay();
         if (this.bjState.phase === 'result') this.resolveResult();
     }
@@ -296,9 +309,28 @@ export class BlackjackPanel {
 
     private prepareNextHand(): void {
         if (this.newHandBtn) { this.newHandBtn.destroy(); this.newHandBtn = null; }
+        if (this.freeBtn)    { this.freeBtn.destroy();    this.freeBtn    = null; }
         this.bjState    = nextHand(this.bjState);
         this.betDeducted = false;
         this.showPhaseUI();
+        this.refreshDisplay();
+    }
+
+    private offerFreeChips(): void {
+        if (this.freeBtn) return;  // already shown
+
+        const FREE_AMOUNT = 500;
+        this.freeBtn = this.makeButton(
+            PW / 2 - 100, PH / 2 - 88, 140, 28,
+            `◈ FREE ${FREE_AMOUNT} CHIPS`, 0x1a4a1a,
+            () => {
+                GameState.addChips(FREE_AMOUNT);
+                if (this.freeBtn) { this.freeBtn.destroy(); this.freeBtn = null; }
+                this.currentBet = BET_OPTIONS[0];
+                this.refreshDisplay();
+            },
+        );
+        this.container.add(this.freeBtn);
         this.refreshDisplay();
     }
 
@@ -485,7 +517,7 @@ export class BlackjackPanel {
     private updateStats(): void {
         const s = this.bjState;
         if (s.handsPlayed === 0) {
-            this.statsText.setText('ESC to close  ·  Select bet and press DEAL');
+            this.statsText.setText('ESC to close  ·  Select bet and press DEAL or SPACE');
         } else {
             this.statsText.setText(
                 `Hands: ${s.handsPlayed}  ·  Wins: ${s.sessionWins}  ·  Losses: ${s.sessionLosses}  ·  Pushes: ${s.sessionPushes}`
@@ -530,6 +562,7 @@ export class BlackjackPanel {
         }
 
         this.scene.input.keyboard!.removeKey(this.escKey);
+        this.scene.input.keyboard!.removeKey(this.spaceKey);
         this.overlay.destroy();
         this.container.destroy(true);
         this.onClose();
