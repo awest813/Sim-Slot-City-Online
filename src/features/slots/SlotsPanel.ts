@@ -1,10 +1,13 @@
-// ── Playable slot machine minigame ───────────────────────────────────────────
+// ── Playable slot machine minigame ────────────────────────────────────────────
 // Three reels, configurable bet, payout table, win/loss feedback.
 import Phaser from 'phaser';
 import { GameState } from '../../core/state/GameState';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
+    COL_UI_BG2, COL_UI_BORDER_DIM,
+    COL_TRIM, COL_TRIM_LIGHT, COL_TRIM_DIM,
     COL_SLOT_BODY, COL_SLOT_TRIM,
+    FONT, PANEL_RADIUS, ANIM_MED,
 } from '../../game/constants';
 
 const SYMBOLS  = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
@@ -12,16 +15,9 @@ const WEIGHTS  = [30, 25, 20, 12, 7, 4, 2];  // weighted rarity (lower = rarer)
 
 // Payout multipliers for matching symbols (3-of-a-kind)
 const PAYOUTS: Record<string, number> = {
-    '🍒': 2,
-    '🍋': 3,
-    '🍊': 4,
-    '🍇': 6,
-    '⭐': 10,
-    '💎': 20,
-    '7️⃣': 50,
+    '🍒': 2, '🍋': 3, '🍊': 4, '🍇': 6, '⭐': 10, '💎': 20, '7️⃣': 50,
 };
-// Two-of-a-kind cherry = small consolation (only when the pair IS cherries)
-const CHERRY_PAIR_PAYOUT = 1;
+const CHERRY_PAIR_PAYOUT = 1;   // Two cherries = small consolation
 
 function weightedRandom(): string {
     const total = WEIGHTS.reduce((a, b) => a + b, 0);
@@ -34,229 +30,122 @@ function weightedRandom(): string {
 }
 
 type SpinState = 'idle' | 'spinning' | 'result';
-
 const BET_OPTIONS = [10, 25, 50, 100];
 
 export class SlotsPanel {
-    private scene: Phaser.Scene;
+    private scene:   Phaser.Scene;
     private onClose: () => void;
 
     // Phaser objects
-    private overlay!: Phaser.GameObjects.Rectangle;
-    private container!: Phaser.GameObjects.Container;
-    private reelTexts: Phaser.GameObjects.Text[] = [];
-    private resultText!: Phaser.GameObjects.Text;
-    private chipsText!: Phaser.GameObjects.Text;
-    private betText!: Phaser.GameObjects.Text;
-    private statsText!: Phaser.GameObjects.Text;
-    private spinBtn!: Phaser.GameObjects.Rectangle;
+    private overlay!:      Phaser.GameObjects.Rectangle;
+    private panelGfx!:     Phaser.GameObjects.Graphics;
+    private container!:    Phaser.GameObjects.Container;
+    private reelTexts:     Phaser.GameObjects.Text[] = [];
+    private payLineGfx!:   Phaser.GameObjects.Graphics;
+    private resultText!:   Phaser.GameObjects.Text;
+    private chipsText!:    Phaser.GameObjects.Text;
+    private betText!:      Phaser.GameObjects.Text;
+    private statsText!:    Phaser.GameObjects.Text;
+    private spinBtnGfx!:   Phaser.GameObjects.Graphics;
     private spinBtnLabel!: Phaser.GameObjects.Text;
-    private betBtns: Phaser.GameObjects.Container[] = [];
-    private payLine!: Phaser.GameObjects.Rectangle;
-    private escKey!: Phaser.Input.Keyboard.Key;
-    private spaceKey!: Phaser.Input.Keyboard.Key;
-    private freeChipsBtn: Phaser.GameObjects.Container | null = null;
+    private spinBtnHit!:   Phaser.GameObjects.Rectangle;
+    private betBtns:       Array<{ gfx: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text; amount: number }> = [];
+    private freeChipsContainer: Phaser.GameObjects.Container | null = null;
+    private escKey!:       Phaser.Input.Keyboard.Key;
+    private spaceKey!:     Phaser.Input.Keyboard.Key;
 
     // State
-    private spinState: SpinState = 'idle';
-    private currentBet: number = 25;
-    private reelValues: string[] = ['🎰', '🎰', '🎰'];
-    private spinTimers: Phaser.Time.TimerEvent[] = [];
-    private spinDone: boolean[] = [false, false, false];
-    private closed: boolean = false;
+    private spinState:    SpinState = 'idle';
+    private currentBet:   number    = 25;
+    private reelValues:   string[]  = ['🎰', '🎰', '🎰'];
+    private spinTimers:   Phaser.Time.TimerEvent[] = [];
+    private spinDone:     boolean[] = [false, false, false];
+    private closed:       boolean   = false;
 
-    // Session statistics
-    private totalSpins: number = 0;
-    private totalWon: number = 0;
-    private totalWagered: number = 0;
-    private winStreak: number = 0;
-    private maxWinStreak: number = 0;
+    // Session stats
+    private totalSpins   = 0;
+    private totalWon     = 0;
+    private totalWagered = 0;
+    private winStreak    = 0;
+    private maxWinStreak = 0;
+
+    // Layout
+    private readonly PW = 520;
+    private readonly PH = 460;
 
     constructor(scene: Phaser.Scene, onClose: () => void) {
-        this.scene = scene;
+        this.scene   = scene;
         this.onClose = onClose;
         this.build();
     }
 
+    // ── Build ─────────────────────────────────────────────────────────────────
+
     private build(): void {
+        const { PW, PH } = this;
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
-        const pw = 520;
-        const ph = 460;
 
         // Dimming overlay
-        this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.75)
+        this.overlay = this.scene.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0)
             .setScrollFactor(0).setDepth(DEPTH_PANEL - 1).setInteractive();
+        this.scene.tweens.add({ targets: this.overlay, fillAlpha: 0.76, duration: ANIM_MED });
 
-        // Main container
-        this.container = this.scene.add.container(cx, cy).setScrollFactor(0).setDepth(DEPTH_PANEL + 1);
+        // Panel background (rounded rect)
+        this.panelGfx = this.scene.add.graphics()
+            .setScrollFactor(0).setDepth(DEPTH_PANEL);
+        this.drawPanelBg();
 
-        // Panel background
-        const bg = this.scene.add.rectangle(0, 0, pw, ph, COL_SLOT_BODY, 1)
-            .setStrokeStyle(3, COL_SLOT_TRIM, 1);
-        this.container.add(bg);
+        // Content container (entrance animation)
+        this.container = this.scene.add.container(cx, cy)
+            .setScrollFactor(0).setDepth(DEPTH_PANEL + 1);
+        this.container.setAlpha(0).setScale(0.93);
+        this.scene.tweens.add({
+            targets: this.container, alpha: 1, scaleX: 1, scaleY: 1,
+            duration: ANIM_MED, ease: 'Back.Out',
+        });
 
-        // Title
-        const title = this.scene.add.text(0, -ph / 2 + 22, '🎰  SLOT MACHINE', {
-            fontFamily: 'monospace', fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
+        // ── Title ─────────────────────────────────────────────────────────
+        const title = this.scene.add.text(0, -PH / 2 + 26, '🎰  SLOT MACHINE', {
+            fontFamily: FONT, fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
         this.container.add(title);
 
-        const divider = this.scene.add.rectangle(0, -ph / 2 + 40, pw - 40, 1, COL_SLOT_TRIM, 0.6);
-        this.container.add(divider);
+        // Close button (circle X, top-right corner of panel)
+        this.buildCloseButton();
 
-        // Chips display
-        this.chipsText = this.scene.add.text(-pw / 2 + 20, -ph / 2 + 54, '', {
-            fontFamily: 'monospace', fontSize: '13px', color: '#2ecc71',
-        }).setOrigin(0, 0);
+        // Chips balance
+        this.chipsText = this.scene.add.text(-PW / 2 + 18, -PH / 2 + 62, '', {
+            fontFamily: FONT, fontSize: '12px', color: '#2ecc71', fontStyle: 'bold',
+        }).setOrigin(0, 0.5);
         this.container.add(this.chipsText);
 
-        // Reel panel
-        const reelPanelY = -30;
-        const reelBg = this.scene.add.rectangle(0, reelPanelY, 340, 110, 0x080814, 1)
-            .setStrokeStyle(2, COL_SLOT_TRIM, 0.8);
-        this.container.add(reelBg);
+        // ── Reel window ────────────────────────────────────────────────────
+        const reelPanelY = -26;
+        this.buildReelWindow(reelPanelY);
 
-        // Three reels
-        const reelXs = [-110, 0, 110];
-        for (let i = 0; i < 3; i++) {
-            const reelFrame = this.scene.add.rectangle(reelXs[i], reelPanelY, 90, 90, 0x0d0d1e, 1)
-                .setStrokeStyle(1.5, COL_SLOT_TRIM, 0.6);
-            this.container.add(reelFrame);
-
-            const reel = this.scene.add.text(reelXs[i], reelPanelY, '🎰', {
-                fontFamily: 'monospace', fontSize: '42px',
-            }).setOrigin(0.5);
-            this.container.add(reel);
-            this.reelTexts.push(reel);
-        }
-
-        // Pay line indicator
-        this.payLine = this.scene.add.rectangle(0, reelPanelY, 340, 3, COL_SLOT_TRIM, 0.4);
-        this.container.add(this.payLine);
-
-        // Result text
-        this.resultText = this.scene.add.text(0, reelPanelY + 72, '', {
-            fontFamily: 'monospace', fontSize: '15px', color: '#c9a84c',
+        // ── Result text ────────────────────────────────────────────────────
+        this.resultText = this.scene.add.text(0, reelPanelY + 76, '', {
+            fontFamily: FONT, fontSize: '15px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
         this.container.add(this.resultText);
 
         // Session stats
-        this.statsText = this.scene.add.text(0, reelPanelY + 91, '', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#888888',
+        this.statsText = this.scene.add.text(0, reelPanelY + 96, '', {
+            fontFamily: FONT, fontSize: '10px', color: '#666688',
         }).setOrigin(0.5);
         this.container.add(this.statsText);
 
-        // Bet section label
-        const betLabel = this.scene.add.text(-90, ph / 2 - 150, 'BET:', {
-            fontFamily: 'monospace', fontSize: '11px', color: '#888888',
-        }).setOrigin(0, 0.5);
-        this.container.add(betLabel);
+        // ── Bet controls + SPIN button ─────────────────────────────────────
+        this.buildBetControls();
+        this.buildSpinButton();
 
-        // Max Bet shortcut button
-        const maxBetRect = this.scene.add.rectangle(pw / 2 - 56, ph / 2 - 150, 72, 24, 0x1e1e3a, 1)
-            .setStrokeStyle(1, 0x4444aa, 1)
-            .setInteractive({ useHandCursor: true });
-        const maxBetLabel = this.scene.add.text(pw / 2 - 56, ph / 2 - 150, 'MAX BET', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#8888cc',
-        }).setOrigin(0.5);
-        maxBetRect.on('pointerover', () => maxBetRect.setStrokeStyle(1, COL_SLOT_TRIM, 1));
-        maxBetRect.on('pointerout',  () => maxBetRect.setStrokeStyle(1, 0x4444aa, 1));
-        maxBetRect.on('pointerdown', () => {
-            const chips = GameState.get().chips;
-            let newBet = BET_OPTIONS[0];  // fallback to minimum option
-            for (let i = BET_OPTIONS.length - 1; i >= 0; i--) {
-                if (chips >= BET_OPTIONS[i]) {
-                    newBet = BET_OPTIONS[i];
-                    break;
-                }
-            }
-            this.currentBet = newBet;
-            this.updateBetDisplay();
-        });
-        this.container.add([maxBetRect, maxBetLabel]);
+        // ── Payout hint row ────────────────────────────────────────────────
+        this.buildPayoutHint();
 
-        // Bet amount buttons
-        const betBtnXs = [-90, -30, 30, 90];
-        BET_OPTIONS.forEach((amount, i) => {
-            const isDefault = amount === this.currentBet;
-            const rect = this.scene.add.rectangle(betBtnXs[i], ph / 2 - 130, 52, 28, isDefault ? 0x2a2a5e : 0x1a1a3e, 1)
-                .setStrokeStyle(isDefault ? 2 : 1, isDefault ? COL_SLOT_TRIM : 0x444488, 1)
-                .setInteractive({ useHandCursor: true });
-            const label = this.scene.add.text(betBtnXs[i], ph / 2 - 130, `${amount}`, {
-                fontFamily: 'monospace', fontSize: '13px', color: isDefault ? '#c9a84c' : '#8888bb',
-            }).setOrigin(0.5);
-
-            rect.on('pointerover', () => rect.setStrokeStyle(1, COL_SLOT_TRIM, 1));
-            rect.on('pointerout',  () => rect.setStrokeStyle(1, this.currentBet === amount ? COL_SLOT_TRIM : 0x444488, 1));
-            rect.on('pointerdown', () => {
-                this.currentBet = amount;
-                this.updateBetDisplay();
-            });
-
-            const btnContainer = this.scene.add.container(0, 0, [rect, label]);
-            this.container.add(btnContainer);
-            this.betBtns.push(btnContainer);
-        });
-
-        this.betText = this.scene.add.text(0, ph / 2 - 105, '', {
-            fontFamily: 'monospace', fontSize: '12px', color: '#aaaacc',
-        }).setOrigin(0.5);
-        this.container.add(this.betText);
-
-        // Spin button
-        this.spinBtn = this.scene.add.rectangle(0, ph / 2 - 74, 200, 40, 0x3a2a6a, 1)
-            .setStrokeStyle(2, COL_SLOT_TRIM, 1)
-            .setInteractive({ useHandCursor: true });
-
-        this.spinBtnLabel = this.scene.add.text(0, ph / 2 - 74, 'SPIN', {
-            fontFamily: 'monospace', fontSize: '16px', color: '#c9a84c', fontStyle: 'bold',
-        }).setOrigin(0.5);
-
-        // SPACE key hint inside button (subtle)
-        const spaceHint = this.scene.add.text(80, ph / 2 - 74, '[SPACE]', {
-            fontFamily: 'monospace', fontSize: '9px', color: '#554466',
-        }).setOrigin(0, 0.5);
-        this.container.add(spaceHint);
-
-        this.spinBtn.on('pointerover', () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x4a3a8a); });
-        this.spinBtn.on('pointerout',  () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x3a2a6a); });
-        this.spinBtn.on('pointerdown', () => {
-            if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x2a1a5a);
-            this.spin();
-        });
-        this.spinBtn.on('pointerup', () => { if (this.spinState === 'idle') this.spinBtn.setFillStyle(0x4a3a8a); });
-
-        this.container.add([this.spinBtn, this.spinBtnLabel]);
-
-        // Payout table hint (two lines)
-        const payHint1 = this.scene.add.text(0, ph / 2 - 46, '7️⃣×3=50x  💎×3=20x  ⭐×3=10x  🍇×3=6x', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#666688',
-        }).setOrigin(0.5);
-        const payHint2 = this.scene.add.text(0, ph / 2 - 32, '🍊×3=4x  🍋×3=3x  🍒×3=2x  🍒pair=1x', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#555566',
-        }).setOrigin(0.5);
-        this.container.add([payHint1, payHint2]);
-
-        // Close button
-        const closeRect = this.scene.add.rectangle(pw / 2 - 14, -ph / 2 + 14, 20, 20, 0x3a1e1e, 1)
-            .setStrokeStyle(1, 0x8a3a3a, 1)
-            .setInteractive({ useHandCursor: true });
-        const closeLabel = this.scene.add.text(pw / 2 - 14, -ph / 2 + 14, '✕', {
-            fontFamily: 'monospace', fontSize: '12px', color: '#e05050',
-        }).setOrigin(0.5);
-
-        closeRect.on('pointerover', () => closeRect.setFillStyle(0x5a2a2a));
-        closeRect.on('pointerout',  () => closeRect.setFillStyle(0x3a1e1e));
-        closeRect.on('pointerdown', () => { closeRect.setFillStyle(0x2a0a0a); this.close(); });
-        closeRect.on('pointerup',   () => closeRect.setFillStyle(0x5a2a2a));
-
-        this.container.add([closeRect, closeLabel]);
-
-        // ESC and SPACE keyboard shortcuts
+        // ── Keyboard shortcuts ─────────────────────────────────────────────
         this.escKey   = this.scene.input.keyboard!.addKey('ESC');
         this.spaceKey = this.scene.input.keyboard!.addKey('SPACE');
-        // Use .on() for both so they're both cleanly destroyed in close()
         this.escKey.on('down',   () => this.close());
         this.spaceKey.on('down', () => { if (this.spinState === 'idle') this.spin(); });
 
@@ -265,42 +154,347 @@ export class SlotsPanel {
         this.updateStatsDisplay();
     }
 
+    // ── Sub-builders ──────────────────────────────────────────────────────────
+
+    private drawPanelBg(): void {
+        const { PW, PH } = this;
+        const cx = GAME_WIDTH  / 2;
+        const cy = GAME_HEIGHT / 2;
+        const px = cx - PW / 2;
+        const py = cy - PH / 2;
+        const g  = this.panelGfx;
+        g.clear();
+
+        // Outer shadow
+        g.fillStyle(0x000000, 0.55);
+        g.fillRoundedRect(px + 5, py + 6, PW, PH, PANEL_RADIUS + 2);
+        // Body
+        g.fillStyle(COL_SLOT_BODY, 1);
+        g.fillRoundedRect(px, py, PW, PH, PANEL_RADIUS);
+        // Header band
+        g.fillStyle(0x0d0d28, 1);
+        g.fillRoundedRect(px, py, PW, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
+        // Gold border
+        g.lineStyle(2, COL_SLOT_TRIM, 0.9);
+        g.strokeRoundedRect(px, py, PW, PH, PANEL_RADIUS);
+        // Inner inset
+        g.lineStyle(1, COL_TRIM_DIM, 0.20);
+        g.strokeRoundedRect(px + 3, py + 3, PW - 6, PH - 6, PANEL_RADIUS - 1);
+        // Header divider
+        g.lineStyle(1.5, COL_TRIM, 0.5);
+        g.lineBetween(px + 16, py + 52, px + PW - 16, py + 52);
+    }
+
+    private buildCloseButton(): void {
+        const { PW, PH } = this;
+        const r  = 12;
+        const bx = PW / 2 - 18;
+        const by = -PH / 2 + 18;
+
+        const gfx  = this.scene.add.graphics();
+        const draw = (hover: boolean): void => {
+            gfx.clear();
+            gfx.fillStyle(hover ? 0x622020 : 0x3a1818, 1);
+            gfx.fillCircle(bx, by, r);
+            gfx.lineStyle(1, hover ? 0xaa3030 : 0x773030, 0.9);
+            gfx.strokeCircle(bx, by, r);
+        };
+        draw(false);
+
+        const hitArea = this.scene.add.circle(bx, by, r, 0x000000, 0)
+            .setInteractive({ useHandCursor: true });
+        const xLabel = this.scene.add.text(bx, by, '✕', {
+            fontFamily: FONT, fontSize: '13px', color: '#cc4040',
+        }).setOrigin(0.5);
+
+        hitArea.on('pointerover', () => { draw(true);  xLabel.setColor('#ff5050'); });
+        hitArea.on('pointerout',  () => { draw(false); xLabel.setColor('#cc4040'); });
+        hitArea.on('pointerdown', () => this.close());
+
+        this.container.add([gfx, hitArea, xLabel]);
+    }
+
+    private buildReelWindow(reelPanelY: number): void {
+        const reelW = 350;
+        const reelH = 118;
+
+        const reelBgGfx = this.scene.add.graphics();
+        // Outer shadow
+        reelBgGfx.fillStyle(0x000000, 0.5);
+        reelBgGfx.fillRoundedRect(-reelW / 2 + 3, reelPanelY - reelH / 2 + 3, reelW, reelH, 8);
+        // Main bg
+        reelBgGfx.fillStyle(0x050510, 1);
+        reelBgGfx.fillRoundedRect(-reelW / 2, reelPanelY - reelH / 2, reelW, reelH, 8);
+        // Gold border
+        reelBgGfx.lineStyle(2, COL_SLOT_TRIM, 0.9);
+        reelBgGfx.strokeRoundedRect(-reelW / 2, reelPanelY - reelH / 2, reelW, reelH, 8);
+        // Inner glow ring
+        reelBgGfx.lineStyle(1, COL_TRIM_DIM, 0.25);
+        reelBgGfx.strokeRoundedRect(-reelW / 2 + 4, reelPanelY - reelH / 2 + 4, reelW - 8, reelH - 8, 6);
+        this.container.add(reelBgGfx);
+
+        // Individual reel slots
+        const reelXs = [-110, 0, 110];
+        const rSlotW = 96;
+        const rSlotH = 96;
+
+        for (let i = 0; i < 3; i++) {
+            const rgfx = this.scene.add.graphics();
+            // Slot bg
+            rgfx.fillStyle(0x07071a, 1);
+            rgfx.fillRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY - rSlotH / 2, rSlotW, rSlotH, 5);
+            // Slot border
+            rgfx.lineStyle(1, COL_SLOT_TRIM, 0.4);
+            rgfx.strokeRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY - rSlotH / 2, rSlotW, rSlotH, 5);
+            // Inner shadow at top/bottom
+            rgfx.fillStyle(0x000000, 0.45);
+            rgfx.fillRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY - rSlotH / 2, rSlotW, 14, { tl: 5, tr: 5, bl: 0, br: 0 });
+            rgfx.fillRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY + rSlotH / 2 - 14, rSlotW, 14, { tl: 0, tr: 0, bl: 5, br: 5 });
+            this.container.add(rgfx);
+
+            const reel = this.scene.add.text(reelXs[i], reelPanelY, '🎰', {
+                fontFamily: FONT, fontSize: '44px',
+            }).setOrigin(0.5);
+            this.container.add(reel);
+            this.reelTexts.push(reel);
+        }
+
+        // Pay-line
+        this.payLineGfx = this.scene.add.graphics();
+        this.drawPayLine(false);
+        this.container.add(this.payLineGfx);
+    }
+
+    private buildBetControls(): void {
+        const { PW, PH } = this;
+        const betAreaY = PH / 2 - 142;
+
+        const betLbl = this.scene.add.text(-PW / 2 + 18, betAreaY, 'BET PER SPIN:', {
+            fontFamily: FONT, fontSize: '10px', color: '#667788', fontStyle: 'bold', letterSpacing: 1,
+        }).setOrigin(0, 0.5);
+        this.container.add(betLbl);
+
+        // MAX BET shortcut
+        const maxGfx = this.scene.add.graphics();
+        const drawMax = (hover: boolean): void => {
+            maxGfx.clear();
+            maxGfx.fillStyle(hover ? 0x222248 : 0x18183c, 1);
+            maxGfx.fillRoundedRect(PW / 2 - 82, betAreaY - 13, 72, 26, 4);
+            maxGfx.lineStyle(1, hover ? COL_TRIM : 0x4444aa, 0.8);
+            maxGfx.strokeRoundedRect(PW / 2 - 82, betAreaY - 13, 72, 26, 4);
+        };
+        drawMax(false);
+        const maxHit = this.scene.add.rectangle(PW / 2 - 46, betAreaY, 72, 26, 0x000000, 0)
+            .setInteractive({ useHandCursor: true });
+        const maxLbl = this.scene.add.text(PW / 2 - 46, betAreaY, 'MAX BET', {
+            fontFamily: FONT, fontSize: '9px', color: '#8888cc', fontStyle: 'bold',
+        }).setOrigin(0.5);
+        maxHit.on('pointerover', () => { drawMax(true);  maxLbl.setColor('#c9a84c'); });
+        maxHit.on('pointerout',  () => { drawMax(false); maxLbl.setColor('#8888cc'); });
+        maxHit.on('pointerdown', () => {
+            const chips = GameState.get().chips;
+            let newBet = BET_OPTIONS[0];
+            for (let i = BET_OPTIONS.length - 1; i >= 0; i--) {
+                if (chips >= BET_OPTIONS[i]) { newBet = BET_OPTIONS[i]; break; }
+            }
+            this.currentBet = newBet;
+            this.updateBetDisplay();
+        });
+        this.container.add([maxGfx, maxHit, maxLbl]);
+
+        // Bet amount buttons
+        const btnW = 56;
+        const btnH = 30;
+        const total = BET_OPTIONS.length * btnW + (BET_OPTIONS.length - 1) * 8;
+        const startX = -total / 2 + btnW / 2;
+        const btnY = betAreaY + 24;
+
+        BET_OPTIONS.forEach((amount, i) => {
+            const bx = startX + i * (btnW + 8);
+            const gfx = this.scene.add.graphics();
+
+            const drawBtn = (selected: boolean, canAfford: boolean): void => {
+                gfx.clear();
+                const fill = selected ? 0x2a2a60 : canAfford ? 0x18183c : 0x10101e;
+                const sc   = selected ? COL_SLOT_TRIM : canAfford ? 0x444488 : 0x282820;
+                const sa   = selected ? 1 : canAfford ? 0.6 : 0.3;
+                gfx.fillStyle(fill, 1);
+                gfx.fillRoundedRect(bx - btnW / 2, btnY - btnH / 2, btnW, btnH, 4);
+                gfx.lineStyle(selected ? 1.5 : 1, sc, sa);
+                gfx.strokeRoundedRect(bx - btnW / 2, btnY - btnH / 2, btnW, btnH, 4);
+            };
+
+            const chips = GameState.get().chips;
+            drawBtn(amount === this.currentBet, chips >= amount);
+
+            const hitRect = this.scene.add.rectangle(bx, btnY, btnW, btnH, 0x000000, 0)
+                .setInteractive({ useHandCursor: true });
+            const lbl = this.scene.add.text(bx, btnY, `${amount}`, {
+                fontFamily: FONT, fontSize: '13px',
+                color: amount === this.currentBet ? '#c9a84c' : '#8888bb',
+            }).setOrigin(0.5);
+
+            hitRect.on('pointerdown', () => {
+                if (GameState.get().chips < amount) return;
+                this.currentBet = amount;
+                this.updateBetDisplay();
+            });
+
+            this.container.add([gfx, hitRect, lbl]);
+            this.betBtns.push({ gfx, label: lbl, amount });
+        });
+
+        this.betText = this.scene.add.text(0, btnY + 26, '', {
+            fontFamily: FONT, fontSize: '11px', color: '#9090cc',
+        }).setOrigin(0.5);
+        this.container.add(this.betText);
+    }
+
+    private buildSpinButton(): void {
+        const { PH } = this;
+        const btnW = 210;
+        const btnH = 44;
+        const btnY = PH / 2 - 74;
+
+        this.spinBtnGfx = this.scene.add.graphics();
+        this.drawSpinButton('idle');
+
+        this.spinBtnLabel = this.scene.add.text(0, btnY, 'SPIN', {
+            fontFamily: FONT, fontSize: '17px', color: '#c9a84c', fontStyle: 'bold',
+        }).setOrigin(0.5);
+
+        const spaceHint = this.scene.add.text(btnW / 2 - 4, btnY, '[SPACE]', {
+            fontFamily: FONT, fontSize: '8px', color: '#3a2a5a',
+        }).setOrigin(1, 0.5);
+
+        this.spinBtnHit = this.scene.add.rectangle(0, btnY, btnW, btnH, 0x000000, 0)
+            .setInteractive({ useHandCursor: true });
+        this.spinBtnHit.on('pointerover', () => { if (this.spinState === 'idle') this.drawSpinButton('hover'); });
+        this.spinBtnHit.on('pointerout',  () => { if (this.spinState === 'idle') this.drawSpinButton('idle'); });
+        this.spinBtnHit.on('pointerdown', () => {
+            if (this.spinState === 'idle') { this.drawSpinButton('press'); this.spin(); }
+        });
+        this.spinBtnHit.on('pointerup',   () => { if (this.spinState === 'idle') this.drawSpinButton('hover'); });
+
+        this.container.add([this.spinBtnGfx, this.spinBtnLabel, spaceHint, this.spinBtnHit]);
+    }
+
+    private drawSpinButton(state: 'idle' | 'hover' | 'press' | 'spinning'): void {
+        const { PH } = this;
+        const btnW = 210;
+        const btnH = 44;
+        const btnY = PH / 2 - 74;
+        const r = 6;
+        const g = this.spinBtnGfx;
+        g.clear();
+
+        const fills: Record<typeof state, number> = {
+            idle: 0x2e1a58, hover: 0x4a2a88, press: 0x1e0e3a, spinning: 0x1a1238,
+        };
+        const strokeC: Record<typeof state, number> = {
+            idle: COL_SLOT_TRIM, hover: COL_TRIM_LIGHT, press: COL_TRIM_DIM, spinning: 0x443366,
+        };
+        const strokeA: Record<typeof state, number> = {
+            idle: 0.85, hover: 1, press: 0.7, spinning: 0.4,
+        };
+
+        // Shadow
+        g.fillStyle(0x000000, 0.4);
+        g.fillRoundedRect(-btnW / 2 + 2, btnY - btnH / 2 + 3, btnW, btnH, r + 1);
+        // Fill
+        g.fillStyle(fills[state], 1);
+        g.fillRoundedRect(-btnW / 2, btnY - btnH / 2, btnW, btnH, r);
+        // Top gloss
+        if (state !== 'spinning') {
+            g.fillStyle(0xffffff, state === 'hover' ? 0.06 : 0.04);
+            g.fillRoundedRect(-btnW / 2 + 3, btnY - btnH / 2 + 3, btnW - 6, btnH / 2 - 3, { tl: r - 1, tr: r - 1, bl: 0, br: 0 });
+        }
+        // Border
+        g.lineStyle(1.5, strokeC[state], strokeA[state]);
+        g.strokeRoundedRect(-btnW / 2, btnY - btnH / 2, btnW, btnH, r);
+        // Hover glow
+        if (state === 'hover') {
+            g.lineStyle(6, COL_TRIM, 0.10);
+            g.strokeRoundedRect(-btnW / 2 - 2, btnY - btnH / 2 - 2, btnW + 4, btnH + 4, r + 2);
+        }
+    }
+
+    private buildPayoutHint(): void {
+        const { PH, PW } = this;
+        const tableY = PH / 2 - 40;
+
+        const tgfx = this.scene.add.graphics();
+        tgfx.fillStyle(COL_UI_BG2, 0.7);
+        tgfx.fillRoundedRect(-PW / 2 + 14, tableY - 18, PW - 28, 22, 4);
+        tgfx.lineStyle(1, COL_UI_BORDER_DIM, 0.2);
+        tgfx.strokeRoundedRect(-PW / 2 + 14, tableY - 18, PW - 28, 22, 4);
+        this.container.add(tgfx);
+
+        const allPayouts = [
+            { s: '7️⃣×3', m: '50×', c: '#ffd700' },
+            { s: '💎×3', m: '20×', c: '#80c8ff' },
+            { s: '⭐×3',  m: '10×', c: '#e0e050' },
+            { s: '🍇×3', m: '6×',  c: '#c070e0' },
+            { s: '🍊×3', m: '4×',  c: '#f0a040' },
+            { s: '🍋×3', m: '3×',  c: '#e0e040' },
+            { s: '🍒×3', m: '2×',  c: '#e06060' },
+            { s: '🍒×2', m: '1×',  c: '#c04040' },
+        ];
+        const colW = (PW - 40) / 4;
+        allPayouts.slice(0, 4).forEach((p, i) => {
+            const px = -PW / 2 + 20 + i * colW + colW / 2;
+            this.container.add(this.scene.add.text(px, tableY - 8, `${p.s}=${p.m}`, {
+                fontFamily: FONT, fontSize: '8px', color: p.c,
+            }).setOrigin(0.5));
+        });
+    }
+
+    // ── Draw helpers ──────────────────────────────────────────────────────────
+
+    private drawPayLine(active: boolean): void {
+        const g = this.payLineGfx;
+        g.clear();
+        g.lineStyle(active ? 2.5 : 1.5, active ? COL_TRIM_LIGHT : COL_SLOT_TRIM, active ? 0.9 : 0.3);
+        g.lineBetween(-175, -26, 175, -26);
+    }
+
+    // ── Display updates ───────────────────────────────────────────────────────
+
     private updateChipsDisplay(): void {
         this.chipsText.setText(`◈ ${GameState.get().chips.toLocaleString()} chips`);
     }
 
     private updateStatsDisplay(): void {
-        if (this.totalSpins === 0) {
-            this.statsText.setText('');
-            return;
-        }
-        const net = this.totalWon - this.totalWagered;
+        if (this.totalSpins === 0) { this.statsText.setText(''); return; }
+        const net    = this.totalWon - this.totalWagered;
         const netStr = net >= 0 ? `+${net}` : `${net}`;
-        const netColor = net >= 0 ? '#2ecc71' : '#e74c3c';
-        let streakStr = '';
-        if (this.winStreak >= 3) {
-            streakStr = `  🔥 ${this.winStreak}`;
-        } else if (this.maxWinStreak >= 3) {
-            streakStr = `  best:${this.maxWinStreak}`;
-        }
-        this.statsText.setText(`Spins: ${this.totalSpins}  ·  Net: ${netStr}◈${streakStr}`).setColor(netColor);
+        const col    = net >= 0 ? '#2ecc71' : '#e74c3c';
+        let streak   = '';
+        if (this.winStreak >= 3)        streak = `  🔥×${this.winStreak}`;
+        else if (this.maxWinStreak >= 3) streak = `  best:${this.maxWinStreak}`;
+        this.statsText.setText(`Spins: ${this.totalSpins}  ·  Net: ${netStr}◈${streak}`).setColor(col);
     }
 
     private updateBetDisplay(): void {
         const chips = GameState.get().chips;
-        // Highlight selected bet; dim unaffordable bets
-        BET_OPTIONS.forEach((amount, i) => {
-            const btn = this.betBtns[i];
-            const rect = btn.list[0] as Phaser.GameObjects.Rectangle;
-            const label = btn.list[1] as Phaser.GameObjects.Text;
-            const selected = this.currentBet === amount;
-            const canAfford = chips >= amount;
-            rect.setStrokeStyle(selected ? 2 : 1, selected ? COL_SLOT_TRIM : (canAfford ? 0x444488 : 0x332233), 1);
-            rect.setFillStyle(selected ? 0x2a2a5e : (canAfford ? 0x1a1a3e : 0x110d1a));
-            label.setColor(selected ? '#c9a84c' : (canAfford ? '#8888bb' : '#443344'));
+        this.betBtns.forEach(({ gfx, label, amount }) => {
+            const sel  = this.currentBet === amount;
+            const can  = chips >= amount;
+            const bx   = label.x;
+            const by   = label.y;
+            const bw   = 56;
+            const bh   = 30;
+            gfx.clear();
+            gfx.fillStyle(sel ? 0x2a2a60 : can ? 0x18183c : 0x10101e, 1);
+            gfx.fillRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 4);
+            gfx.lineStyle(sel ? 1.5 : 1, sel ? COL_SLOT_TRIM : can ? 0x444488 : 0x282820, sel ? 1 : can ? 0.6 : 0.3);
+            gfx.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 4);
+            label.setColor(sel ? '#c9a84c' : can ? '#8888bb' : '#443344');
         });
-        this.betText.setText(`Bet: ${this.currentBet}◈`);
+        this.betText.setText(`Bet: ${this.currentBet} ◈`);
     }
+
+    // ── Spin logic ────────────────────────────────────────────────────────────
 
     private spin(): void {
         if (this.spinState !== 'idle') return;
@@ -311,8 +505,7 @@ export class SlotsPanel {
             return;
         }
 
-        // Clear any stale (already-fired) timer references from the previous spin
-        // so the array doesn't grow unboundedly over many spins.
+        // Clear any stale timer references before new spin
         this.spinTimers = [];
 
         GameState.addChips(-this.currentBet);
@@ -321,38 +514,37 @@ export class SlotsPanel {
         this.updateChipsDisplay();
 
         this.spinState = 'spinning';
-        // Grey out spin button during spin
-        this.spinBtn.setFillStyle(0x1a1a3a);
-        this.spinBtn.setStrokeStyle(2, 0x555577, 0.6);
-        this.spinBtnLabel.setText('SPINNING...').setColor('#666688');
+        this.drawSpinButton('spinning');
+        this.spinBtnLabel.setText('SPINNING...').setColor('#554466');
         this.resultText.setText('');
+        this.drawPayLine(false);
         this.spinDone = [false, false, false];
 
-        // Stop each reel with increasing delay
-        const stopDelays = [600, 1050, 1500];
+        const stopDelays = [620, 1080, 1540];
 
         for (let i = 0; i < 3; i++) {
-            // Fast roll animation
             const rollTimer = this.scene.time.addEvent({
-                delay: 80,
+                delay: 75,
                 repeat: -1,
                 callback: () => {
                     this.reelTexts[i].setText(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
                 },
             });
 
-            // Stop reel after delay — store in spinTimers so close() can cancel it
             const stopTimer = this.scene.time.delayedCall(stopDelays[i], () => {
                 rollTimer.remove();
                 if (this.closed) return;
                 const final = weightedRandom();
                 this.reelValues[i] = final;
                 this.reelTexts[i].setText(final);
+                // Bounce on stop
+                this.scene.tweens.add({
+                    targets: this.reelTexts[i],
+                    scaleX: 1.12, scaleY: 1.12,
+                    yoyo: true, duration: 80, ease: 'Quad.easeOut',
+                });
                 this.spinDone[i] = true;
-
-                if (this.spinDone.every(d => d)) {
-                    this.evalResult();
-                }
+                if (this.spinDone.every(d => d)) this.evalResult();
             });
 
             this.spinTimers.push(rollTimer, stopTimer);
@@ -362,45 +554,36 @@ export class SlotsPanel {
     private evalResult(): void {
         if (this.closed) return;
         this.spinState = 'result';
-        // Keep button visually disabled during post-eval cooldown
-        this.spinBtn.setFillStyle(0x1a1a3a);
-        this.spinBtn.setStrokeStyle(2, 0x555577, 0.6);
-        this.spinBtnLabel.setText('SPIN').setColor('#666688');
+        this.drawSpinButton('spinning');
+        this.spinBtnLabel.setText('SPIN').setColor('#554466');
         this.spinTimers = [];
 
         const [a, b, c] = this.reelValues;
-
         let payout = 0;
-        let msg = '';
-        let msgColor = '#c9a84c';
-        let isJackpot = false;
+        let msg    = '';
+        let msgCol = '#c9a84c';
+        let jackpot = false;
 
         if (a === b && b === c) {
-            // Three of a kind
             const mult = PAYOUTS[a] ?? 2;
-            payout = this.currentBet * mult;
-            isJackpot = a === '7️⃣';
-            msg = isJackpot
-                ? `★ JACKPOT! 7️⃣×3  +${payout}◈ ★`
-                : `3×${a}  +${payout}◈`;
-            msgColor = '#2ecc71';
+            payout  = this.currentBet * mult;
+            jackpot = a === '7️⃣';
+            msg     = jackpot ? `★ JACKPOT!  7️⃣×3  +${payout}◈ ★` : `3×${a}  +${payout}◈`;
+            msgCol  = '#2ecc71';
         } else if (a === b || b === c || a === c) {
-            // Two of a kind — cherry pair consolation only when the pair IS cherries
             const cherryPair =
-                (a === b && a === '🍒') ||
-                (b === c && b === '🍒') ||
-                (a === c && a === '🍒');
+                (a === b && a === '🍒') || (b === c && b === '🍒') || (a === c && a === '🍒');
             if (cherryPair) {
                 payout = this.currentBet * CHERRY_PAIR_PAYOUT;
-                msg = `Cherry pair!  +${payout}◈`;
-                msgColor = '#f0a040';
+                msg    = `Cherry pair!  +${payout}◈`;
+                msgCol = '#f0a040';
             } else {
-                msg = 'No match — try again';
-                msgColor = '#888888';
+                msg    = 'No match — try again';
+                msgCol = '#666688';
             }
         } else {
-            msg = 'No match — try again';
-            msgColor = '#888888';
+            msg    = 'No match — try again';
+            msgCol = '#666688';
         }
 
         if (payout > 0) {
@@ -410,58 +593,37 @@ export class SlotsPanel {
             GameState.addChips(payout);
             this.updateChipsDisplay();
             this.showChipDelta(`+${payout}◈`, '#2ecc71');
+            this.drawPayLine(true);
 
-            if (isJackpot) {
-                // Jackpot: bigger, repeated flash + payline glow
+            if (jackpot) {
                 this.scene.tweens.add({
-                    targets: this.reelTexts,
-                    scaleX: 1.35,
-                    scaleY: 1.35,
-                    yoyo: true,
-                    duration: 120,
-                    repeat: 5,
+                    targets: this.reelTexts, scaleX: 1.4, scaleY: 1.4,
+                    yoyo: true, duration: 100, repeat: 6,
                 });
                 this.scene.tweens.add({
-                    targets: this.payLine,
-                    alpha: 0,
-                    yoyo: true,
-                    duration: 80,
-                    repeat: 8,
-                    onComplete: () => { this.payLine.setAlpha(0.4); },
+                    targets: this.payLineGfx, alpha: 0,
+                    yoyo: true, duration: 70, repeat: 10,
+                    onComplete: () => { this.drawPayLine(false); this.payLineGfx.setAlpha(1); },
                 });
             } else {
-                // Standard win flash
                 this.scene.tweens.add({
-                    targets: this.reelTexts,
-                    scaleX: 1.15,
-                    scaleY: 1.15,
-                    yoyo: true,
-                    duration: 150,
-                    repeat: 2,
+                    targets: this.reelTexts, scaleX: 1.14, scaleY: 1.14,
+                    yoyo: true, duration: 130, repeat: 2,
                 });
-                this.scene.tweens.add({
-                    targets: this.payLine,
-                    alpha: 1,
-                    yoyo: true,
-                    duration: 120,
-                    repeat: 3,
-                    onComplete: () => { this.payLine.setAlpha(0.4); },
-                });
+                this.scene.time.delayedCall(600, () => this.drawPayLine(false));
             }
         } else {
             this.winStreak = 0;
             this.showChipDelta(`-${this.currentBet}◈`, '#e74c3c');
         }
 
-        this.showResult(msg, msgColor);
+        this.showResult(msg, msgCol);
         this.updateStatsDisplay();
 
         const idleTimer = this.scene.time.delayedCall(500, () => {
             if (this.closed) return;
             this.spinState = 'idle';
-            // Restore spin button to active style now that cooldown is done
-            this.spinBtn.setFillStyle(0x3a2a6a);
-            this.spinBtn.setStrokeStyle(2, COL_SLOT_TRIM, 1);
+            this.drawSpinButton('idle');
             this.spinBtnLabel.setColor('#c9a84c');
             this.updateBetDisplay();
             this.checkLowChips();
@@ -469,85 +631,88 @@ export class SlotsPanel {
         this.spinTimers.push(idleTimer);
     }
 
+    // ── UI helpers ────────────────────────────────────────────────────────────
+
     /** Show a brief floating chip gain/loss indicator near the reels. */
     private showChipDelta(text: string, color: string): void {
-        const reelPanelY = -30;
-        const delta = this.scene.add.text(0, reelPanelY - 54, text, {
-            fontFamily: 'monospace', fontSize: '16px', color, fontStyle: 'bold',
+        const delta = this.scene.add.text(0, -116, text, {
+            fontFamily: FONT, fontSize: '18px', color, fontStyle: 'bold',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_PANEL + 5);
         this.container.add(delta);
         this.scene.tweens.add({
-            targets: delta,
-            y: reelPanelY - 82,
-            alpha: 0,
-            duration: 900,
-            ease: 'Cubic.easeOut',
+            targets: delta, y: -148, alpha: 0, duration: 1000, ease: 'Cubic.easeOut',
             onComplete: () => delta.destroy(),
         });
     }
 
     private showResult(msg: string, color: string): void {
         this.resultText.setText(msg).setColor(color);
+        this.scene.tweens.add({
+            targets: this.resultText,
+            scaleX: [1.15, 1], scaleY: [1.15, 1],
+            duration: 200, ease: 'Back.Out',
+        });
     }
 
     private checkLowChips(): void {
         const chips = GameState.get().chips;
-        const canAffordMin = chips >= BET_OPTIONS[0];
-
-        // Auto-reduce bet to the highest option the player can still afford
         if (chips > 0 && chips < this.currentBet) {
             const affordable = BET_OPTIONS.filter(b => b <= chips);
             this.currentBet = affordable.length > 0
-                ? affordable[affordable.length - 1]   // highest affordable
-                : BET_OPTIONS[0];                      // fallback; spin() will block it
+                ? affordable[affordable.length - 1]
+                : BET_OPTIONS[0];
             this.updateBetDisplay();
         }
-
-        // Show free chips button when totally broke
-        if (!canAffordMin) {
-            this.showFreeChipsOffer();
-        }
+        if (chips < BET_OPTIONS[0]) this.showFreeChipsOffer();
     }
 
     private showFreeChipsOffer(): void {
-        if (this.freeChipsBtn) return;   // already shown
+        if (this.freeChipsContainer) return;
 
-        // Position below pay hints and above panel bottom edge
-        const rect = this.scene.add.rectangle(0, 215, 220, 26, 0x1a2a0a, 1)
-            .setStrokeStyle(1, 0x4a8a1a, 1)
-            .setInteractive({ useHandCursor: true });
-        const label = this.scene.add.text(0, 215, '🎁 Free 500 chips — Reload!', {
-            fontFamily: 'monospace', fontSize: '11px', color: '#6acc30',
+        const gfx = this.scene.add.graphics();
+        const draw = (hover: boolean): void => {
+            gfx.clear();
+            gfx.fillStyle(hover ? 0x203010 : 0x142008, 1);
+            gfx.fillRoundedRect(-120, 215, 240, 28, 5);
+            gfx.lineStyle(1, hover ? 0x6acc30 : 0x4a8a1a, 0.9);
+            gfx.strokeRoundedRect(-120, 215, 240, 28, 5);
+        };
+        draw(false);
+
+        const label = this.scene.add.text(0, 229, '🎁 FREE 500 CHIPS — RELOAD', {
+            fontFamily: FONT, fontSize: '10px', color: '#6acc30', fontStyle: 'bold',
         }).setOrigin(0.5);
 
-        rect.on('pointerover', () => rect.setFillStyle(0x2a4a10));
-        rect.on('pointerout',  () => rect.setFillStyle(0x1a2a0a));
-        rect.on('pointerdown', () => {
+        const hit = this.scene.add.rectangle(0, 229, 240, 28, 0x000000, 0)
+            .setInteractive({ useHandCursor: true });
+        hit.on('pointerover', () => draw(true));
+        hit.on('pointerout',  () => draw(false));
+        hit.on('pointerdown', () => {
             GameState.addChips(500);
             this.currentBet = 25;
             this.updateChipsDisplay();
             this.updateBetDisplay();
             this.updateStatsDisplay();
             this.showResult('🎁 500 free chips added!', '#6acc30');
-            this.freeChipsBtn?.destroy();
-            this.freeChipsBtn = null;
+            this.freeChipsContainer?.destroy();
+            this.freeChipsContainer = null;
         });
 
-        this.freeChipsBtn = this.scene.add.container(0, 0, [rect, label]);
-        this.container.add(this.freeChipsBtn);
+        this.freeChipsContainer = this.scene.add.container(0, 0, [gfx, label, hit]);
+        this.container.add(this.freeChipsContainer);
     }
+
+    // ── Close ─────────────────────────────────────────────────────────────────
 
     private close(): void {
         if (this.closed) return;
         this.closed = true;
-
-        // Cancel all running timers
         this.spinTimers.forEach(t => t.remove());
-
         this.escKey.destroy();
         this.spaceKey.destroy();
         this.overlay.destroy();
-        this.container.destroy();
+        this.panelGfx.destroy();
+        this.container.destroy(true);
         this.onClose();
     }
 }
