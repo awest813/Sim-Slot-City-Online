@@ -212,8 +212,9 @@ export class BlackjackTableRoom extends BaseRoom<BlackjackRoomState> {
       playerId:   p.playerId,
       username:   p.username,
       chips:      p.chips,
-      hand:       this.bjState.dealerRevealed || p.result !== null ? p.hand : p.hand,
-      handValue:  handValue(p.hand),
+      // Hide other players' hands until the round is resolved
+      hand:       p.result !== null ? p.hand : [],
+      handValue:  p.result !== null ? handValue(p.hand) : 0,
       bet:        p.bet,
       result:     p.result,
       isActive:   p.isActive,

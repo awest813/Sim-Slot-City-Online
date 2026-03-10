@@ -189,7 +189,7 @@ export class BlackjackPanel {
         this.container.add(dealBtn);
     }
 
-    private selectBet(amt: number, btn: Phaser.GameObjects.Container): void {
+    private selectBet(amt: number, _btn: Phaser.GameObjects.Container): void {
         if (this.bjState.phase !== 'betting') return;
         const chips = GameState.get().chips;
         if (amt > chips) return;
@@ -201,7 +201,6 @@ export class BlackjackPanel {
             const bg = b.getAt(0) as Phaser.GameObjects.Rectangle;
             bg.setFillStyle(isThis ? COL_BTN_PRIMARY : 0x2a3a2a);
         });
-        void btn; // suppress TS unused warning
         this.refreshDisplay();
     }
 
@@ -226,11 +225,12 @@ export class BlackjackPanel {
         if (this.newHandBtn) { this.newHandBtn.destroy(); this.newHandBtn = null; }
 
         const chips = GameState.get().chips;
-        const label  = chips > 0 ? 'NEXT HAND ▶' : 'OUT OF CHIPS';
-        const colour = chips > 0 ? COL_BTN_PRIMARY : COL_BTN_DANGER;
+        const canPlay = chips > 0;
+        const label  = canPlay ? 'NEXT HAND ▶' : 'CLOSE TABLE';
+        const colour = canPlay ? COL_BTN_PRIMARY : COL_BTN_DANGER;
 
         this.newHandBtn = this.makeButton(-PW / 2 + 100, PH / 2 - 88, 130, 26, label, colour,
-            () => chips > 0 ? this.prepareNextHand() : this.close());
+            () => GameState.get().chips > 0 ? this.prepareNextHand() : this.close());
         this.container.add(this.newHandBtn);
     }
 

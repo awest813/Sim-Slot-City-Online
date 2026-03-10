@@ -135,7 +135,9 @@ function updatePlayer(
 
 // ── Player management ─────────────────────────────────────────────────────────
 
-export function addPlayer(state: BJServerState, player: Omit<BJServerPlayer, "hand" | "bet" | "result" | "hasActed" | "isActive">): BJServerState {
+type NewBJPlayer = Omit<BJServerPlayer, "hand" | "bet" | "result" | "hasActed" | "isActive">;
+
+export function addPlayer(state: BJServerState, player: NewBJPlayer): BJServerState {
   if (state.players.find(p => p.playerId === player.playerId)) return state;
   return {
     ...state,
