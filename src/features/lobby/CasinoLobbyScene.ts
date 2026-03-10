@@ -6,7 +6,7 @@ import {
     COL_TRIM, COL_TRIM_DIM, COL_FELT, COL_TABLE, COL_BAR,
     COL_SLOT_BODY, COL_SLOT_TRIM,
     DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD,
-    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR,
+    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK,
     FONT,
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
@@ -16,11 +16,12 @@ import { HUD } from '../ui/HUD';
 import { SlotsPanel } from '../slots/SlotsPanel';
 import { BarPanel, resetBarSession } from '../bar/BarPanel';
 import { PokerPanel } from '../poker/PokerPanel';
+import { BlackjackPanel } from '../blackjack/BlackjackPanel';
 
 export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!: AvatarController;
     private interaction!: InteractionSystem;
-    private activePanel: 'none' | 'slots' | 'bar' | 'poker' = 'none';
+    private activePanel: 'none' | 'slots' | 'bar' | 'poker' | 'blackjack' = 'none';
     private graphics!: Phaser.GameObjects.Graphics;
 
     constructor() { super({ key: 'CasinoLobbyScene' }); }
@@ -135,11 +136,16 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillStyle(0x1a1005, 0.5);
         g.fillRect(ZONE_BAR.x, ZONE_BAR.y, ZONE_BAR.w, ZONE_BAR.h);
 
+        // Blackjack zone
+        g.fillStyle(0x1a0d1a, 0.5);
+        g.fillRect(ZONE_BLACKJACK.x, ZONE_BLACKJACK.y, ZONE_BLACKJACK.w, ZONE_BLACKJACK.h);
+
         // === Zone trim borders ===
         g.lineStyle(1, COL_TRIM_DIM, 0.4);
         g.strokeRect(ZONE_SLOTS.x, ZONE_SLOTS.y, ZONE_SLOTS.w, ZONE_SLOTS.h);
         g.strokeRect(ZONE_POKER.x, ZONE_POKER.y, ZONE_POKER.w, ZONE_POKER.h);
         g.strokeRect(ZONE_BAR.x,   ZONE_BAR.y,   ZONE_BAR.w,   ZONE_BAR.h);
+        g.strokeRect(ZONE_BLACKJACK.x, ZONE_BLACKJACK.y, ZONE_BLACKJACK.w, ZONE_BLACKJACK.h);
 
         // === Entrance path ===
         g.fillStyle(0x1a3a1a, 1);
@@ -163,6 +169,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         // === POKER ZONE — 1 large poker table ===
         this.drawPokerTable(790, 190);
+
+        // === BLACKJACK ZONE — 1 blackjack table ===
+        this.drawBlackjackTable(ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2);
 
         // === BAR ZONE — bar counter + stools ===
         this.drawBarCounter();
@@ -222,6 +231,63 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // Shadow
         g2.fillStyle(0x000000, 0.2);
         g2.fillEllipse(x, y + 36, 40, 8);
+    }
+
+    private drawBlackjackTable(cx: number, cy: number): void {
+        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
+
+        // Table shadow
+        g2.fillStyle(0x000000, 0.25);
+        g2.fillEllipse(cx, cy + 8, 200, 80);
+
+        // Table wood rim
+        g2.fillStyle(COL_TABLE, 1);
+        g2.fillEllipse(cx, cy, 190, 90);
+
+        // Felt surface
+        g2.fillStyle(0x2a0d2a, 1);
+        g2.fillEllipse(cx, cy, 162, 74);
+
+        // Felt ring
+        g2.lineStyle(2, 0x6a2a6a, 1);
+        g2.strokeEllipse(cx, cy, 148, 66);
+
+        // Center arc (insurance / blackjack pays 3:2 text area)
+        g2.lineStyle(1, 0x5a1a5a, 0.6);
+        g2.strokeEllipse(cx, cy - 6, 80, 34);
+
+        // Card suits
+        const suits = ['♠', '♣', '♥', '♦'];
+        const angles = [270, 0, 90, 180];
+        for (let i = 0; i < 4; i++) {
+            const rad = (angles[i] * Math.PI) / 180;
+            const sx = cx + Math.cos(rad) * 40;
+            const sy = cy + Math.sin(rad) * 18;
+            this.add.text(sx, sy, suits[i], {
+                fontFamily: FONT, fontSize: '12px',
+                color: i < 2 ? '#3a1a3a' : '#5a1a1a',
+            }).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
+        }
+
+        // Dealer position indicator (top of table)
+        g2.fillStyle(COL_TRIM, 0.4);
+        g2.fillRect(cx - 20, cy - 35, 40, 6);
+
+        // Player betting circles
+        const betPositions = [-70, -35, 0, 35, 70];
+        for (const bx of betPositions) {
+            g2.lineStyle(1, 0x8a3a8a, 0.6);
+            g2.strokeCircle(cx + bx, cy + 20, 10);
+        }
+
+        // Chip stacks
+        for (let i = 0; i < 2; i++) {
+            const chipX = cx - 20 + i * 40;
+            g2.fillStyle(0x9b59b6, 1);
+            g2.fillCircle(chipX, cy - 8, 6);
+            g2.lineStyle(1, 0x6c3483, 1);
+            g2.strokeCircle(chipX, cy - 8, 6);
+        }
     }
 
     private drawPokerTable(cx: number, cy: number): void {
@@ -372,6 +438,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.buildZoneSign(ZONE_POKER.x + ZONE_POKER.w / 2, ZONE_POKER.y + 20, '♠ POKER ROOM', d);
         this.buildZoneSign(ZONE_BAR.x + ZONE_BAR.w / 2, ZONE_BAR.y + 14, '🍹 BAR & LOUNGE', d);
         this.buildZoneSign(ZONE_ENTRANCE.x + ZONE_ENTRANCE.w / 2, ZONE_ENTRANCE.y + 14, '↑ ENTRANCE', d);
+        this.buildZoneSign(ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + 14, '🃏 BLACKJACK', d);
     }
 
     private buildZoneSign(x: number, y: number, text: string, depth: number): void {
@@ -423,6 +490,11 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // Poker table (ellipse approximated as rect)
         this.avatar.addBlocker({ x: 790 - 110, y: 190 - 60, w: 220, h: 120 });
 
+        // Blackjack table (ellipse approximated as rect)
+        const bjCx = ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2;
+        const bjCy = ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2;
+        this.avatar.addBlocker({ x: bjCx - 95, y: bjCy - 45, w: 190, h: 90 });
+
         // Bar counter
         this.avatar.addBlocker({ x: ZONE_BAR.x + 20, y: ZONE_BAR.y + 30, w: ZONE_BAR.w - 40, h: 50 });
     }
@@ -437,6 +509,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         if (this.inZone(x, y, ZONE_SLOTS)) zone = 'slots';
         else if (this.inZone(x, y, ZONE_POKER)) zone = 'poker';
         else if (this.inZone(x, y, ZONE_BAR))   zone = 'bar';
+        else if (this.inZone(x, y, ZONE_BLACKJACK)) zone = 'blackjack';
         else if (this.inZone(x, y, ZONE_ENTRANCE)) zone = 'entrance';
 
         if (GameState.get().zone !== zone) {
@@ -478,6 +551,16 @@ export class CasinoLobbyScene extends Phaser.Scene {
             label: 'Press E to order at bar',
             onInteract: () => this.openBar(),
         });
+
+        // Blackjack table
+        this.interaction.register({
+            id: 'blackjack',
+            x: ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,
+            y: ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2,
+            radius: 100,
+            label: 'Press E to play blackjack',
+            onInteract: () => this.openBlackjack(),
+        });
     }
 
     // ── Panel Openers ─────────────────────────────────────────────────────────
@@ -501,6 +584,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.activePanel = 'poker';
         GameState.setInteraction('poker');
         new PokerPanel(this, () => this.closePanel());
+    }
+
+    private openBlackjack(): void {
+        if (this.activePanel !== 'none') return;
+        this.activePanel = 'blackjack';
+        GameState.setInteraction('blackjack');
+        new BlackjackPanel(this, () => this.closePanel());
     }
 
     private closePanel(): void {
@@ -534,7 +624,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         const steps: Array<{ icon: string; title: string; desc: string }> = [
             { icon: '①', title: 'Move around', desc: 'WASD or Arrow keys to walk your avatar through the casino' },
             { icon: '②', title: 'Approach a zone', desc: 'Walk near Slots, Poker Table, or Bar until a prompt appears' },
-            { icon: '③', title: 'Press E to interact', desc: 'Open the Slots machine, Poker table, or Bar order panel' },
+            { icon: '③', title: 'Press E to interact', desc: 'Open Slots, Poker table, Blackjack table, or Bar order panel' },
             { icon: '④', title: 'Play & earn chips', desc: 'You start with 1,000 ◈ · Free reload offered if you go broke' },
         ];
 
@@ -594,7 +684,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         hintBg.setStrokeStyle(0);
 
         const hint = this.add.text(cx, GAME_HEIGHT - 14,
-            'WASD / ↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  ESC close', {
+            'WASD / ↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  Blackjack: H=Hit S=Stand  ·  ESC close', {
             fontFamily: FONT, fontSize: '9px', color: '#446644',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2);
         hint.setAlpha(0);

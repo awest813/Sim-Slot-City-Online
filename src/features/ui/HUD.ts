@@ -5,11 +5,12 @@ import {
 } from '../../game/constants';
 
 const ZONE_LABELS: Record<Zone, string> = {
-    entrance: 'Entrance',
-    slots:    'Slots Corner',
-    poker:    'Poker Room',
-    bar:      'Bar & Lounge',
-    floor:    'Casino Floor',
+    entrance:  'Entrance',
+    slots:     'Slots Corner',
+    poker:     'Poker Room',
+    bar:       'Bar & Lounge',
+    blackjack: 'Blackjack Table',
+    floor:     'Casino Floor',
 };
 
 const FREE_CHIPS_AMOUNT = 500;
