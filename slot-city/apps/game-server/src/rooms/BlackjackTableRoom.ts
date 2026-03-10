@@ -212,9 +212,9 @@ export class BlackjackTableRoom extends BaseRoom<BlackjackRoomState> {
       playerId:   p.playerId,
       username:   p.username,
       chips:      p.chips,
-      // Hide other players' hands until the round is resolved
-      hand:       p.result !== null ? p.hand : [],
-      handValue:  p.result !== null ? handValue(p.hand) : 0,
+      // Blackjack hands are always face-up (unlike poker); send the full hand every time
+      hand:       p.hand,
+      handValue:  p.hand.length > 0 ? handValue(p.hand) : 0,
       bet:        p.bet,
       result:     p.result,
       isActive:   p.isActive,

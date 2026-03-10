@@ -237,3 +237,178 @@ describe("BlackjackEngine — state machine", () => {
     expect(next!.players[0].result).not.toBeNull();
   });
 });
+
+// ── Dealer blackjack edge cases ────────────────────────────────────────────────
+
+describe("BlackjackEngine — dealer blackjack rules", () => {
+  /** Build a rigged deck whose first N draws match the supplied cards. */
+  function riggedDeck(...topCards: Card[]): Card[] {
+    const full = createDeck().filter(
+      c => !topCards.some(t => t.rank === c.rank && t.suit === c.suit),
+    );
+    return [...topCards, ...full];
+  }
+
+  it("player BJ + dealer BJ = push (bet returned, no 1.5× bonus)", () => {
+    // Deal order with 1 player: p1-card1, dealer-card1, p1-card2, dealer-card2
+    // → p1: Ace♠ + King♠ = BJ,  dealer: Ace♥ + King♥ = BJ
+    const deck = riggedDeck(
+      card(CardRank.ACE,  CardSuit.SPADES),
+      card(CardRank.ACE,  CardSuit.HEARTS),
+      card(CardRank.KING, CardSuit.SPADES),
+      card(CardRank.KING, CardSuit.HEARTS),
+    );
+
+    let state = { ...makeState(), phase: BJServerPhase.BETTING, deck };
+    state     = placeBet(state, "p1", 100, 10, 500)!;
+    state     = dealHands(state);
+
+    const p1 = state.players[0];
+    expect(p1.result).toBe("push");
+    // Chips: started 1000, bet 100 (chips=900 after placeBet), push returns 100 → chips = 1000
+    expect(p1.chips).toBe(1000);
+    expect(state.phase).toBe(BJServerPhase.RESULT);
+    expect(state.dealerRevealed).toBe(true);
+  });
+
+  it("player BJ only (no dealer BJ) = blackjack win with 1.5× bonus", () => {
+    // p1: Ace♠ + King♠ = BJ,  dealer: Two♥ + Three♥ = 5 (no BJ)
+    const deck = riggedDeck(
+      card(CardRank.ACE,   CardSuit.SPADES),
+      card(CardRank.TWO,   CardSuit.HEARTS),
+      card(CardRank.KING,  CardSuit.SPADES),
+      card(CardRank.THREE, CardSuit.HEARTS),
+    );
+
+    let state = { ...makeState(), phase: BJServerPhase.BETTING, deck };
+    state     = placeBet(state, "p1", 100, 10, 500)!;
+    state     = dealHands(state);
+
+    const p1 = state.players[0];
+    expect(p1.result).toBe("blackjack");
+    // Chips: 900 + (100 + floor(100 * 1.5)) = 900 + 250 = 1150
+    expect(p1.chips).toBe(1150);
+    expect(state.phase).toBe(BJServerPhase.RESULT);
+  });
+
+  it("player BJ + dealer BJ — two players both get push", () => {
+    let state = createServerGame();
+    state = addPlayer(state, { playerId: "p1", username: "Alice", chips: 1000, seatIndex: 0 });
+    state = addPlayer(state, { playerId: "p2", username: "Bob",   chips: 500,  seatIndex: 1 });
+
+    // Deal order with 2 players: p1-c1, p2-c1, d-c1, p1-c2, p2-c2, d-c2
+    // p1: A♠+K♠=BJ,  p2: A♥+K♥=BJ,  dealer: A♦+K♦=BJ
+    const deck = riggedDeck(
+      card(CardRank.ACE,  CardSuit.SPADES),
+      card(CardRank.ACE,  CardSuit.HEARTS),
+      card(CardRank.ACE,  CardSuit.DIAMONDS),
+      card(CardRank.KING, CardSuit.SPADES),
+      card(CardRank.KING, CardSuit.HEARTS),
+      card(CardRank.KING, CardSuit.DIAMONDS),
+    );
+
+    state = { ...state, phase: BJServerPhase.BETTING, deck };
+    state = placeBet(state, "p1", 100, 10, 500)!;
+    state = placeBet(state, "p2", 50,  10, 500)!;
+    state = dealHands(state);
+
+    const p1 = state.players.find(p => p.playerId === "p1")!;
+    const p2 = state.players.find(p => p.playerId === "p2")!;
+    expect(p1.result).toBe("push");
+    expect(p2.result).toBe("push");
+    expect(p1.chips).toBe(1000);  // bet returned
+    expect(p2.chips).toBe(500);   // bet returned
+    expect(state.phase).toBe(BJServerPhase.RESULT);
+  });
+
+  it("placeBet rejects duplicate bet from same player", () => {
+    let state = { ...makeState(), phase: BJServerPhase.BETTING };
+    state = placeBet(state, "p1", 25, 10, 500)!;
+    expect(placeBet(state, "p1", 25, 10, 500)).toBeNull();
+  });
+
+  it("placeBet rejects bet above maxBet", () => {
+    const state = { ...makeState(), phase: BJServerPhase.BETTING };
+    expect(placeBet(state, "p1", 501, 10, 500)).toBeNull();
+  });
+
+  it("playerHit rejects action when not PLAYER_TURN", () => {
+    const state = makeState();  // WAITING phase
+    expect(playerHit(state, "p1")).toBeNull();
+  });
+
+  it("playerStand rejects action when not PLAYER_TURN", () => {
+    const state = makeState();
+    expect(playerStand(state, "p1")).toBeNull();
+  });
+
+  it("playerDouble rejects when player hand has 3+ cards", () => {
+    let state = { ...makeState(), phase: BJServerPhase.BETTING };
+    state = placeBet(state, "p1", 50, 10, 500)!;
+    state = dealHands(state);
+
+    if (state.phase !== BJServerPhase.PLAYER_TURN) return;
+
+    // Give player a 3-card hand
+    state = {
+      ...state,
+      players: state.players.map(p =>
+        p.playerId === "p1"
+          ? { ...p, hand: [card(CardRank.FOUR), card(CardRank.FIVE), card(CardRank.SIX)], hasActed: false }
+          : p,
+      ),
+    };
+    expect(playerDouble(state, "p1")).toBeNull();
+  });
+
+  it("playerDouble rejects when player cannot afford the second bet half", () => {
+    let state = createServerGame();
+    state = addPlayer(state, { playerId: "p1", username: "Alice", chips: 50, seatIndex: 0 });
+    state = { ...state, phase: BJServerPhase.BETTING };
+    state = placeBet(state, "p1", 50, 10, 500)!;
+    state = dealHands(state);
+
+    if (state.phase !== BJServerPhase.PLAYER_TURN) return;
+
+    // Player has 0 chips left after betting all 50; double requires 50 more
+    state = {
+      ...state,
+      players: state.players.map(p =>
+        p.playerId === "p1"
+          ? { ...p, hand: [card(CardRank.EIGHT), card(CardRank.EIGHT)], hasActed: false, chips: 0 }
+          : p,
+      ),
+    };
+    expect(playerDouble(state, "p1")).toBeNull();
+  });
+
+  it("bust player does not trigger dealer play while another player is still active", () => {
+    let state = createServerGame();
+    state = addPlayer(state, { playerId: "p1", username: "Alice", chips: 500, seatIndex: 0 });
+    state = addPlayer(state, { playerId: "p2", username: "Bob",   chips: 500, seatIndex: 1 });
+
+    state = { ...state, phase: BJServerPhase.BETTING };
+    state = placeBet(state, "p1", 25, 10, 500)!;
+    state = placeBet(state, "p2", 25, 10, 500)!;
+    state = dealHands(state);
+
+    if (state.phase !== BJServerPhase.PLAYER_TURN) return;
+
+    // Force p1 hand to a guaranteed bust (10+10+10 = 30 before hit — hit adds one more)
+    state = {
+      ...state,
+      players: state.players.map(p =>
+        p.playerId === "p1"
+          ? { ...p, hand: [card(CardRank.TEN), card(CardRank.TEN), card(CardRank.TEN)], hasActed: false }
+          : p,
+      ),
+    };
+
+    const after = playerHit(state, "p1");
+    expect(after).not.toBeNull();
+    const p1 = after!.players.find(p => p.playerId === "p1")!;
+    expect(p1.result).toBe("bust");
+    // p2 has not acted yet → round must remain in PLAYER_TURN
+    expect(after!.phase).toBe(BJServerPhase.PLAYER_TURN);
+  });
+});
