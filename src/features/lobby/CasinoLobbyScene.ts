@@ -512,45 +512,91 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
     private showWelcomeBanner(): void {
         const cx = GAME_WIDTH / 2;
-        const cy = 72;
         const name = GameState.get().displayName;
 
-        const bg = this.add.rectangle(cx, cy, 480, 60, 0x000000, 0.85)
-            .setScrollFactor(0).setDepth(DEPTH_HUD + 5);
-        bg.setStrokeStyle(1, COL_TRIM, 0.8);
+        // ── Tutorial overlay — fades out after 12 seconds ──────────────────
+        const tutY = GAME_HEIGHT / 2;
+        const tutW = 560;
+        const tutH = 260;
 
-        const greeting = name !== 'Guest' ? `Welcome, ${name}!` : 'Welcome to Slot City Casino!';
-        const text = this.add.text(cx, cy - 12, `★  ${greeting}  ★`, {
-            fontFamily: FONT, fontSize: '14px', color: '#c9a84c',
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 6);
+        const tutBg = this.add.rectangle(cx, tutY, tutW, tutH, 0x020a02, 0.94)
+            .setScrollFactor(0).setDepth(DEPTH_HUD + 10);
+        tutBg.setStrokeStyle(2, COL_TRIM, 0.9);
 
-        const sub = this.add.text(cx, cy + 8, 'WASD / Arrow keys to move  ·  E to interact  ·  ESC to close panels', {
-            fontFamily: FONT, fontSize: '10px', color: '#668866',
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 6);
+        const greeting = name !== 'Guest' ? `Welcome to Slot City, ${name}!` : 'Welcome to Slot City Casino!';
+        const tutTitle = this.add.text(cx, tutY - 108, `★  ${greeting}  ★`, {
+            fontFamily: FONT, fontSize: '15px', color: '#c9a84c', fontStyle: 'bold',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
 
-        this.time.delayedCall(6000, () => {
-            this.tweens.add({
-                targets: [bg, text, sub],
-                alpha: 0,
-                duration: 700,
-                onComplete: () => { bg.destroy(); text.destroy(); sub.destroy(); },
-            });
+        const divLine = this.add.rectangle(cx, tutY - 90, tutW - 40, 1, COL_TRIM, 0.4)
+            .setScrollFactor(0).setDepth(DEPTH_HUD + 11);
+
+        const steps: Array<{ icon: string; title: string; desc: string }> = [
+            { icon: '①', title: 'Move around', desc: 'WASD or Arrow keys to walk your avatar through the casino' },
+            { icon: '②', title: 'Approach a zone', desc: 'Walk near Slots, Poker Table, or Bar until a prompt appears' },
+            { icon: '③', title: 'Press E to interact', desc: 'Open the Slots machine, Poker table, or Bar order panel' },
+            { icon: '④', title: 'Play & earn chips', desc: 'You start with 1,000 ◈ · Free reload offered if you go broke' },
+        ];
+
+        const tutObjs: Phaser.GameObjects.GameObject[] = [tutBg, tutTitle, divLine];
+
+        steps.forEach((s, i) => {
+            const sy = tutY - 66 + i * 44;
+            const iconT = this.add.text(cx - 240, sy, s.icon, {
+                fontFamily: FONT, fontSize: '18px', color: '#c9a84c',
+            }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
+            const titleT = this.add.text(cx - 210, sy - 8, s.title, {
+                fontFamily: FONT, fontSize: '12px', color: '#a0c8a0', fontStyle: 'bold',
+            }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
+            const descT = this.add.text(cx - 210, sy + 10, s.desc, {
+                fontFamily: FONT, fontSize: '10px', color: '#5a7a5a',
+            }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
+            tutObjs.push(iconT, titleT, descT);
         });
 
-        // Persistent controls hint at bottom edge
-        const hintBg = this.add.rectangle(cx, GAME_HEIGHT - 14, 420, 20, 0x000000, 0.55)
+        const dismiss = this.add.text(cx, tutY + 108, 'Press any key or click to dismiss  ·  Closes automatically in 12s', {
+            fontFamily: FONT, fontSize: '9px', color: '#3a5a3a',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
+        tutObjs.push(dismiss);
+
+        let tutorialDismissed = false;
+
+        const closeTutorial = (): void => {
+            if (tutorialDismissed) return;
+            tutorialDismissed = true;
+            this.tweens.add({
+                targets: tutObjs,
+                alpha: 0,
+                duration: 500,
+                onComplete: () => {
+                    tutObjs.forEach(o => o.destroy());
+                    // Fade in the persistent hint bar once tutorial is gone
+                    if (hint.active) {
+                        this.tweens.add({ targets: [hintBg, hint], alpha: 1, duration: 500 });
+                    }
+                },
+            });
+        };
+
+        // Click anywhere on overlay to dismiss
+        tutBg.setInteractive();
+        tutBg.once('pointerdown', closeTutorial);
+
+        // Any key dismisses
+        this.input.keyboard!.once('keydown', closeTutorial);
+
+        // Auto-close after 12 seconds
+        this.time.delayedCall(12000, closeTutorial);
+
+        // ── Persistent controls hint at bottom edge ────────────────────────
+        const hintBg = this.add.rectangle(cx, GAME_HEIGHT - 14, 560, 20, 0x000000, 0.65)
             .setScrollFactor(0).setDepth(DEPTH_HUD + 1);
         hintBg.setStrokeStyle(0);
 
         const hint = this.add.text(cx, GAME_HEIGHT - 14,
-            'WASD / ↑↓←→ to move  ·  E to interact  ·  Slots: SPACE to spin  ·  Poker: F/C/R keys', {
-            fontFamily: FONT, fontSize: '10px', color: '#446644',
+            'WASD / ↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  ESC close', {
+            fontFamily: FONT, fontSize: '9px', color: '#446644',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2);
         hint.setAlpha(0);
-
-        // Fade hint in after welcome banner fades
-        this.time.delayedCall(7000, () => {
-            this.tweens.add({ targets: [hintBg, hint], alpha: 1, duration: 500 });
-        });
     }
 }

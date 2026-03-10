@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COL_UI_BORDER, COL_UI_BG, TEXT_TITLE, TEXT_MD } from '../game/constants';
+import { GAME_WIDTH, GAME_HEIGHT, COL_UI_BORDER, TEXT_TITLE } from '../game/constants';
 import { GameState } from '../core/state/GameState';
 
 export class PreloadScene extends Phaser.Scene {
     private nameInput: string = '';
     private nameDisplay!: Phaser.GameObjects.Text;
     private startBtn!: Phaser.GameObjects.Rectangle;
+    private startBtnLabel!: Phaser.GameObjects.Text;
     private inputActive = false;
 
     constructor() { super({ key: 'PreloadScene' }); }
@@ -14,56 +15,76 @@ export class PreloadScene extends Phaser.Scene {
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
 
-        // Background
-        this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, COL_UI_BG);
+        // Background gradient effect (two overlapping rects)
+        this.add.rectangle(cx, cy, GAME_WIDTH, GAME_HEIGHT, 0x050a05);
+        this.add.rectangle(cx, cy - GAME_HEIGHT / 4, GAME_WIDTH, GAME_HEIGHT / 2, 0x071207, 0.7);
+
+        // Decorative corner accents
+        const g = this.add.graphics();
+        g.lineStyle(1, COL_UI_BORDER, 0.25);
+        g.strokeRect(12, 12, GAME_WIDTH - 24, GAME_HEIGHT - 24);
+        g.lineStyle(1, COL_UI_BORDER, 0.12);
+        g.strokeRect(20, 20, GAME_WIDTH - 40, GAME_HEIGHT - 40);
 
         // Logo
-        this.add.text(cx, cy - 100, '🎰 SLOT CITY', {
+        this.add.text(cx, cy - 160, '🎰', {
+            fontFamily: 'monospace', fontSize: '40px',
+        }).setOrigin(0.5);
+
+        this.add.text(cx, cy - 112, 'SLOT  CITY', {
             ...TEXT_TITLE,
-            fontSize: '36px',
+            fontSize: '42px',
+            letterSpacing: 8,
         }).setOrigin(0.5);
 
-        this.add.text(cx, cy - 62, 'Social Casino', {
-            ...TEXT_MD,
-            color: '#888888',
+        this.add.text(cx, cy - 72, '— Online Social Casino —', {
+            fontFamily: 'monospace', fontSize: '13px', color: '#7a6a3a',
         }).setOrigin(0.5);
 
-        // Progress bar (always fills instantly since no external assets)
-        const barW = 320;
-        const barH = 8;
-        const barX = cx - barW / 2;
-        const barY = cy - 28;
-
-        const outline = this.add.graphics();
-        outline.lineStyle(1, COL_UI_BORDER, 0.4);
-        outline.strokeRect(barX, barY, barW, barH);
-
-        const bar = this.add.graphics();
-        this.load.on('progress', (v: number) => {
-            bar.clear();
-            bar.fillStyle(COL_UI_BORDER, 0.5);
-            bar.fillRect(barX + 1, barY + 1, Math.max(0, (barW - 2) * v), barH - 2);
+        // Feature pills (what to do in the game)
+        const features: Array<{ icon: string; text: string }> = [
+            { icon: '🎰', text: 'Slot Machines' },
+            { icon: '♠', text: "Texas Hold'em Poker" },
+            { icon: '🍹', text: 'Bar & Lounge' },
+        ];
+        const pillY = cy - 28;
+        const pillSpacing = 210;
+        const pillStart = cx - pillSpacing;
+        features.forEach((f, i) => {
+            const px = pillStart + i * pillSpacing;
+            this.add.rectangle(px, pillY, 190, 34, 0x0a1a0a, 1)
+                .setStrokeStyle(1, COL_UI_BORDER, 0.45);
+            this.add.text(px, pillY, `${f.icon}  ${f.text}`, {
+                fontFamily: 'monospace', fontSize: '11px', color: '#8a7a4a',
+            }).setOrigin(0.5);
         });
 
         // No external assets — all procedural shapes
+        const bar = this.add.graphics();
+        this.load.on('progress', (v: number) => {
+            bar.clear();
+            bar.fillStyle(COL_UI_BORDER, 0.3);
+            bar.fillRect(cx - 100, cy + 8, Math.max(0, 200 * v), 2);
+        });
     }
 
     create(): void {
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
 
-        // Name entry prompt
-        this.add.text(cx, cy + 8, 'Enter your name:', {
-            fontFamily: 'monospace', fontSize: '13px', color: '#888888',
+        // Name entry section
+        const labelY = cy + 36;
+        this.add.text(cx, labelY, 'Choose your player name', {
+            fontFamily: 'monospace', fontSize: '12px', color: '#6a7a5a',
         }).setOrigin(0.5);
 
         // Name input display box
-        const inputBg = this.add.rectangle(cx, cy + 38, 280, 36, 0x0d1117, 1)
-            .setStrokeStyle(1, COL_UI_BORDER, 0.8)
+        const inputBg = this.add.rectangle(cx, labelY + 30, 300, 40, 0x060e06, 1)
+            .setStrokeStyle(1, COL_UI_BORDER, 0.9)
             .setInteractive({ useHandCursor: true });
 
-        this.nameDisplay = this.add.text(cx, cy + 38, 'Guest▌', {
-            fontFamily: 'monospace', fontSize: '16px', color: '#c9a84c',
+        this.nameDisplay = this.add.text(cx, labelY + 30, 'Guest▌', {
+            fontFamily: 'monospace', fontSize: '17px', color: '#c9a84c',
         }).setOrigin(0.5);
 
         // Clicking the input box activates it
@@ -78,24 +99,46 @@ export class PreloadScene extends Phaser.Scene {
         this.inputActive = true; // Start active
 
         // Start button
-        this.startBtn = this.add.rectangle(cx, cy + 90, 200, 40, 0x2a5f2a, 1)
-            .setStrokeStyle(1, COL_UI_BORDER, 1)
+        this.startBtn = this.add.rectangle(cx, labelY + 86, 220, 44, 0x1a4a1a, 1)
+            .setStrokeStyle(2, COL_UI_BORDER, 1)
             .setInteractive({ useHandCursor: true });
-        this.add.text(cx, cy + 90, 'Enter Casino →', {
-            fontFamily: 'monospace', fontSize: '14px', color: '#f0e6d3', fontStyle: 'bold',
+        this.startBtnLabel = this.add.text(cx, labelY + 86, 'Enter Casino  →', {
+            fontFamily: 'monospace', fontSize: '15px', color: '#d0e8d0', fontStyle: 'bold',
         }).setOrigin(0.5);
 
-        this.startBtn.on('pointerover', () => this.startBtn.setFillStyle(0x3a7f3a));
-        this.startBtn.on('pointerout',  () => this.startBtn.setFillStyle(0x2a5f2a));
+        this.startBtn.on('pointerover', () => {
+            this.startBtn.setFillStyle(0x2a6a2a);
+            this.startBtnLabel.setColor('#ffffff');
+        });
+        this.startBtn.on('pointerout', () => {
+            this.startBtn.setFillStyle(0x1a4a1a);
+            this.startBtnLabel.setColor('#d0e8d0');
+        });
         this.startBtn.on('pointerdown', () => this.enterCasino());
 
-        // Info line
-        this.add.text(cx, cy + 130, 'WASD / Arrow keys to move  ·  E to interact  ·  ESC to close panels', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#445544',
+        // Controls quick-reference grid
+        const refY = labelY + 148;
+        this.add.text(cx, refY, '— Quick Reference —', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#3a5a3a',
         }).setOrigin(0.5);
 
-        this.add.text(cx, cy + 148, '500 ◈ to join Poker  ·  10–100 ◈ to play Slots  ·  Keyboard shortcuts in games', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#334433',
+        const controls: string[] = [
+            'Move avatar     WASD / Arrow keys',
+            'Interact        E  (approach a zone)',
+            'Spin slots      SPACE',
+            'Poker actions   F = Fold   C = Call   R = Raise',
+            'Close panel     ESC',
+        ];
+        controls.forEach((line, i) => {
+            this.add.text(cx, refY + 16 + i * 14, line, {
+                fontFamily: 'monospace', fontSize: '10px', color: '#2a4a2a',
+            }).setOrigin(0.5);
+        });
+
+        // Starting chips hint
+        this.add.text(cx, refY + 16 + controls.length * 14 + 6,
+            'You start with 1,000 ◈ chips  ·  Poker buy-in 500 ◈  ·  Slots from 10 ◈', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#2a3a2a',
         }).setOrigin(0.5);
     }
 
