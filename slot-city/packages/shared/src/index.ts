@@ -35,6 +35,15 @@ export enum PokerGameState {
   END_ROUND = "END_ROUND",
 }
 
+export enum BlackjackGameState {
+  WAITING    = "WAITING",
+  BETTING    = "BETTING",
+  DEALING    = "DEALING",
+  PLAYER_TURN = "PLAYER_TURN",
+  DEALER_TURN = "DEALER_TURN",
+  RESULT     = "RESULT",
+}
+
 export enum TournamentStatus {
   WAITING_FOR_PLAYERS = "WAITING_FOR_PLAYERS",
   STARTING = "STARTING",
@@ -171,6 +180,39 @@ export interface PokerTableState {
 }
 
 // ─────────────────────────────────────────────
+//  Blackjack
+// ─────────────────────────────────────────────
+
+export type BlackjackResult = "blackjack" | "win" | "push" | "lose" | "bust" | null;
+
+export interface BlackjackPlayerState {
+  playerId: string;
+  username: string;
+  chips: number;
+  /** Cards are only populated for the active player (privacy) or after dealer reveals. */
+  hand: Card[];
+  handValue: number;
+  bet: number;
+  result: BlackjackResult;
+  isActive: boolean;
+  hasActed: boolean;
+  seatIndex: number;
+}
+
+export interface BlackjackTableState {
+  tableId: string;
+  gameState: BlackjackGameState;
+  players: BlackjackPlayerState[];
+  /** Dealer hand — second card is { rank: "?" } until DEALER_TURN phase. */
+  dealerHand: Card[];
+  dealerHandValue: number;
+  dealerRevealed: boolean;
+  minBet: number;
+  maxBet: number;
+  maxSeats: number;
+}
+
+// ─────────────────────────────────────────────
 //  Tournament
 // ─────────────────────────────────────────────
 
@@ -236,6 +278,13 @@ export interface MsgRegisterTournament {
   tournamentId: string;
 }
 
+export interface MsgBlackjackAction {
+  type: "BLACKJACK_ACTION";
+  action: "bet" | "hit" | "stand" | "double";
+  /** Required when action === "bet". */
+  amount?: number;
+}
+
 export type ClientMessage =
   | MsgMove
   | MsgChat
@@ -243,7 +292,8 @@ export type ClientMessage =
   | MsgSitDown
   | MsgStandUp
   | MsgPokerAction
-  | MsgRegisterTournament;
+  | MsgRegisterTournament
+  | MsgBlackjackAction;
 
 // ─────────────────────────────────────────────
 //  Server → Client Messages
@@ -285,6 +335,11 @@ export interface MsgError {
   message: string;
 }
 
+export interface MsgBlackjackStateUpdate {
+  type: "BLACKJACK_STATE_UPDATE";
+  table: BlackjackTableState;
+}
+
 export type ServerMessage =
   | MsgPlayerJoined
   | MsgPlayerLeft
@@ -292,7 +347,8 @@ export type ServerMessage =
   | MsgPokerStateUpdate
   | MsgTournamentUpdate
   | MsgChipsUpdate
-  | MsgError;
+  | MsgError
+  | MsgBlackjackStateUpdate;
 
 // ─────────────────────────────────────────────
 //  Constants

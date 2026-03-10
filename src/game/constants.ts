@@ -62,7 +62,8 @@ export const DEPTH_PANEL       = 1000;
 export const DEPTH_OVERLAY     = 1100;
 
 // ── Zone definitions (world-space) ────────────────────────────────────────────
-export const ZONE_ENTRANCE = { x: 380, y: 580, w: 200, h: 120 };
-export const ZONE_SLOTS    = { x: 30,  y: 60,  w: 260, h: 380 };
-export const ZONE_POKER    = { x: 650, y: 60,  w: 280, h: 380 };
-export const ZONE_BAR      = { x: 290, y: 30,  w: 380, h: 200 };
+export const ZONE_ENTRANCE   = { x: 380, y: 580, w: 200, h: 120 };
+export const ZONE_SLOTS      = { x: 30,  y: 60,  w: 260, h: 380 };
+export const ZONE_POKER      = { x: 650, y: 60,  w: 280, h: 380 };
+export const ZONE_BAR        = { x: 290, y: 30,  w: 380, h: 200 };
+export const ZONE_BLACKJACK  = { x: 330, y: 250, w: 300, h: 200 };

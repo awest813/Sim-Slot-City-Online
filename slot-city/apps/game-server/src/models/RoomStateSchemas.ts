@@ -54,5 +54,8 @@ export class BarRoomState extends BaseRoomState {
 }
 
 export class BlackjackRoomState extends BaseRoomState {
-  @type("string") dealerHand: string = "";
+  @type("string")  dealerHand: string = "";
+  @type("string")  gamePhase: string = "WAITING";
+  @type("number")  minBet: number = 10;
+  @type("number")  maxBet: number = 500;
 }

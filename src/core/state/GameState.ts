@@ -1,8 +1,8 @@
 // Central game state store — kept flat and simple so future multiplayer sync
 // can replace local state by swapping this module.
 
-export type Zone = 'entrance' | 'slots' | 'poker' | 'bar' | 'floor';
-export type InteractionState = 'free' | 'slots' | 'poker' | 'bar';
+export type Zone = 'entrance' | 'slots' | 'poker' | 'bar' | 'blackjack' | 'floor';
+export type InteractionState = 'free' | 'slots' | 'poker' | 'bar' | 'blackjack';
 
 export interface PlayerState {
   displayName: string;
