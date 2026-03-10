@@ -230,7 +230,7 @@ export class BarPanel {
             rect.on('pointerdown', () => {
                 if (!this.isDisabled(drink)) {
                     rect.setFillStyle(PRESSED_COLOR);
-                    this.orderDrink(drink, nameLabel, costLabel);
+                    this.orderDrink(drink, nameLabel, costLabel, rect, DISABLED_COLOR);
                 }
             });
             rect.on('pointerup', () => {
@@ -307,6 +307,8 @@ export class BarPanel {
         drink: DrinkOption,
         nameLabel: Phaser.GameObjects.Text,
         _costLabel: Phaser.GameObjects.Text,
+        rect: Phaser.GameObjects.Rectangle,
+        disabledColor: number,
     ): void {
         if (this.isDisabled(drink)) return;
 
@@ -326,6 +328,8 @@ export class BarPanel {
         if (drink.oncePerSession) {
             _sessionClaimedBonuses.add(drink.name);
             nameLabel.setColor('#444444');
+            // Immediately dim the button so the claimed state is visible without mouse-out
+            rect.setFillStyle(disabledColor);
         }
 
         this.drinksOrdered++;

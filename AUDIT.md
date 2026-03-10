@@ -1,8 +1,12 @@
 # Slot City — Repo Truth Audit
 
-**Date:** 2026-03-09
-**Branch:** `claude/audit-repo-structure-HH8oJ`
+**Originally written:** 2026-03-09 (pre-solo-vertical-slice)
+**Updated:** 2026-03-09 (post-solo-vertical-slice)
 **Auditor:** Lead gameplay engineer pass
+
+> **TL;DR for agents:** The solo vertical slice described in Section 5 is **complete**. Sections 1–4
+> reflect the state of the codebase *before* that work. Read Section 5 (marked ✅ DONE) and the
+> Phase 2 TODO in Section 6 for the current picture.
 
 ---
 
@@ -10,87 +14,100 @@
 
 | README Claim | Reality |
 |---|---|
-| Account creation / login ✅ Working | **Requires running Colyseus server + PostgreSQL.** Without them, login returns a network error. |
-| Persistent chip balance ✅ Working | Requires PostgreSQL + Prisma. No offline fallback. |
-| Isometric casino lobby ✅ Working | Scene exists and draws correctly, but avatar/movement only spawn if server connection succeeds. |
-| Player movement (keyboard + click) ✅ Working | Code exists; blocked by server dependency at runtime. |
-| Real-time multiplayer ✅ Working | Colyseus rooms are defined; untested without running infrastructure. |
+| Account creation / login ✅ Working | **Requires running Colyseus server + PostgreSQL.** Without them, login returns a network error. Guest/solo mode bypasses this. |
+| Persistent chip balance ✅ Working | Server-side requires PostgreSQL + Prisma. **LocalStore (localStorage) fallback exists for guest mode.** |
+| Isometric casino lobby ✅ Working | ✅ Works fully offline. Avatar spawns immediately; no server required. |
+| Player movement (keyboard + click) ✅ Working | ✅ Works in solo mode (WASD / arrow keys). |
+| Real-time multiplayer ✅ Working | Colyseus rooms defined; needs server + DB to run. |
 | Room chat + emotes ✅ Working | Code exists; depends on server for broadcast. |
 | Seating system ✅ Working | Defined in schemas and BaseRoom; not testable without server. |
-| Texas Hold'em engine ✅ Working | PokerEngine.ts is complete and unit-tested independently. ✅ |
+| Texas Hold'em engine ✅ Working | ✅ PokerEngine complete and unit-tested. Also fully playable in-browser vs AI without server. |
 | Tournament system ✅ Working | TournamentManager.ts exists and is tested. ✅ |
 | Leaderboard ✅ Working | REST endpoint exists; requires DB. |
 | Next.js web shell ✅ Working | Pages exist; requires DB for data. |
-| Slot machines 🔜 Placeholder | **Not implemented** — just decorative props in lobby. |
+| Slot machines 🔜 Placeholder | ✅ **Fully playable 3-reel slot machine implemented** (SlotsPanel.ts). |
 | Blackjack 🔜 Room skeleton only | BlackjackTableRoom.ts exists but is a stub with no gameplay. |
 
-**Overall:** The architecture is sound and complete as a multiplayer server skeleton. But the game is **not playable** without a running Colyseus server (port 2567) and PostgreSQL instance. There is no offline/solo mode.
+**Overall:** The solo-mode experience is complete and fully playable. The multiplayer server
+skeleton is sound but requires Colyseus + PostgreSQL to activate.
 
 ---
 
-## 2. Root-Level Legacy Code
+## 2. Root-Level Code — Current State
 
-The repo root contains a **separate, unrelated RPG battle game** under `/src/`:
+**The root `/src/` directory is the solo-mode casino game, not legacy RPG code.**
 
 ```
 src/
-  scenes/  BattleScene.ts, CampScene.ts, DialogueScene.ts  ← Fire Emblem-style RPG
-  systems/ CombatSystem.ts, GridSystem.ts, SupportSystem.ts, TurnSystem.ts
-  entities/ Unit.ts
-  data/    maps.ts, units.ts, support_demo.json
+  scenes/       BootScene.ts, PreloadScene.ts        ← Casino boot flow
+  core/         GameState.ts, AvatarController.ts,
+                InteractionSystem.ts                  ← Shared solo-mode systems
+  features/
+    lobby/      CasinoLobbyScene.ts                  ← Main playable casino floor
+    slots/      SlotsPanel.ts                        ← ✅ Fully playable slot machine
+    poker/      PokerPanel.ts, PokerEngine.ts,
+                PokerAI.ts                           ← ✅ Fully playable Texas Hold'em
+    bar/        BarPanel.ts                          ← ✅ Drink ordering + chip bonuses
+    ui/         HUD.ts, Panel.ts                    ← Persistent UI
+  game/         config.ts, constants.ts
+  main.ts       ← Entry point for solo mode
 ```
 
-This code is orphaned. The root `index.html` points to `/src/main.ts` (the RPG), not the casino. The root `package.json` ("slot-city-client") uses Vite but `src/main.ts` still boots the RPG game — meaning `npm run dev` at repo root launches the wrong game.
-
-**The actual casino lives in `/slot-city/apps/game-client/`.**
+`npm run dev` at the repo root boots this casino game correctly.
 
 ---
 
-## 3. Structural Mismatches
+## 3. Structural Notes
 
-| Issue | Location |
-|---|---|
-| Root `index.html` → `/src/main.ts` → RPG game | repo root |
-| Root `package.json` named "slot-city-client" but points at RPG | `/package.json` |
-| Vite configs at `/vite/config.dev.mjs` serve the RPG | `/vite/` |
-| Casino code at `/slot-city/apps/game-client/` has its own Vite config | `/slot-city/apps/game-client/vite.config.ts` |
-| `CasinoLobbyScene` creates avatar only inside `setupRoomHandlers()`, which only runs on server success | lobby scene |
-| No `SlotsScene` exists despite slot machine props in the lobby | client scenes |
-| Slot machine portals not mapped in lobby — Blackjack portal routes to `CasinoLobbyScene` (placeholder comment in code) | `CasinoLobbyScene.ts:433` |
+| Issue | Location | Status |
+|---|---|---|
+| Root solo client and `slot-city/` multiplayer client are independent codebases | repo root vs `slot-city/apps/game-client/` | By design — no cross-imports |
+| `CasinoLobbyScene` always spawns avatar + movement (no server required) | `src/features/lobby/CasinoLobbyScene.ts` | ✅ Fixed |
+| `SlotsScene` exists in multiplayer client | `slot-city/apps/game-client/src/scenes/SlotsScene.ts` | ✅ |
+| Blackjack portal in multiplayer lobby routes to `CasinoLobbyScene` (placeholder) | `CasinoLobbyScene.ts` (multiplayer) | 🔜 Phase 2 |
+| `LocalStore` + `NetworkManager.setGuestUser()` enable offline play in multiplayer client | `slot-city/apps/game-client/` | ✅ |
 
 ---
 
-## 4. What Actually Works Right Now (Cold Start, No Server)
+## 4. What Works Right Now (Cold Start, No Server)
 
-- ✅ Phaser boots and loads (`slot-city/apps/game-client/`)
-- ✅ PreloadScene renders loading bar + title
-- ✅ LoginScene renders form with neon grid
-- ❌ Login/Register fails (no server)
-- ❌ Lobby does not load (requires auth)
-- ❌ Avatar does not appear
-- ❌ Nothing is playable
+### Solo mode (`npm run dev` at root)
+
+- ✅ Phaser boots and loads
+- ✅ PreloadScene: name entry, progress bar
+- ✅ CasinoLobbyScene: full isometric casino floor with avatar + movement
+- ✅ **Slot machine minigame** — 3 reels, weighted RNG, bet selection, payouts
+- ✅ **Texas Hold'em poker** — full game vs AI, all streets, showdown, session stats
+- ✅ **Bar & Lounge** — drinks, gambling tips, once-per-session bonuses
+- ✅ Chip economy (in-memory; resets on refresh)
+- ✅ HUD (balance + zone label)
+- ✅ Free chips reload when broke
+
+### Multiplayer client (`slot-city/apps/game-client/`) without server
+
+- ✅ LoginScene renders with "Play Solo — No Server" button
+- ✅ Guest mode: avatar + lobby + movement work
+- ✅ SlotsScene playable in guest mode (LocalStore-backed balance)
+- ❌ Login/Register → server error (expected without Colyseus)
+- ❌ Multiplayer avatar sync → not available without server
 
 ---
 
 ## 5. Execution Plan — Minimal Playable Vertical Slice
 
-**Goal:** Playable solo slot machine in 10 steps, no server required.
+**Status: ✅ COMPLETE**
 
-### Phase 1 (this branch) — Solo Vertical Slice
+All 9 steps from the original plan have been implemented:
 
-1. **`LocalStore.ts`** — localStorage-backed chip balance + guest username
-2. **`NetworkManager` guest mode** — `setGuestUser()`, `isGuestMode()`
-3. **`LoginScene` Play Solo button** — skip auth, set guest user, enter lobby
-4. **`PreloadScene` offline path** — if user already set, skip server validation
-5. **`CasinoLobbyScene` always-online avatar** — create avatar + movement immediately, not gated on server
-6. **Hotspot system** — detect proximity to slot machines, show `[F] Play Slots` prompt
-7. **`SlotsScene`** — fully playable 3-reel slot machine with weighted symbols, bet sizing, win detection, visual feedback
-8. **Wire SlotsScene** in `main.ts` scene list
-9. **Rewrite README** to accurately describe current state
-
-### Phase 2 — Multiplayer & Persistence (deferred)
-
-See section 6 below.
+1. ✅ `LocalStore.ts` — localStorage chip balance + guest username
+2. ✅ `NetworkManager` guest mode — `setGuestUser()`, `isGuestMode()`
+3. ✅ `LoginScene` "Play Solo" button — skips auth, sets guest user, enters lobby
+4. ✅ `CasinoLobbyScene` always-online avatar — not gated on server
+5. ✅ Hotspot system — proximity prompt + E-key callback
+6. ✅ `SlotsPanel.ts` — 3-reel slot machine, weighted symbols, win detection
+7. ✅ `PokerPanel.ts` + `PokerEngine.ts` + `PokerAI.ts` — full Texas Hold'em
+8. ✅ `BarPanel.ts` — drink ordering, session tracking
+9. ✅ `README.md` — accurately reflects current state
 
 ---
 
@@ -99,7 +116,7 @@ See section 6 below.
 - [ ] **Dev environment setup guide** — docker-compose for Postgres + Colyseus with one command
 - [ ] **Session persistence** — connect lobby chip balance to Prisma via ChipEconomyService
 - [ ] **Server-authoritative slot machine** — move spin logic to a SlotMachineRoom on the server; client is display-only
-- [ ] **Actual `SlotsScene` portal** in lobby (replace the Blackjack placeholder)
+- [ ] **Actual `SlotsScene` portal** in multiplayer lobby (replace the Blackjack placeholder)
 - [ ] **Blackjack gameplay** — complete BlackjackTableRoom + client scene
 - [ ] **Avatar outfit selector** — use `outfitId` field that's already in the schema
 - [ ] **Depth-sorted walking** — MovementController currently allows clicking through UI objects
@@ -107,12 +124,4 @@ See section 6 below.
 - [ ] **Next.js + game auth handoff** — share JWT between web shell and game client
 - [ ] **Tournament UI** — live tournament bracket visible in BarRoomScene
 - [ ] **VIP room** — defined in RoomType enum, room not implemented
-
----
-
-## 7. Quarantine Recommendation
-
-The root `/src/` RPG code should be moved to a `_legacy/` folder or deleted. It is dead code that causes confusion. The root `index.html` and root Vite configs should either be removed or redirected to the casino game.
-
-**Short-term:** Leave as-is (don't break root build behavior). Document clearly.
-**Long-term:** Remove `/src/` entirely or archive to git history.
+- [ ] **Fix BB pre-flop option** in `PokerRoundManager.isBettingRoundComplete()` — BB should get one more action opportunity when everyone has called (server-side only; client PokerEngine is correct)

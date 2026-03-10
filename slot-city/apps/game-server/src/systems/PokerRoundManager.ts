@@ -320,17 +320,20 @@ export class PokerRoundManager {
 
     const winners = determineWinners(eligible, this.state.communityCards);
     const share = Math.floor(this.state.pot / winners.length);
+    // Remainder (odd chip) goes to the first winner, matching standard casino rules.
+    const remainder = this.state.pot % winners.length;
 
-    for (const winnerId of winners) {
+    winners.forEach((winnerId, i) => {
+      const award = share + (i === 0 ? remainder : 0);
       const winner = this.state.players.get(winnerId);
       if (winner) {
-        winner.chips += share;
+        winner.chips += award;
       }
       this.onEvent({
         type: "WINNER_DECLARED",
-        data: { playerId: winnerId, amount: share, pot: this.state.pot },
+        data: { playerId: winnerId, amount: award, pot: this.state.pot },
       });
-    }
+    });
 
     this.state.pot = 0;
     this.endRound();

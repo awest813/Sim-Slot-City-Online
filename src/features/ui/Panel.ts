@@ -19,6 +19,7 @@ export class Panel {
     private overlay!: Phaser.GameObjects.Rectangle;
     private bg!: Phaser.GameObjects.Rectangle;
     protected contentY: number = 60;   // current Y cursor inside panel
+    private escCloseHandler: (() => void) | null = null;
 
     constructor(scene: Phaser.Scene, protected w: number = 440, protected h: number = 360) {
         this.scene = scene;
@@ -124,13 +125,18 @@ export class Panel {
         rect.on('pointerdown', () => { rect.setFillStyle(0x2a0a0a); onClose(); });
         rect.on('pointerup',   () => rect.setFillStyle(0x5a2a2a));
 
-        // ESC key
-        this.scene.input.keyboard!.once('keydown-ESC', onClose);
+        // ESC key — store reference so destroy() can remove the listener
+        this.escCloseHandler = onClose;
+        this.scene.input.keyboard!.on('keydown-ESC', onClose);
 
         this.container.add([rect, label]);
     }
 
     destroy(): void {
+        if (this.escCloseHandler) {
+            this.scene.input.keyboard!.off('keydown-ESC', this.escCloseHandler);
+            this.escCloseHandler = null;
+        }
         this.overlay.destroy();
         this.bg.destroy();
         this.container.destroy();
