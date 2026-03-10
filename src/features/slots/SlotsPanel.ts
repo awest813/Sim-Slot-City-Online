@@ -344,6 +344,7 @@ export class SlotsPanel {
             // Stop reel after delay — store in spinTimers so close() can cancel it
             const stopTimer = this.scene.time.delayedCall(stopDelays[i], () => {
                 rollTimer.remove();
+                if (this.closed) return;
                 const final = weightedRandom();
                 this.reelValues[i] = final;
                 this.reelTexts[i].setText(final);
@@ -359,6 +360,7 @@ export class SlotsPanel {
     }
 
     private evalResult(): void {
+        if (this.closed) return;
         this.spinState = 'result';
         // Keep button visually disabled during post-eval cooldown
         this.spinBtn.setFillStyle(0x1a1a3a);
@@ -455,6 +457,7 @@ export class SlotsPanel {
         this.updateStatsDisplay();
 
         const idleTimer = this.scene.time.delayedCall(500, () => {
+            if (this.closed) return;
             this.spinState = 'idle';
             // Restore spin button to active style now that cooldown is done
             this.spinBtn.setFillStyle(0x3a2a6a);

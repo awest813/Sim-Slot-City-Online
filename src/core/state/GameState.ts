@@ -29,6 +29,9 @@ class GameStateStore {
   }
 
   update(partial: Partial<PlayerState>): void {
+    if (partial.chips !== undefined) {
+      partial = { ...partial, chips: Math.max(0, partial.chips) };
+    }
     this.player = { ...this.player, ...partial };
     this.listeners.forEach(fn => fn(this.get()));
   }
