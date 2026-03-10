@@ -123,11 +123,12 @@ export function deal(state: BlackjackState, bet: number): BlackjackState {
         playerHand,
         dealerHand,
         bet,
-        phase:          playerBJ ? 'result' : 'playing',
-        result:         playerBJ ? 'blackjack' : null,
-        dealerRevealed: playerBJ,
+        phase,
+        result,
+        dealerRevealed: playerBJ || dealerBJ,
         handsPlayed:    state.handsPlayed + 1,
-        sessionWins:    playerBJ ? state.sessionWins + 1 : state.sessionWins,
+        sessionWins,
+        sessionPushes,
     };
 }
 
