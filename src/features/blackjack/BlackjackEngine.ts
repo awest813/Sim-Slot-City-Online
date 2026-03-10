@@ -117,6 +117,14 @@ export function deal(state: BlackjackState, bet: number): BlackjackState {
         };
     }
 
+    // Reaching here means at most ONE side has a natural blackjack (both-BJ is handled above).
+    // Determine phase and result based on natural blackjacks
+    const phase: BJPhase  = (playerBJ || dealerBJ) ? 'result' : 'playing';
+    const result: BJResult = playerBJ ? 'blackjack' : (dealerBJ ? 'lose' : null);
+    const sessionWins    = playerBJ ? state.sessionWins   + 1 : state.sessionWins;
+    const sessionLosses  = dealerBJ ? state.sessionLosses + 1 : state.sessionLosses;
+    const sessionPushes  = state.sessionPushes;
+
     return {
         ...state,
         deck,
@@ -128,6 +136,7 @@ export function deal(state: BlackjackState, bet: number): BlackjackState {
         dealerRevealed: playerBJ || dealerBJ,
         handsPlayed:    state.handsPlayed + 1,
         sessionWins,
+        sessionLosses,
         sessionPushes,
     };
 }

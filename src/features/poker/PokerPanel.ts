@@ -261,7 +261,7 @@ export class PokerPanel {
         this.container.add([helpRect, helpLabel]);
 
         this.escKey = this.scene.input.keyboard!.addKey('ESC');
-        this.escKey.once('down', () => this.close());
+        this.escKey.on('down', () => this.close());
 
         // Keyboard shortcuts for player actions (active only when it's the player's turn)
         this.fKey = this.scene.input.keyboard!.addKey('F');
@@ -538,13 +538,14 @@ export class PokerPanel {
     }
 
     private doAIAction(idx: number): void {
-        if (!this.game) return;
+        if (this.closed || !this.game) return;
         const decision = getAIDecision(this.game, idx);
         this.game = processAction(this.game, decision.action, decision.raiseTotal);
         this.afterAction();
     }
 
     private afterAction(): void {
+        if (this.closed) return;
         this.refreshAllSeats();
         this.updateCommunityCards();
         this.updatePot();
@@ -943,11 +944,11 @@ export class PokerPanel {
             GameState.addChips(BUY_IN);
         }
 
-        this.escKey.destroy();
-        this.fKey.destroy();
-        this.cKey.destroy();
-        this.rKey.destroy();
-        this.spaceKey.destroy();
+        this.escKey.removeAllListeners();
+        this.fKey.removeAllListeners();
+        this.cKey.removeAllListeners();
+        this.rKey.removeAllListeners();
+        this.spaceKey.removeAllListeners();
         this.overlay.destroy();
         this.container.destroy();
         this.onClose();
