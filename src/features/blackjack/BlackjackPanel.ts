@@ -33,6 +33,8 @@ export class BlackjackPanel {
     private container!:  Phaser.GameObjects.Container;
     private escKey!:     Phaser.Input.Keyboard.Key;
     private spaceKey!:   Phaser.Input.Keyboard.Key;
+    private hKey!:       Phaser.Input.Keyboard.Key;
+    private sKey!:       Phaser.Input.Keyboard.Key;
 
     // Dynamic display groups (rebuilt on each hand redraw)
     private dealerCardObjs: Phaser.GameObjects.GameObject[] = [];
@@ -157,6 +159,13 @@ export class BlackjackPanel {
         this.spaceKey.on('down', () => {
             if (this.bjState.phase === 'betting') this.startHand();
         });
+
+        // ── H / S shortcuts (Hit / Stand during play) ─────────────────────────
+        this.hKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.H);
+        this.hKey.on('down', () => { if (this.bjState.phase === 'playing') this.doHit(); });
+
+        this.sKey = this.scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+        this.sKey.on('down', () => { if (this.bjState.phase === 'playing') this.doStand(); });
 
         // Build bet-selection UI
         this.buildBetUI();
@@ -517,7 +526,7 @@ export class BlackjackPanel {
     private updateStats(): void {
         const s = this.bjState;
         if (s.handsPlayed === 0) {
-            this.statsText.setText('ESC to close  ·  Select bet and press DEAL or SPACE');
+            this.statsText.setText('ESC to close  ·  Select bet and press DEAL or SPACE  ·  H=Hit  S=Stand');
         } else {
             this.statsText.setText(
                 `Hands: ${s.handsPlayed}  ·  Wins: ${s.sessionWins}  ·  Losses: ${s.sessionLosses}  ·  Pushes: ${s.sessionPushes}`
@@ -561,8 +570,10 @@ export class BlackjackPanel {
             GameState.addChips(this.bjState.bet);
         }
 
-        this.scene.input.keyboard!.removeKey(this.escKey);
-        this.scene.input.keyboard!.removeKey(this.spaceKey);
+        this.escKey.destroy();
+        this.spaceKey.destroy();
+        this.hKey.destroy();
+        this.sKey.destroy();
         this.overlay.destroy();
         this.container.destroy(true);
         this.onClose();

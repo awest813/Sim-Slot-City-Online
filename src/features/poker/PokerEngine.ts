@@ -245,8 +245,10 @@ export function processAction(
             const amt = Math.min(totalBet - actor.roundBet, actor.chips);
             actor.chips -= amt; actor.roundBet += amt; pot += amt;
             if (actor.chips === 0) actor.allIn = true;
-            minRaise = actor.roundBet - currentBet;
-            currentBet = actor.roundBet;
+            // Preserve minRaise when an all-in is less than a full raise (standard poker rules)
+            const raiseIncrement = actor.roundBet - currentBet;
+            if (raiseIncrement > 0) minRaise = Math.max(minRaise, raiseIncrement);
+            currentBet = Math.max(currentBet, actor.roundBet);
             msg = `${actor.name} raises to ${actor.roundBet}◈`;
             break;
         }

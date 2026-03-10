@@ -105,6 +105,7 @@ export class InteractionSystem {
     }
 
     destroy(): void {
+        this.eKey.destroy();
         this.promptBg.destroy();
         this.promptText.destroy();
     }

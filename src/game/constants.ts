@@ -25,6 +25,7 @@ export const COL_SLOT_BODY   = 0x1a1a3e;
 export const COL_SLOT_TRIM   = 0xc9a84c;
 export const COL_CHIP        = 0x2ecc71;
 export const COL_LOSS        = 0xe74c3c;
+export const COL_ALL_IN      = 0xcc44cc;   // magenta badge for all-in players at poker table
 export const COL_WHITE       = 0xf0e6d3;
 export const COL_GRAY        = 0x888888;
 
