@@ -99,6 +99,23 @@ export function deal(state: BlackjackState, bet: number): BlackjackState {
     const dealerHand: Card[] = [c2, c4];
 
     const playerBJ = isBlackjack(playerHand);
+    const dealerBJ = isBlackjack(dealerHand);
+
+    // Both have blackjack → push; only player → blackjack win; neither → play on
+    let result: BJResult = null;
+    let phase: BJPhase = 'playing';
+    let sessionWins   = state.sessionWins;
+    let sessionPushes = state.sessionPushes;
+
+    if (playerBJ && dealerBJ) {
+        result = 'push';
+        phase  = 'result';
+        sessionPushes++;
+    } else if (playerBJ) {
+        result = 'blackjack';
+        phase  = 'result';
+        sessionWins++;
+    }
 
     return {
         ...state,
@@ -106,11 +123,12 @@ export function deal(state: BlackjackState, bet: number): BlackjackState {
         playerHand,
         dealerHand,
         bet,
-        phase:          playerBJ ? 'result' : 'playing',
-        result:         playerBJ ? 'blackjack' : null,
-        dealerRevealed: playerBJ,
+        phase,
+        result,
+        dealerRevealed: playerBJ || dealerBJ,
         handsPlayed:    state.handsPlayed + 1,
-        sessionWins:    playerBJ ? state.sessionWins + 1 : state.sessionWins,
+        sessionWins,
+        sessionPushes,
     };
 }
 

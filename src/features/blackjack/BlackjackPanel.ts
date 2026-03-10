@@ -254,8 +254,8 @@ export class BlackjackPanel {
         this.showPhaseUI();
         this.refreshDisplay();
 
-        // Check player blackjack
-        if (this.bjState.result === 'blackjack') {
+        // Resolve immediately if the hand ended on deal (player BJ, or both BJ → push)
+        if (this.bjState.phase === 'result') {
             this.resolveResult();
         }
     }

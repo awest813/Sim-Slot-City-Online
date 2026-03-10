@@ -519,11 +519,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
   }
 
   private async enterRoom(roomType: RoomType): Promise<void> {
-    // BLACKJACK portal re-routed to Slots (Blackjack not yet implemented)
+    // Blackjack: offline scene for guest/solo mode, server scene when connected
     if (roomType === RoomType.BLACKJACK) {
+      const sceneName = networkManager.isGuestMode() ? "OfflineBlackjackScene" : "BlackjackRoomScene";
       if (this.room) await networkManager.leaveRoom();
       this.cleanup();
-      this.scene.start("SlotsScene");
+      this.scene.start(sceneName);
       return;
     }
 
