@@ -109,6 +109,7 @@ export class PokerPanel {
     private spaceKey!: Phaser.Input.Keyboard.Key;
     private dealButtonVisible = false;
     private closed = false;
+    private rankingsPopup: Phaser.GameObjects.Container | undefined = undefined;
 
     // Session tracking
     private sessionStartChips: number = 0;
@@ -231,7 +232,7 @@ export class PokerPanel {
         // Status bar
         const statusBg = this.scene.add.rectangle(0, ph / 2 - 52, pw - 40, 26, 0x020a02, 0.92)
             .setStrokeStyle(1, 0x2a4a2a, 0.6);
-        this.statusText = this.scene.add.text(0, ph / 2 - 52, 'Select an empty seat to join the table.', {
+        this.statusText = this.scene.add.text(0, ph / 2 - 52, 'Click a green OPEN seat to join · Buy-in: 500◈', {
             fontFamily: 'monospace', fontSize: '11px', color: '#6a8a6a',
         }).setOrigin(0.5);
         this.container.add([statusBg, this.statusText]);
@@ -247,6 +248,17 @@ export class PokerPanel {
         closeRect.on('pointerdown', () => { closeRect.setFillStyle(0x2a0a0a); this.close(); });
         closeRect.on('pointerup',   () => closeRect.setFillStyle(0x5a2a2a));
         this.container.add([closeRect, closeLabel]);
+
+        // Help button — shows hand rankings reference
+        const helpRect = this.scene.add.rectangle(pw / 2 - 30, -ph / 2 + 22, 40, 22, 0x0a1a2a, 1)
+            .setStrokeStyle(1, 0x3a5a7a, 1).setInteractive({ useHandCursor: true });
+        const helpLabel = this.scene.add.text(pw / 2 - 30, -ph / 2 + 22, '? Help', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#6a9aaa',
+        }).setOrigin(0.5);
+        helpRect.on('pointerover', () => helpRect.setFillStyle(0x152a3a));
+        helpRect.on('pointerout',  () => helpRect.setFillStyle(0x0a1a2a));
+        helpRect.on('pointerdown', () => this.toggleHandRankings());
+        this.container.add([helpRect, helpLabel]);
 
         this.escKey = this.scene.input.keyboard!.addKey('ESC');
         this.escKey.once('down', () => this.close());
@@ -611,10 +623,21 @@ export class PokerPanel {
         const spacing = Math.min(MAX_BTN_SPACING, ACTION_AREA_WIDTH / Math.max(row1.length, 1));
         const startX  = -((row1.length - 1) * spacing) / 2;
 
-        const turnBanner = this.scene.add.text(0, -22, '— YOUR TURN —', {
-            fontFamily: 'monospace', fontSize: '10px', color: '#c9a84c',
+        const turnBanner = this.scene.add.text(0, -22, '★ YOUR TURN ★', {
+            fontFamily: 'monospace', fontSize: '11px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
+        const turnBg = this.scene.add.rectangle(0, -22, 160, 20, 0x1a1200, 1)
+            .setStrokeStyle(1, 0xc9a84c, 0.7);
+        this.actionArea.add(turnBg);
         this.actionArea.add(turnBanner);
+        // Subtle pulse on the banner to draw player attention
+        this.scene.tweens.add({
+            targets: turnBanner,
+            alpha: 0.5,
+            yoyo: true,
+            repeat: 3,
+            duration: 380,
+        });
 
         row1.forEach((def, i) => {
             const bx = startX + i * spacing;
@@ -842,6 +865,62 @@ export class PokerPanel {
         this.statusText.setText(msg).setColor(color);
     }
 
+    // ── Hand Rankings Popup ───────────────────────────────────────────────────
+
+    private toggleHandRankings(): void {
+        if (this.rankingsPopup) {
+            this.rankingsPopup.destroy();
+            this.rankingsPopup = undefined;
+            return;
+        }
+
+        const pw = PANEL_W;
+        const popW = 300, popH = 280;
+        const popX = -pw / 2 + popW / 2 + 8;
+        const popY = 0;
+
+        const popBg = this.scene.add.rectangle(popX, popY, popW, popH, 0x020c1a, 0.97)
+            .setStrokeStyle(1, 0x3a6a9a, 1);
+        const popTitle = this.scene.add.text(popX, popY - popH / 2 + 14, 'Hand Rankings (best → worst)', {
+            fontFamily: 'monospace', fontSize: '10px', color: '#6a9aaa', fontStyle: 'bold',
+        }).setOrigin(0.5);
+        const divider = this.scene.add.rectangle(popX, popY - popH / 2 + 24, popW - 16, 1, 0x3a6a9a, 0.4);
+
+        const hands: Array<{ name: string; example: string }> = [
+            { name: '① Royal Flush',    example: 'A K Q J 10 (same suit)' },
+            { name: '② Str. Flush',     example: '9 8 7 6 5 (same suit)' },
+            { name: '③ Four of a Kind', example: 'K K K K x' },
+            { name: '④ Full House',     example: 'Q Q Q J J' },
+            { name: '⑤ Flush',          example: '5 cards same suit' },
+            { name: '⑥ Straight',       example: '8 7 6 5 4 (any suits)' },
+            { name: '⑦ Three of Kind',  example: '7 7 7 x x' },
+            { name: '⑧ Two Pair',       example: 'J J 4 4 x' },
+            { name: '⑨ Pair',           example: 'A A x x x' },
+            { name: '⑩ High Card',      example: 'Highest card wins' },
+        ];
+
+        const items: Phaser.GameObjects.Text[] = [];
+        hands.forEach((h, i) => {
+            const hy = popY - popH / 2 + 40 + i * 22;
+            const nameT = this.scene.add.text(popX - popW / 2 + 12, hy, h.name, {
+                fontFamily: 'monospace', fontSize: '9px', color: '#8ab8c8',
+            }).setOrigin(0, 0.5);
+            const exT = this.scene.add.text(popX + popW / 2 - 8, hy, h.example, {
+                fontFamily: 'monospace', fontSize: '9px', color: '#3a5a6a',
+            }).setOrigin(1, 0.5);
+            items.push(nameT, exT);
+        });
+
+        const closeHint = this.scene.add.text(popX, popY + popH / 2 - 10, '[ click ? to close ]', {
+            fontFamily: 'monospace', fontSize: '8px', color: '#2a4a5a',
+        }).setOrigin(0.5);
+
+        this.rankingsPopup = this.scene.add.container(
+            GAME_WIDTH / 2, GAME_HEIGHT / 2,
+            [popBg, popTitle, divider, ...items, closeHint],
+        ).setScrollFactor(0).setDepth(DEPTH_PANEL + 5);
+    }
+
     // ── Close ─────────────────────────────────────────────────────────────────
 
     private close(): void {
@@ -849,6 +928,11 @@ export class PokerPanel {
         this.closed = true;
 
         this.aiTimers.forEach(t => t.remove());
+
+        if (this.rankingsPopup) {
+            this.rankingsPopup.destroy();
+            this.rankingsPopup = undefined;
+        }
 
         // Return remaining chips to GameState
         if (this.game && this.playerSeatId !== null) {
