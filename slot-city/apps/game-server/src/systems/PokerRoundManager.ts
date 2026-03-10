@@ -51,6 +51,13 @@ export class PokerRoundManager {
   private onEvent: RoundEventCallback;
   private actionTimer: NodeJS.Timeout | null = null;
   private readonly ACTION_TIMEOUT_MS = 30_000;
+  /**
+   * Pre-flop only: the Big Blind is entitled to one action (the "option")
+   * even after all other players have called. This flag is set when the round
+   * starts and cleared as soon as the BB takes their turn or if the BB is
+   * all-in (and therefore cannot bet further).
+   */
+  private bbHasOption: boolean = false;
 
   constructor(onEvent: RoundEventCallback) {
     this.onEvent = onEvent;
@@ -159,6 +166,11 @@ export class PokerRoundManager {
     this.dealHoleCards();
     this.postBlinds();
     this.transitionTo(PokerGameState.PRE_FLOP);
+
+    // BB gets the option to re-open action pre-flop if they can still bet.
+    const bbPlayer = this.getPlayerBySeat(this.state.bigBlindSeat);
+    this.bbHasOption = !!(bbPlayer && !bbPlayer.isAllIn);
+
     this.setNextActivePlayer();
   }
 
@@ -249,6 +261,14 @@ export class PokerRoundManager {
       return true;
     }
 
+    // Clear the BB's pre-flop option as soon as the BB takes any action.
+    if (
+      this.state.gameState === PokerGameState.PRE_FLOP &&
+      activePlayer.seatIndex === this.state.bigBlindSeat
+    ) {
+      this.bbHasOption = false;
+    }
+
     if (this.isBettingRoundComplete()) {
       this.advanceStreet();
     } else {
@@ -260,10 +280,20 @@ export class PokerRoundManager {
 
   private isBettingRoundComplete(): boolean {
     const active = this.getActivePlayers().filter((p) => !p.isAllIn);
-    return active.every((p) => p.currentBet === this.state.currentBet);
+    if (!active.every((p) => p.currentBet === this.state.currentBet)) {
+      return false;
+    }
+    // Pre-flop: the BB still has their option to raise even when all bets match.
+    if (this.state.gameState === PokerGameState.PRE_FLOP && this.bbHasOption) {
+      return false;
+    }
+    return true;
   }
 
   private advanceStreet(): void {
+    // Pre-flop option no longer applies once we advance past the pre-flop street.
+    this.bbHasOption = false;
+
     // Reset bets
     for (const p of this.state.players.values()) {
       p.currentBet = 0;
@@ -364,16 +394,25 @@ export class PokerRoundManager {
       return;
     }
 
+    // Always work with players sorted by seat index so turn order is deterministic.
+    const sorted = [...active].sort((a, b) => a.seatIndex - b.seatIndex);
+    const allSeats = sorted.map((p) => p.seatIndex);
+
     let nextSeat: number;
     if (postBlinds) {
-      // Start from seat after dealer (or small blind for postflop)
-      const allSeats = active.map((p) => p.seatIndex).sort((a, b) => a - b);
+      // Post-flop: first active player clockwise from the dealer, starting at SB.
       const sbIdx = allSeats.findIndex((s) => s >= this.state.smallBlindSeat);
       nextSeat = sbIdx >= 0 ? allSeats[sbIdx] : allSeats[0];
+    } else if (this.state.activePlayerSeat === -1) {
+      // Pre-flop start: first actor is UTG — the first active player after the BB.
+      const bbSeat = this.state.bigBlindSeat;
+      const utgIdx = allSeats.findIndex((s) => s > bbSeat);
+      nextSeat = utgIdx >= 0 ? allSeats[utgIdx] : allSeats[0];
     } else {
-      const currentIdx = active.findIndex((p) => p.seatIndex === this.state.activePlayerSeat);
-      const nextIdx = (currentIdx + 1) % active.length;
-      nextSeat = active[nextIdx].seatIndex;
+      // Mid-round: advance to the next seat clockwise.
+      const currentIdx = sorted.findIndex((p) => p.seatIndex === this.state.activePlayerSeat);
+      const nextIdx = (currentIdx + 1) % sorted.length;
+      nextSeat = sorted[nextIdx].seatIndex;
     }
 
     this.state.activePlayerSeat = nextSeat;
@@ -410,6 +449,7 @@ export class PokerRoundManager {
 
   reset(): void {
     this.clearActionTimer();
+    this.bbHasOption = false;
     this.state = this.createInitialState();
   }
 }

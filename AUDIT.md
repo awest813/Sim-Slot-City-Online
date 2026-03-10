@@ -124,4 +124,4 @@ All 9 steps from the original plan have been implemented:
 - [ ] **Next.js + game auth handoff** — share JWT between web shell and game client
 - [ ] **Tournament UI** — live tournament bracket visible in BarRoomScene
 - [ ] **VIP room** — defined in RoomType enum, room not implemented
-- [ ] **Fix BB pre-flop option** in `PokerRoundManager.isBettingRoundComplete()` — BB should get one more action opportunity when everyone has called (server-side only; client PokerEngine is correct)
+- [x] **Fix BB pre-flop option** in `PokerRoundManager.isBettingRoundComplete()` — BB now always gets one action pre-flop via `bbHasOption` flag; pre-flop turn ordering fixed to sort by seat index
