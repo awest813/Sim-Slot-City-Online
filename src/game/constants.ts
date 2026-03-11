@@ -36,6 +36,7 @@ export const COL_SLOTS_ACCENT     = 0xf5a020;   // Amber (slots)
 export const COL_POKER_ACCENT     = 0x3a90e0;   // Blue (poker)
 export const COL_BAR_ACCENT       = 0xe06820;   // Orange (bar)
 export const COL_BLACKJACK_ACCENT = 0x9b50c0;   // Purple (blackjack)
+export const COL_ROULETTE_ACCENT  = 0xcc3333;   // Red (roulette)
 
 // ── Palette — UI ──────────────────────────────────────────────────────────────
 export const COL_UI_BG        = 0x080f1c;   // Panel background (deep navy)
@@ -95,3 +96,4 @@ export const ZONE_SLOTS      = { x: 30,  y: 60,  w: 260, h: 380 };
 export const ZONE_POKER      = { x: 650, y: 60,  w: 280, h: 380 };
 export const ZONE_BAR        = { x: 290, y: 30,  w: 380, h: 200 };
 export const ZONE_BLACKJACK  = { x: 330, y: 250, w: 300, h: 200 };
+export const ZONE_ROULETTE   = { x:  30, y: 450, w: 270, h: 130 };

@@ -12,6 +12,7 @@ const ZONE_LABELS: Record<Zone, string> = {
     poker:     '♠ Poker Room',
     bar:       '🍹 Bar & Lounge',
     blackjack: '🃏 Blackjack',
+    roulette:  '🎡 Roulette',
     floor:     '🏛 Casino Floor',
 };
 

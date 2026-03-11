@@ -29,6 +29,7 @@ const LOBBY_LAYOUT = {
     { tileX: 16, tileY: 5,  targetRoom: RoomType.POKER,     label: "🃏 Poker Room"    },
     { tileX: 16, tileY: 12, targetRoom: RoomType.BAR,       label: "🍸 Lucky Lounge"  },
     { tileX: 3,  tileY: 8,  targetRoom: RoomType.BLACKJACK, label: "🎰 Slot Machines"  },
+    { tileX: 10, tileY: 15, targetRoom: RoomType.ROULETTE,  label: "🎡 Roulette"       },
   ] as RoomPortal[],
 };
 
@@ -199,6 +200,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
     // Reception desk
     this.drawDesk(propGraphics, 10, 14);
 
+    // Roulette table
+    this.drawRouletteTable(propGraphics, 10, 15);
+
     // Tournament board
     this.drawTournamentBoard(propGraphics, 12, 3);
 
@@ -230,6 +234,29 @@ export class CasinoLobbyScene extends Phaser.Scene {
     g.fillRect(x - 40, y - 30, 80, 12);
     g.lineStyle(1, 0xaa4400, 1);
     g.strokeRect(x - 40, y - 30, 80, 30);
+    g.setDepth(getDepth(tx, ty) * 10 + 5);
+  }
+
+  private drawRouletteTable(g: Phaser.GameObjects.Graphics, tx: number, ty: number): void {
+    const { x, y } = isoToScreen(tx, ty);
+    // Table felt
+    g.fillStyle(0x0c2a0c, 1);
+    g.fillEllipse(x, y - 10, 100, 40);
+    g.lineStyle(2, 0xcc3333, 0.8);
+    g.strokeEllipse(x, y - 10, 86, 30);
+    // Wheel
+    g.fillStyle(0x3a1c08, 1);
+    g.fillCircle(x - 30, y - 10, 18);
+    g.fillStyle(0xcc2222, 1);
+    g.fillCircle(x - 30, y - 10, 13);
+    g.fillStyle(0x080808, 1);
+    g.fillCircle(x - 30, y - 10, 6);
+    g.lineStyle(1, 0xc9a84c, 0.7);
+    g.strokeCircle(x - 30, y - 10, 13);
+    // Label text
+    this.add.text(x, y - 28, "🎡 ROULETTE", {
+      fontSize: "8px", color: "#cc3333", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 10);
     g.setDepth(getDepth(tx, ty) * 10 + 5);
   }
 
@@ -403,6 +430,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
         promptLabel: "[ F ] Play Slot Machines",
         action: () => { this.cleanup(); this.scene.start("SlotsScene"); },
       },
+      {
+        // Roulette table portal area
+        tileX: 10,
+        tileY: 15,
+        radius: 2,
+        promptLabel: "[ F ] Play Roulette",
+        action: () => { this.cleanup(); this.scene.start("RouletteScene"); },
+      },
     ];
   }
 
@@ -534,6 +569,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
       if (this.room) await networkManager.leaveRoom();
       this.cleanup();
       this.scene.start(sceneName);
+      return;
+    }
+
+    // Roulette: always uses the offline-capable scene
+    if (roomType === RoomType.ROULETTE) {
+      if (this.room) await networkManager.leaveRoom();
+      this.cleanup();
+      this.scene.start("RouletteScene");
       return;
     }
 

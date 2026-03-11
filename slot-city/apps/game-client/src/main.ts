@@ -9,6 +9,7 @@ import { OfflinePokerScene } from "./scenes/OfflinePokerScene";
 import { BarRoomScene } from "./scenes/BarRoomScene";
 import { BlackjackRoomScene } from "./scenes/BlackjackRoomScene";
 import { OfflineBlackjackScene } from "./scenes/OfflineBlackjackScene";
+import { RouletteScene } from "./scenes/RouletteScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -16,7 +17,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 768,
   parent: "game-container",
   backgroundColor: "#0a0a1a",
-  scene: [BootScene, PreloadScene, LoginScene, CasinoLobbyScene, SlotsScene, PokerRoomScene, OfflinePokerScene, BarRoomScene, BlackjackRoomScene, OfflineBlackjackScene],
+  scene: [BootScene, PreloadScene, LoginScene, CasinoLobbyScene, SlotsScene, PokerRoomScene, OfflinePokerScene, BarRoomScene, BlackjackRoomScene, OfflineBlackjackScene, RouletteScene],
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
