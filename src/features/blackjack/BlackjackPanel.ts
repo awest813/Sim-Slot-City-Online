@@ -351,7 +351,11 @@ export class BlackjackPanel {
     private doDouble(): void {
         if (this.bjState.phase !== 'playing') return;
         const chips = GameState.get().chips;
-        if (this.bjState.bet > chips) return;
+        if (this.bjState.bet > chips) {
+            this.statsText.setText('Not enough chips to double down!').setColor('#e74c3c');
+            this.scene.time.delayedCall(1200, () => this.updateStats());
+            return;
+        }
         GameState.addChips(-this.bjState.bet);
         this.bjState = doubleDown(this.bjState);
         this.refreshDisplay();

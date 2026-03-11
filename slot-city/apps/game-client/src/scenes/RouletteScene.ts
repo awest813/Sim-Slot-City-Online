@@ -600,16 +600,22 @@ export class RouletteScene extends Phaser.Scene {
 
     this.bets.clear();
 
+    // totalReturn = stake returned + net profit (always >= 0)
+    const totalReturn = wagered + net;
+    if (totalReturn > 0) {
+      this.chips += totalReturn;
+      localStore.adjustChips(totalReturn);
+    }
+
     if (net > 0) {
       this.winsCount++;
-      this.chips += wagered + net;
-      localStore.adjustChips(wagered + net);
       this.resultText.setText(`${result} — WIN! +${net.toLocaleString()} chips`).setColor("#ffd700");
       this.cameras.main.flash(400, 200, 200, 0);
     } else if (net === 0) {
-      this.chips += wagered; // push
-      localStore.adjustChips(wagered);
       this.resultText.setText(`${result} — Push`).setColor("#888888");
+    } else if (totalReturn > 0) {
+      // Partial return: some bets won, overall net loss
+      this.resultText.setText(`${result} — Net loss  (${totalReturn.toLocaleString()} returned)`).setColor("#888888");
     } else {
       this.resultText.setText(`${result} — No win  -${wagered.toLocaleString()} chips`).setColor("#888888");
     }
