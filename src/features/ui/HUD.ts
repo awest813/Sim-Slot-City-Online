@@ -214,8 +214,8 @@ export class HUD {
         }
         this.prevChips = s.chips;
 
-        // Free chips button
-        const broke = s.chips === 0 && s.interaction === 'free';
+        // Free chips button — show whenever broke, regardless of active zone/interaction
+        const broke = s.chips === 0;
         if (broke !== this.freeChipsVisible) {
             this.setFreeChipsVisible(broke);
         }

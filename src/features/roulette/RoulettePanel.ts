@@ -752,15 +752,23 @@ export class RoulettePanel {
         this.totalWagered += wagered;
         this.bets.clear();
 
+        // totalReturn = stake returned + net profit (always >= 0)
+        const totalReturn = wagered + net;
+        if (totalReturn > 0) {
+            GameState.addChips(totalReturn);
+        }
+
         if (net > 0) {
-            this.totalWon += wagered + net;
-            GameState.addChips(wagered + net);  // return stake + winnings
+            this.totalWon += totalReturn;
             this.showMsg(`${result} — WIN! +${net}◈`, '#2ecc71');
             this.showChipDelta(`+${net}◈`, '#2ecc71');
         } else if (net === 0) {
-            // push (shouldn't happen in roulette, but just in case)
-            GameState.addChips(wagered);
+            // push (e.g., bets on both red and black cancel out)
             this.showMsg(`${result} — Push`, '#c9a84c');
+        } else if (totalReturn > 0) {
+            // Partial return: some bets won, overall net loss
+            this.showMsg(`${result} — Net loss  (${totalReturn}◈ returned)`, '#e74c3c');
+            this.showChipDelta(`-${wagered - totalReturn}◈`, '#e74c3c');
         } else {
             this.showMsg(`${result} — No win  -${wagered}◈`, '#e74c3c');
             this.showChipDelta(`-${wagered}◈`, '#e74c3c');

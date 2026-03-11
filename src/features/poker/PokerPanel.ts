@@ -851,12 +851,12 @@ export class PokerPanel {
             const p = this.game.players.find(pl => pl.seatId === this.playerSeatId);
             if (p) {
                 currentChips = p.chips;
-                this.chipsText.setText(`◈ ${p.chips}`);
+                this.chipsText.setText(`◈ ${p.chips.toLocaleString()}`);
             } else {
-                this.chipsText.setText(`◈ ${currentChips}`);
+                this.chipsText.setText(`◈ ${currentChips.toLocaleString()}`);
             }
         } else {
-            this.chipsText.setText(`◈ ${currentChips}`);
+            this.chipsText.setText(`◈ ${currentChips.toLocaleString()}`);
         }
         this.updateSessionDisplay(currentChips);
     }
