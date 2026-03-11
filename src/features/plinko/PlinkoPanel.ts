@@ -67,10 +67,11 @@ export class PlinkoPanel {
     private boardOffsetY = 0;
 
     // Ball animation
-    private ballX    = 0;
-    private ballY    = 0;
-    private ballPath: Array<{ x: number; y: number }> = [];
-    private pathIdx  = 0;
+    private ballX        = 0;
+    private ballY        = 0;
+    private ballPath:    Array<{ x: number; y: number }> = [];
+    private pathIdx      = 0;
+    private finalSlotIdx = 0;
     private dropTween: Phaser.Tweens.Tween | null = null;
 
     // Session stats
@@ -287,7 +288,7 @@ export class PlinkoPanel {
             g.strokeRect(sx + 1, slotY + 1, slotW - 2, slotH - 2);
 
             // Multiplier label
-            const labelStr = mult >= 1 ? `${mult}×` : `${mult}×`;
+            const labelStr = `${mult}×`;
             const labelCol = Phaser.Display.Color.IntegerToColor(col).rgba;
             const lbl = this.scene.add.text(sx + slotW / 2, slotY + slotH / 2, labelStr, {
                 fontFamily: FONT,
@@ -453,9 +454,10 @@ export class PlinkoPanel {
         this.slotHighlightGfx.clear();
 
         // ── Compute ball path through the peg grid ────────────────────────────
-        const path = this.computeBallPath();
-        this.ballPath = path;
-        this.pathIdx  = 0;
+        const { points, finalSlot } = this.computeBallPath();
+        this.ballPath    = points;
+        this.finalSlotIdx = finalSlot;
+        this.pathIdx     = 0;
 
         // Start ball at the top center
         this.ballX = this.boardOffsetX;
@@ -469,9 +471,9 @@ export class PlinkoPanel {
     /**
      * Simulate the ball dropping through the peg grid.
      * At each peg row the ball randomly goes left or right.
-     * Returns an array of {x,y} waypoints from top to a slot.
+     * Returns waypoints from top to a slot plus the landing slot index.
      */
-    private computeBallPath(): Array<{ x: number; y: number }> {
+    private computeBallPath(): { points: Array<{ x: number; y: number }>; finalSlot: number } {
         const points: Array<{ x: number; y: number }> = [];
         const ox = this.boardOffsetX;
         const oy = this.boardOffsetY;
@@ -510,18 +512,14 @@ export class PlinkoPanel {
         points.push({ x: finalX, y: finalY - 8 });
         points.push({ x: finalX, y: finalY });
 
-        // Attach the final slot index to path for retrieval
-        (points as any)._finalSlot = clampedSlot;
-
-        return points;
+        return { points, finalSlot: clampedSlot };
     }
 
     private animateBallStep(): void {
         if (this.closed) return;
         if (this.pathIdx >= this.ballPath.length - 1) {
             // Ball has reached the end
-            const finalSlot = (this.ballPath as any)._finalSlot as number;
-            this.onBallLanded(finalSlot);
+            this.onBallLanded(this.finalSlotIdx);
             return;
         }
 
@@ -571,14 +569,17 @@ export class PlinkoPanel {
             },
         });
 
-        // Apply payout
-        if (payout > 0) {
-            this.totalWon += payout;
-            GameState.addChips(payout);
-            this.updateChipsDisplay();
-            this.showChipDelta(`+${payout}◈`, '#2ecc71');
+        // Apply payout; show net delta (profit/loss vs. stake), not gross return
+        const net = payout - this.currentBet;
+        this.totalWon += payout;   // gross return tracked for stats (net = totalWon - totalWagered)
+        GameState.addChips(payout);
+        this.updateChipsDisplay();
+        if (net > 0) {
+            this.showChipDelta(`+${net}◈`, '#2ecc71');
+        } else if (net === 0) {
+            this.showChipDelta(`±0◈`, '#c9a84c');
         } else {
-            this.showChipDelta(`-${this.currentBet}◈`, '#e74c3c');
+            this.showChipDelta(`${net}◈`, '#e74c3c');
         }
 
         const colStr = Phaser.Display.Color.IntegerToColor(col).rgba;

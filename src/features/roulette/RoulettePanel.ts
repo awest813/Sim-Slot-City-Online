@@ -456,8 +456,8 @@ export class RoulettePanel {
         const hit = this.scene.add.rectangle(bx + cw / 2, by + ch / 2, cw, ch, 0x000000, 0)
             .setInteractive({ useHandCursor: true });
 
-        hit.on('pointerover',  () => draw(this.getBetKey('straight', num) in Object.fromEntries(this.bets), true, false));
-        hit.on('pointerout',   () => draw(this.getBetKey('straight', num) in Object.fromEntries(this.bets), false, false));
+        hit.on('pointerover',  () => draw(this.bets.has(this.getBetKey('straight', num)), true, false));
+        hit.on('pointerout',   () => draw(this.bets.has(this.getBetKey('straight', num)), false, false));
         hit.on('pointerdown',  () => this.addToBet('straight', num));
 
         this.container.add([gfx, lbl, hit]);
@@ -508,7 +508,7 @@ export class RoulettePanel {
         draw(false, false, false);
 
         const lblColor = textColor
-            ? `#${textColor.toString(16).padStart(6, '0').replace(/^0+/, '')}` || '#ffffff'
+            ? `#${textColor.toString(16).padStart(6, '0')}`
             : '#aaccaa';
         const lbl = this.scene.add.text(bx + cw / 2, by + ch / 2, label, {
             fontFamily: FONT, fontSize: '9px', color: lblColor, fontStyle: 'bold',
@@ -671,7 +671,7 @@ export class RoulettePanel {
         this.spinState = 'spinning';
         this.drawSpinBtn('spinning');
         this.spinBtnLabel.setText('SPINNING...').setColor('#3a6a3a');
-        this.showMsg('', '');
+        this.msgText.setText('');
 
         // Animate wheel rotation then show result
         const winIndex    = getWheelIndex(result);
@@ -694,14 +694,20 @@ export class RoulettePanel {
 
     private animateBall(_result: number): void {
         if (this.closed) return;
-        // Spin ball in opposite direction at decreasing radius
+        // Spin ball in opposite direction, decelerating over the spin duration
         let angle = 0;
+        let speed = 28;   // degrees/tick — starts fast
+        let tick  = 0;
+        const TOTAL_TICKS = 45;
         const timer = this.scene.time.addEvent({
             delay:    60,
-            repeat:   45,
+            repeat:   TOTAL_TICKS,
             callback: () => {
                 if (this.closed) { timer.remove(); return; }
-                angle += 18;  // decreasing with time
+                // Ease-out: speed falls from 28 to 6 over the animation
+                speed = 28 * (1 - tick / TOTAL_TICKS) + 6;
+                angle += speed;
+                tick++;
                 const r   = WHEEL_OR + 6;
                 const rad = (angle * Math.PI) / 180;
                 this.ballGfx.setPosition(

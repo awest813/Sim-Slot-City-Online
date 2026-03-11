@@ -26,6 +26,7 @@ const WAYPOINTS: [number, number][] = [
     [560, 300], // blackjack right side
     [240, 160], // bar left approach
     [720, 160], // bar right approach
+    [790, 515], // plinko area
 ];
 
 export const AI_NAMES  = ['Alex', 'Jamie', 'Morgan', 'Riley', 'Casey', 'Jordan', 'Taylor', 'Sam'];
