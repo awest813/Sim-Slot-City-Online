@@ -13,6 +13,7 @@ import {
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
 import { AvatarController } from '../../core/systems/AvatarController';
+import { AIWalker, AI_NAMES, AI_COLORS } from '../../core/systems/AIWalker';
 import { InteractionSystem } from '../../core/systems/InteractionSystem';
 import { HUD } from '../ui/HUD';
 import { SlotsPanel } from '../slots/SlotsPanel';
@@ -23,6 +24,7 @@ import { RoulettePanel } from '../roulette/RoulettePanel';
 
 export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!:      AvatarController;
+    private aiWalkers:    AIWalker[] = [];
     private interaction!: InteractionSystem;
     private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' = 'none';
     private graphics!:    Phaser.GameObjects.Graphics;
@@ -53,6 +55,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.avatar = new AvatarController(this, spawnX, spawnY, GameState.get().displayName);
         this.registerAvatarBlockers();
 
+        // AI walkers — spawn at staggered positions around the floor
+        this.spawnAIWalkers();
+
         // Camera — manual follow in update()
         this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
         this.cameras.main.scrollX = spawnX - GAME_WIDTH / 2;
@@ -76,6 +81,10 @@ export class CasinoLobbyScene extends Phaser.Scene {
         if (this.activePanel !== 'none') return;
 
         this.avatar.update(delta);
+
+        for (const ai of this.aiWalkers) {
+            ai.update(delta);
+        }
 
         // Manual camera follow with easing
         const targetX = this.avatar.x - GAME_WIDTH  / 2;
@@ -557,33 +566,65 @@ export class CasinoLobbyScene extends Phaser.Scene {
     // ── Avatar Blockers ───────────────────────────────────────────────────────
 
     private registerAvatarBlockers(): void {
-        // Perimeter walls
-        this.avatar.addBlocker({ x: 0,            y: 0,            w: WORLD_W, h: 32   });
-        this.avatar.addBlocker({ x: 0,            y: 0,            w: 24,      h: WORLD_H });
-        this.avatar.addBlocker({ x: WORLD_W - 24, y: 0,            w: 24,      h: WORLD_H });
-        this.avatar.addBlocker({ x: 0,            y: WORLD_H - 24, w: WORLD_W, h: 24   });
-
-        // Slot machines
-        const slotPositions: [number, number][] = [[60, 100], [120, 100], [60, 200], [120, 200]];
-        for (const [mx, my] of slotPositions) {
-            this.avatar.addBlocker({ x: mx - 22, y: my - 38, w: 44, h: 70 });
+        for (const b of this.getSharedBlockers()) {
+            this.avatar.addBlocker(b);
         }
+    }
 
-        // Poker table (ellipse approx)
-        this.avatar.addBlocker({ x: 790 - 110, y: 190 - 60, w: 220, h: 120 });
+    // ── AI Walkers ────────────────────────────────────────────────────────────
 
-        // Blackjack table (ellipse approx)
+    private spawnAIWalkers(): void {
+        // Starting positions spread across the walkable floor
+        const spawns: [number, number][] = [
+            [200, 490],   // left corridor
+            [760, 470],   // right corridor
+            [480, 560],   // pre-entrance
+            [340, 310],   // blackjack approach
+            [640, 200],   // poker zone approach
+        ];
+
+        const blockerDefs = this.getSharedBlockers();
+
+        for (let i = 0; i < spawns.length; i++) {
+            const [sx, sy] = spawns[i];
+            const name  = AI_NAMES[i % AI_NAMES.length];
+            const color = AI_COLORS[i % AI_COLORS.length];
+
+            const ai = new AIWalker(this, sx, sy, name, color);
+            for (const b of blockerDefs) {
+                ai.addBlocker(b);
+            }
+            this.aiWalkers.push(ai);
+        }
+    }
+
+    /** Returns the shared list of blocker rects used by all walkers (player + AI). */
+    private getSharedBlockers(): Array<{ x: number; y: number; w: number; h: number }> {
         const bjCx = ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2;
         const bjCy = ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2;
-        this.avatar.addBlocker({ x: bjCx - 95, y: bjCy - 45, w: 190, h: 90 });
+        const rtCx = ZONE_ROULETTE.x  + ZONE_ROULETTE.w  / 2;
+        const rtCy = ZONE_ROULETTE.y  + ZONE_ROULETTE.h  / 2;
 
-        // Bar counter
-        this.avatar.addBlocker({ x: ZONE_BAR.x + 20, y: ZONE_BAR.y + 30, w: ZONE_BAR.w - 40, h: 50 });
-
-        // Roulette table (ellipse approx)
-        const rtCx = ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2;
-        const rtCy = ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2;
-        this.avatar.addBlocker({ x: rtCx - 95, y: rtCy - 28, w: 190, h: 56 });
+        return [
+            // Perimeter walls
+            { x: 0,            y: 0,            w: WORLD_W, h: 32   },
+            { x: 0,            y: 0,            w: 24,      h: WORLD_H },
+            { x: WORLD_W - 24, y: 0,            w: 24,      h: WORLD_H },
+            { x: 0,            y: WORLD_H - 24, w: WORLD_W, h: 24   },
+            // Slot machines
+            { x: 60  - 22, y: 100 - 38, w: 44, h: 70 },
+            { x: 120 - 22, y: 100 - 38, w: 44, h: 70 },
+            { x: 60  - 22, y: 200 - 38, w: 44, h: 70 },
+            { x: 120 - 22, y: 200 - 38, w: 44, h: 70 },
+            // Poker table
+            { x: 790 - 110, y: 190 - 60, w: 220, h: 120 },
+            // Blackjack table
+            { x: bjCx - 95, y: bjCy - 45, w: 190, h: 90 },
+            // Bar counter
+            { x: ZONE_BAR.x + 20, y: ZONE_BAR.y + 30, w: ZONE_BAR.w - 40, h: 50 },
+            // Roulette table
+            { x: rtCx - 95, y: rtCy - 28, w: 190, h: 56 },
+        ];
     }
 
     // ── Zone Detection ────────────────────────────────────────────────────────
