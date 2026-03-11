@@ -5,10 +5,10 @@ import {
     COL_BG, COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
     COL_TRIM, COL_TRIM_DIM, COL_FELT, COL_TABLE, COL_BAR,
     COL_SLOT_BODY, COL_SLOT_TRIM,
-    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT,
+    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD,
-    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE,
+    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO,
     FONT, ANIM_SLOW,
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
@@ -21,12 +21,13 @@ import { BarPanel, resetBarSession } from '../bar/BarPanel';
 import { PokerPanel } from '../poker/PokerPanel';
 import { BlackjackPanel } from '../blackjack/BlackjackPanel';
 import { RoulettePanel } from '../roulette/RoulettePanel';
+import { PlinkoPanel } from '../plinko/PlinkoPanel';
 
 export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!:      AvatarController;
     private aiWalkers:    AIWalker[] = [];
     private interaction!: InteractionSystem;
-    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' = 'none';
+    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' | 'plinko' = 'none';
     private graphics!:    Phaser.GameObjects.Graphics;
 
     constructor() { super({ key: 'CasinoLobbyScene' }); }
@@ -154,6 +155,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillStyle(0x1a0808, 0.55);
         g.fillRect(ZONE_ROULETTE.x, ZONE_ROULETTE.y, ZONE_ROULETTE.w, ZONE_ROULETTE.h);
 
+        g.fillStyle(0x071a14, 0.55);
+        g.fillRect(ZONE_PLINKO.x, ZONE_PLINKO.y, ZONE_PLINKO.w, ZONE_PLINKO.h);
+
         // === Zone accent borders — zone-specific color ===
         g.lineStyle(1.5, COL_SLOTS_ACCENT, 0.35);
         g.strokeRect(ZONE_SLOTS.x, ZONE_SLOTS.y, ZONE_SLOTS.w, ZONE_SLOTS.h);
@@ -169,6 +173,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         g.lineStyle(1.5, COL_ROULETTE_ACCENT, 0.35);
         g.strokeRect(ZONE_ROULETTE.x, ZONE_ROULETTE.y, ZONE_ROULETTE.w, ZONE_ROULETTE.h);
+
+        g.lineStyle(1.5, COL_PLINKO_ACCENT, 0.35);
+        g.strokeRect(ZONE_PLINKO.x, ZONE_PLINKO.y, ZONE_PLINKO.w, ZONE_PLINKO.h);
 
         // === Entrance path ===
         g.fillStyle(0x183818, 1);
@@ -213,6 +220,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.drawRouletteTable(
             ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,
             ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2,
+        );
+
+        // Plinko board
+        this.drawPlinkoBoard(
+            ZONE_PLINKO.x + ZONE_PLINKO.w / 2,
+            ZONE_PLINKO.y + ZONE_PLINKO.h / 2,
         );
 
         // Chandeliers
@@ -468,6 +481,60 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g2.strokeCircle(cx + 55, cy + 4, 5);
     }
 
+    private drawPlinkoBoard(cx: number, cy: number): void {
+        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
+        const bw = 120;
+        const bh = 70;
+
+        // Shadow
+        g2.fillStyle(0x000000, 0.3);
+        g2.fillRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 4, bw, bh, 5);
+        // Board background
+        g2.fillStyle(0x040e0a, 1);
+        g2.fillRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
+        // Teal border
+        g2.lineStyle(2, COL_PLINKO_ACCENT, 0.85);
+        g2.strokeRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
+        // Inner inset
+        g2.lineStyle(1, COL_PLINKO_ACCENT, 0.2);
+        g2.strokeRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 3, bw - 6, bh - 6, 3);
+
+        // Mini peg grid (decorative)
+        const pegRows = 4;
+        const pegCols = 5;
+        const pegSpX  = (bw - 24) / (pegCols + 1);
+        const pegSpY  = (bh - 28) / (pegRows + 1);
+        for (let row = 0; row < pegRows; row++) {
+            const offset = row % 2 === 0 ? 0 : pegSpX / 2;
+            const colsThisRow = row % 2 === 0 ? pegCols : pegCols - 1;
+            for (let col = 0; col < colsThisRow; col++) {
+                const px = cx - bw / 2 + 12 + offset + col * pegSpX;
+                const py = cy - bh / 2 + 14 + row * pegSpY;
+                g2.fillStyle(COL_PLINKO_ACCENT, 0.7);
+                g2.fillCircle(px, py, 2);
+            }
+        }
+
+        // Slot bins at bottom
+        const slotColors = [0x445060, 0x3a90e0, 0x2ecc71, 0xf5a020, 0xffd700];
+        const nSlots = 5;
+        const slotW  = (bw - 8) / nSlots;
+        const slotBaseY = cy + bh / 2 - 10;
+        for (let i = 0; i < nSlots; i++) {
+            const sx = cx - bw / 2 + 4 + i * slotW;
+            g2.fillStyle(slotColors[i], 0.4);
+            g2.fillRect(sx, slotBaseY - 6, slotW - 1, 8);
+            g2.lineStyle(1, slotColors[i], 0.6);
+            g2.strokeRect(sx, slotBaseY - 6, slotW - 1, 8);
+        }
+
+        // Drop ball indicator
+        g2.fillStyle(0xffffff, 0.9);
+        g2.fillCircle(cx, cy - bh / 2 + 6, 3);
+        g2.fillStyle(COL_PLINKO_ACCENT, 0.5);
+        g2.fillCircle(cx, cy - bh / 2 + 6, 5);
+    }
+
     private drawPillar(x: number, y: number): void {
         const g2 = this.add.graphics().setDepth(DEPTH_PROPS + 1);
         g2.fillStyle(0x2a1c0e, 1);
@@ -520,6 +587,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.buildZoneSign(ZONE_ENTRANCE.x + ZONE_ENTRANCE.w / 2, ZONE_ENTRANCE.y + 14, '↑ ENTRANCE', COL_TRIM, d);
         this.buildZoneSign(ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + 14, '🃏 BLACKJACK', COL_BLACKJACK_ACCENT, d);
         this.buildZoneSign(ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + 14, '🎡 ROULETTE', COL_ROULETTE_ACCENT, d);
+        this.buildZoneSign(ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + 14, '🎯 PLINKO', COL_PLINKO_ACCENT, d);
     }
 
     private buildZoneSign(x: number, y: number, text: string, accentColor: number, depth: number): void {
@@ -624,6 +692,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
             { x: ZONE_BAR.x + 20, y: ZONE_BAR.y + 30, w: ZONE_BAR.w - 40, h: 50 },
             // Roulette table
             { x: rtCx - 95, y: rtCy - 28, w: 190, h: 56 },
+            // Plinko board
+            {
+                x: ZONE_PLINKO.x + ZONE_PLINKO.w / 2 - 60,
+                y: ZONE_PLINKO.y + ZONE_PLINKO.h / 2 - 35,
+                w: 120, h: 70,
+            },
         ];
     }
 
@@ -638,6 +712,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         else if (this.inZone(x, y, ZONE_BAR))        zone = 'bar';
         else if (this.inZone(x, y, ZONE_BLACKJACK))  zone = 'blackjack';
         else if (this.inZone(x, y, ZONE_ROULETTE))   zone = 'roulette';
+        else if (this.inZone(x, y, ZONE_PLINKO))     zone = 'plinko';
         else if (this.inZone(x, y, ZONE_ENTRANCE))   zone = 'entrance';
 
         if (GameState.get().zone !== zone) {
@@ -687,6 +762,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
             label: 'Play Roulette',
             onInteract: () => this.openRoulette(),
         });
+        this.interaction.register({
+            id: 'plinko',
+            x: ZONE_PLINKO.x + ZONE_PLINKO.w / 2,
+            y: ZONE_PLINKO.y + ZONE_PLINKO.h / 2,
+            radius: 100,
+            label: 'Play Plinko',
+            onInteract: () => this.openPlinko(),
+        });
     }
 
     // ── Panel Openers ─────────────────────────────────────────────────────────
@@ -724,6 +807,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.activePanel = 'roulette';
         GameState.setInteraction('roulette');
         new RoulettePanel(this, () => this.closePanel());
+    }
+
+    private openPlinko(): void {
+        if (this.activePanel !== 'none') return;
+        this.activePanel = 'plinko';
+        GameState.setInteraction('plinko');
+        new PlinkoPanel(this, () => this.closePanel());
     }
 
     private closePanel(): void {
@@ -826,7 +916,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             .setScrollFactor(0).setDepth(DEPTH_HUD + 1).setAlpha(0);
 
         const hint = this.add.text(cx, GAME_HEIGHT - 13,
-            'WASD/↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  BJ: H=Hit S=Stand  ·  Roulette: SPACE spin  ·  ESC close', {
+            'WASD/↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  BJ: H=Hit S=Stand  ·  Roulette: SPACE spin  ·  Plinko: SPACE drop  ·  ESC close', {
             fontFamily: FONT, fontSize: '9px', color: '#3a5a4a',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
     }

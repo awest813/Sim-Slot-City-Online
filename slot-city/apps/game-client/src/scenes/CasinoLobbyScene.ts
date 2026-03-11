@@ -209,6 +209,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
     // Welcome sign
     this.drawSign(propGraphics, 8, 1, "🎰 SLOT CITY");
 
+    // Plinko board (drawn separately so it can be interactive)
+    this.drawPlinkoBoardInteractive(3, 14);
+
     // VIP area rope
     this.drawVIPRope(propGraphics, 2, 15);
   }
@@ -296,6 +299,61 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(getDepth(tx, ty) * 10 + 10);
 
     g.setDepth(getDepth(tx, ty) * 10 + 5);
+  }
+
+  private drawPlinkoBoardInteractive(tx: number, ty: number): void {
+    const { x, y } = isoToScreen(tx, ty);
+    const depth = getDepth(tx, ty) * 10 + 5;
+    const g = this.add.graphics().setDepth(depth);
+
+    const drawBoard = (hover: boolean): void => {
+      g.clear();
+      // Board body
+      g.fillStyle(hover ? 0x0a2018 : 0x040e0a, 1);
+      g.fillRoundedRect(x - 28, y - 52, 56, 52, 4);
+      g.lineStyle(hover ? 3 : 2, 0x20d4a0, hover ? 1 : 0.9);
+      g.strokeRoundedRect(x - 28, y - 52, 56, 52, 4);
+      // Mini peg grid
+      const pegXs = [x - 16, x - 8, x, x + 8, x + 16];
+      const pegYs = [y - 42, y - 30, y - 18];
+      for (let row = 0; row < pegYs.length; row++) {
+        const start = row % 2 === 0 ? 0 : 1;
+        const end   = row % 2 === 0 ? 5 : 4;
+        for (let col = start; col < end; col++) {
+          g.fillStyle(0x20d4a0, hover ? 1 : 0.7);
+          g.fillCircle(pegXs[col], pegYs[row], 2);
+        }
+      }
+      // Slot bins
+      const binColors = [0x445566, 0x2ecc71, 0xffd700, 0x2ecc71, 0x445566];
+      for (let i = 0; i < 5; i++) {
+        g.fillStyle(binColors[i], hover ? 0.65 : 0.45);
+        g.fillRect(x - 24 + i * 10, y - 8, 9, 8);
+      }
+      // Drop ball indicator
+      g.fillStyle(hover ? 0xffffff : 0xaaccaa, hover ? 0.9 : 0.7);
+      g.fillCircle(x, y - 52, 3);
+    };
+
+    drawBoard(false);
+
+    // Label
+    this.add.text(x, y - 60, "🎯 PLINKO", {
+      fontSize: "8px", color: "#20d4a0", fontFamily: "monospace",
+    }).setOrigin(0.5).setDepth(depth + 5);
+
+    // Interactive zone for click-to-play
+    const zone = this.add.zone(x, y - 26, 60, 56).setInteractive({ cursor: "pointer" });
+    zone.setDepth(depth + 10);
+    zone.on("pointerover",  () => drawBoard(true));
+    zone.on("pointerout",   () => drawBoard(false));
+    zone.on("pointerdown",  () => { this.cleanup(); this.scene.start("PlinkoScene"); });
+
+    // Pulse animation on board
+    this.tweens.add({
+      targets: g, alpha: { from: 0.75, to: 1 },
+      yoyo: true, repeat: -1, duration: 1200,
+    });
   }
 
   private drawVIPRope(g: Phaser.GameObjects.Graphics, tx: number, ty: number): void {
@@ -437,6 +495,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
         radius: 2,
         promptLabel: "[ F ] Play Roulette",
         action: () => { this.cleanup(); this.scene.start("RouletteScene"); },
+      },
+      {
+        // Plinko board area
+        tileX: 3,
+        tileY: 14,
+        radius: 2,
+        promptLabel: "[ F ] Play Plinko",
+        action: () => { this.cleanup(); this.scene.start("PlinkoScene"); },
       },
     ];
   }
