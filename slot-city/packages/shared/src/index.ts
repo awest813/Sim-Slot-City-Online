@@ -8,6 +8,7 @@ export enum RoomType {
   BLACKJACK = "blackjack",
   BAR = "bar",
   VIP = "vip",
+  ROULETTE = "roulette",
 }
 
 export enum PlayerDirection {
@@ -362,6 +363,7 @@ export const ROOM_CONFIGS = {
   [RoomType.BLACKJACK]: { maxClients: 7, displayName: "Blackjack Table" },
   [RoomType.BAR]: { maxClients: 50, displayName: "The Lucky Lounge" },
   [RoomType.VIP]: { maxClients: 20, displayName: "VIP Lounge" },
+  [RoomType.ROULETTE]: { maxClients: 10, displayName: "Roulette Table" },
 } as const;
 
 export const ISO_TILE_WIDTH = 64;

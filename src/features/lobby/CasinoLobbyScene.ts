@@ -5,10 +5,10 @@ import {
     COL_BG, COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
     COL_TRIM, COL_TRIM_DIM, COL_FELT, COL_TABLE, COL_BAR,
     COL_SLOT_BODY, COL_SLOT_TRIM,
-    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT,
+    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD,
-    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK,
+    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE,
     FONT, ANIM_SLOW,
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
@@ -19,11 +19,12 @@ import { SlotsPanel } from '../slots/SlotsPanel';
 import { BarPanel, resetBarSession } from '../bar/BarPanel';
 import { PokerPanel } from '../poker/PokerPanel';
 import { BlackjackPanel } from '../blackjack/BlackjackPanel';
+import { RoulettePanel } from '../roulette/RoulettePanel';
 
 export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!:      AvatarController;
     private interaction!: InteractionSystem;
-    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' = 'none';
+    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' = 'none';
     private graphics!:    Phaser.GameObjects.Graphics;
 
     constructor() { super({ key: 'CasinoLobbyScene' }); }
@@ -141,6 +142,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillStyle(0x1a0c1a, 0.55);
         g.fillRect(ZONE_BLACKJACK.x, ZONE_BLACKJACK.y, ZONE_BLACKJACK.w, ZONE_BLACKJACK.h);
 
+        g.fillStyle(0x1a0808, 0.55);
+        g.fillRect(ZONE_ROULETTE.x, ZONE_ROULETTE.y, ZONE_ROULETTE.w, ZONE_ROULETTE.h);
+
         // === Zone accent borders — zone-specific color ===
         g.lineStyle(1.5, COL_SLOTS_ACCENT, 0.35);
         g.strokeRect(ZONE_SLOTS.x, ZONE_SLOTS.y, ZONE_SLOTS.w, ZONE_SLOTS.h);
@@ -153,6 +157,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         g.lineStyle(1.5, COL_BLACKJACK_ACCENT, 0.35);
         g.strokeRect(ZONE_BLACKJACK.x, ZONE_BLACKJACK.y, ZONE_BLACKJACK.w, ZONE_BLACKJACK.h);
+
+        g.lineStyle(1.5, COL_ROULETTE_ACCENT, 0.35);
+        g.strokeRect(ZONE_ROULETTE.x, ZONE_ROULETTE.y, ZONE_ROULETTE.w, ZONE_ROULETTE.h);
 
         // === Entrance path ===
         g.fillStyle(0x183818, 1);
@@ -192,6 +199,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         for (const [px, py] of pillarPositions) {
             this.drawPillar(px, py);
         }
+
+        // Roulette table
+        this.drawRouletteTable(
+            ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,
+            ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2,
+        );
 
         // Chandeliers
         this.drawChandelier(WORLD_W / 2, 90);
@@ -391,6 +404,61 @@ export class CasinoLobbyScene extends Phaser.Scene {
         }
     }
 
+    private drawRouletteTable(cx: number, cy: number): void {
+        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
+
+        // Shadow
+        g2.fillStyle(0x000000, 0.25);
+        g2.fillEllipse(cx, cy + 8, 200, 56);
+        // Table rim
+        g2.fillStyle(0x3a1c08, 1);
+        g2.fillEllipse(cx, cy, 190, 60);
+        // Green felt
+        g2.fillStyle(0x0c2a0c, 1);
+        g2.fillEllipse(cx, cy, 162, 50);
+        // Red roulette accent ring
+        g2.lineStyle(2, 0x882222, 0.8);
+        g2.strokeEllipse(cx, cy, 148, 44);
+        // Gold rim highlight
+        g2.lineStyle(1, COL_ROULETTE_ACCENT, 0.3);
+        g2.strokeEllipse(cx, cy, 164, 52);
+
+        // Wheel representation (small circle left of table)
+        const wx = cx - 52;
+        g2.fillStyle(0x3a1c08, 1);
+        g2.fillCircle(wx, cy, 22);
+        g2.fillStyle(0x881818, 1);
+        g2.fillCircle(wx, cy, 17);
+        g2.fillStyle(0x000000, 0.8);
+        g2.fillCircle(wx, cy, 9);
+        g2.lineStyle(1, COL_ROULETTE_ACCENT, 0.6);
+        g2.strokeCircle(wx, cy, 17);
+        // Wheel spokes
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            g2.lineStyle(0.5, 0xcc3333, 0.4);
+            g2.lineBetween(wx, cy, wx + Math.cos(angle) * 9, cy + Math.sin(angle) * 9);
+        }
+
+        // Betting grid lines on felt
+        g2.lineStyle(0.5, 0x1a4a1a, 0.7);
+        for (let i = 0; i < 4; i++) {
+            g2.lineBetween(cx - 30 + i * 20, cy - 18, cx - 30 + i * 20, cy + 18);
+        }
+        g2.lineBetween(cx - 32, cy - 6, cx + 32, cy - 6);
+        g2.lineBetween(cx - 32, cy + 6, cx + 32, cy + 6);
+
+        // Chip stack
+        g2.fillStyle(COL_ROULETTE_ACCENT, 1);
+        g2.fillCircle(cx + 55, cy - 8, 5);
+        g2.lineStyle(1, 0x882222, 1);
+        g2.strokeCircle(cx + 55, cy - 8, 5);
+        g2.fillStyle(0x111111, 1);
+        g2.fillCircle(cx + 55, cy + 4, 5);
+        g2.lineStyle(1, 0x444444, 1);
+        g2.strokeCircle(cx + 55, cy + 4, 5);
+    }
+
     private drawPillar(x: number, y: number): void {
         const g2 = this.add.graphics().setDepth(DEPTH_PROPS + 1);
         g2.fillStyle(0x2a1c0e, 1);
@@ -442,6 +510,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.buildZoneSign(ZONE_BAR.x + ZONE_BAR.w / 2, ZONE_BAR.y + 14, '🍹 BAR & LOUNGE', COL_BAR_ACCENT, d);
         this.buildZoneSign(ZONE_ENTRANCE.x + ZONE_ENTRANCE.w / 2, ZONE_ENTRANCE.y + 14, '↑ ENTRANCE', COL_TRIM, d);
         this.buildZoneSign(ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + 14, '🃏 BLACKJACK', COL_BLACKJACK_ACCENT, d);
+        this.buildZoneSign(ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + 14, '🎡 ROULETTE', COL_ROULETTE_ACCENT, d);
     }
 
     private buildZoneSign(x: number, y: number, text: string, accentColor: number, depth: number): void {
@@ -510,6 +579,11 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         // Bar counter
         this.avatar.addBlocker({ x: ZONE_BAR.x + 20, y: ZONE_BAR.y + 30, w: ZONE_BAR.w - 40, h: 50 });
+
+        // Roulette table (ellipse approx)
+        const rtCx = ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2;
+        const rtCy = ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2;
+        this.avatar.addBlocker({ x: rtCx - 95, y: rtCy - 28, w: 190, h: 56 });
     }
 
     // ── Zone Detection ────────────────────────────────────────────────────────
@@ -518,11 +592,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         const { x, y } = this.avatar;
         let zone: Zone  = 'floor';
 
-        if (this.inZone(x, y, ZONE_SLOTS))      zone = 'slots';
-        else if (this.inZone(x, y, ZONE_POKER))  zone = 'poker';
-        else if (this.inZone(x, y, ZONE_BAR))    zone = 'bar';
-        else if (this.inZone(x, y, ZONE_BLACKJACK)) zone = 'blackjack';
-        else if (this.inZone(x, y, ZONE_ENTRANCE))  zone = 'entrance';
+        if (this.inZone(x, y, ZONE_SLOTS))          zone = 'slots';
+        else if (this.inZone(x, y, ZONE_POKER))      zone = 'poker';
+        else if (this.inZone(x, y, ZONE_BAR))        zone = 'bar';
+        else if (this.inZone(x, y, ZONE_BLACKJACK))  zone = 'blackjack';
+        else if (this.inZone(x, y, ZONE_ROULETTE))   zone = 'roulette';
+        else if (this.inZone(x, y, ZONE_ENTRANCE))   zone = 'entrance';
 
         if (GameState.get().zone !== zone) {
             GameState.setZone(zone);
@@ -563,6 +638,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
             label: 'Play Blackjack',
             onInteract: () => this.openBlackjack(),
         });
+        this.interaction.register({
+            id: 'roulette',
+            x: ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,
+            y: ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2,
+            radius: 100,
+            label: 'Play Roulette',
+            onInteract: () => this.openRoulette(),
+        });
     }
 
     // ── Panel Openers ─────────────────────────────────────────────────────────
@@ -593,6 +676,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.activePanel = 'blackjack';
         GameState.setInteraction('blackjack');
         new BlackjackPanel(this, () => this.closePanel());
+    }
+
+    private openRoulette(): void {
+        if (this.activePanel !== 'none') return;
+        this.activePanel = 'roulette';
+        GameState.setInteraction('roulette');
+        new RoulettePanel(this, () => this.closePanel());
     }
 
     private closePanel(): void {
@@ -695,7 +785,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             .setScrollFactor(0).setDepth(DEPTH_HUD + 1).setAlpha(0);
 
         const hint = this.add.text(cx, GAME_HEIGHT - 13,
-            'WASD/↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  BJ: H=Hit S=Stand  ·  ESC close', {
+            'WASD/↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  BJ: H=Hit S=Stand  ·  Roulette: SPACE spin  ·  ESC close', {
             fontFamily: FONT, fontSize: '9px', color: '#3a5a4a',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
     }
