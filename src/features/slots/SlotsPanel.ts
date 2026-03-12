@@ -168,12 +168,21 @@ export class SlotsPanel {
         // Outer shadow
         g.fillStyle(0x000000, 0.55);
         g.fillRoundedRect(px + 5, py + 6, PW, PH, PANEL_RADIUS + 2);
-        // Body
+        // Body — deep blue-black
         g.fillStyle(COL_SLOT_BODY, 1);
         g.fillRoundedRect(px, py, PW, PH, PANEL_RADIUS);
+        // Metallic left edge highlight
+        g.fillStyle(0x1c1c5a, 0.35);
+        g.fillRoundedRect(px, py, 6, PH, { tl: PANEL_RADIUS, bl: PANEL_RADIUS, tr: 0, br: 0 });
+        // Metallic right edge shadow
+        g.fillStyle(0x000000, 0.2);
+        g.fillRoundedRect(px + PW - 6, py, 6, PH, { tl: 0, bl: 0, tr: PANEL_RADIUS, br: PANEL_RADIUS });
         // Header band
         g.fillStyle(0x0d0d28, 1);
         g.fillRoundedRect(px, py, PW, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
+        // Header inner highlight
+        g.fillStyle(0x1a1a4a, 0.4);
+        g.fillRoundedRect(px + 2, py + 2, PW - 4, 20, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
         // Gold border
         g.lineStyle(2, COL_SLOT_TRIM, 0.9);
         g.strokeRoundedRect(px, py, PW, PH, PANEL_RADIUS);
@@ -225,12 +234,18 @@ export class SlotsPanel {
         // Main bg
         reelBgGfx.fillStyle(0x050510, 1);
         reelBgGfx.fillRoundedRect(-reelW / 2, reelPanelY - reelH / 2, reelW, reelH, 8);
+        // Outer glow ring
+        reelBgGfx.lineStyle(6, COL_SLOT_TRIM, 0.1);
+        reelBgGfx.strokeRoundedRect(-reelW / 2 - 2, reelPanelY - reelH / 2 - 2, reelW + 4, reelH + 4, 10);
         // Gold border
         reelBgGfx.lineStyle(2, COL_SLOT_TRIM, 0.9);
         reelBgGfx.strokeRoundedRect(-reelW / 2, reelPanelY - reelH / 2, reelW, reelH, 8);
-        // Inner glow ring
-        reelBgGfx.lineStyle(1, COL_TRIM_DIM, 0.25);
+        // Inner glow ring — stronger
+        reelBgGfx.lineStyle(2, COL_TRIM_DIM, 0.4);
         reelBgGfx.strokeRoundedRect(-reelW / 2 + 4, reelPanelY - reelH / 2 + 4, reelW - 8, reelH - 8, 6);
+        // Inner center glow
+        reelBgGfx.fillStyle(0x0808cc, 0.04);
+        reelBgGfx.fillCircle(0, reelPanelY, reelW * 0.35);
         this.container.add(reelBgGfx);
 
         // Individual reel slots
@@ -250,6 +265,9 @@ export class SlotsPanel {
             rgfx.fillStyle(0x000000, 0.45);
             rgfx.fillRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY - rSlotH / 2, rSlotW, 14, { tl: 5, tr: 5, bl: 0, br: 0 });
             rgfx.fillRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY + rSlotH / 2 - 14, rSlotW, 14, { tl: 0, tr: 0, bl: 5, br: 5 });
+            // Inner glow center
+            rgfx.fillStyle(0x3030ff, 0.04);
+            rgfx.fillCircle(reelXs[i], reelPanelY, 36);
             this.container.add(rgfx);
 
             const reel = this.scene.add.text(reelXs[i], reelPanelY, '🎰', {
@@ -398,24 +416,40 @@ export class SlotsPanel {
             idle: 0.85, hover: 1, press: 0.7, spinning: 0.4,
         };
 
+        // Outer glow on hover
+        if (state === 'hover') {
+            g.lineStyle(8, COL_TRIM, 0.08);
+            g.strokeRoundedRect(-btnW / 2 - 3, btnY - btnH / 2 - 3, btnW + 6, btnH + 6, r + 3);
+        }
         // Shadow
         g.fillStyle(0x000000, 0.4);
         g.fillRoundedRect(-btnW / 2 + 2, btnY - btnH / 2 + 3, btnW, btnH, r + 1);
         // Fill
         g.fillStyle(fills[state], 1);
         g.fillRoundedRect(-btnW / 2, btnY - btnH / 2, btnW, btnH, r);
+        // Chrome metallic left strip
+        g.fillStyle(0xffffff, 0.06);
+        g.fillRoundedRect(-btnW / 2 + 1, btnY - btnH / 2 + 2, 3, btnH - 4, { tl: r - 1, bl: r - 1, tr: 0, br: 0 });
         // Top gloss
         if (state !== 'spinning') {
-            g.fillStyle(0xffffff, state === 'hover' ? 0.06 : 0.04);
+            g.fillStyle(0xffffff, state === 'hover' ? 0.08 : 0.05);
             g.fillRoundedRect(-btnW / 2 + 3, btnY - btnH / 2 + 3, btnW - 6, btnH / 2 - 3, { tl: r - 1, tr: r - 1, bl: 0, br: 0 });
         }
+        // Bottom shadow band
+        g.fillStyle(0x000000, 0.2);
+        g.fillRoundedRect(-btnW / 2 + 3, btnY + btnH / 2 - 6, btnW - 6, 4, { tl: 0, tr: 0, bl: r - 1, br: r - 1 });
         // Border
         g.lineStyle(1.5, strokeC[state], strokeA[state]);
         g.strokeRoundedRect(-btnW / 2, btnY - btnH / 2, btnW, btnH, r);
-        // Hover glow
+        // Inner subtle border
+        if (state !== 'spinning') {
+            g.lineStyle(0.5, strokeC[state], strokeA[state] * 0.4);
+            g.strokeRoundedRect(-btnW / 2 + 3, btnY - btnH / 2 + 3, btnW - 6, btnH - 6, r - 2);
+        }
+        // Mid glow on hover
         if (state === 'hover') {
-            g.lineStyle(6, COL_TRIM, 0.10);
-            g.strokeRoundedRect(-btnW / 2 - 2, btnY - btnH / 2 - 2, btnW + 4, btnH + 4, r + 2);
+            g.lineStyle(3, COL_TRIM, 0.15);
+            g.strokeRoundedRect(-btnW / 2 - 1, btnY - btnH / 2 - 1, btnW + 2, btnH + 2, r + 1);
         }
     }
 
@@ -454,8 +488,18 @@ export class SlotsPanel {
     private drawPayLine(active: boolean): void {
         const g = this.payLineGfx;
         g.clear();
-        g.lineStyle(active ? 2.5 : 1.5, active ? COL_TRIM_LIGHT : COL_SLOT_TRIM, active ? 0.9 : 0.3);
-        g.lineBetween(-175, -26, 175, -26);
+        if (active) {
+            // Win celebration — bright visible payline with outer glow
+            g.lineStyle(8, COL_TRIM_LIGHT, 0.15);
+            g.lineBetween(-175, -26, 175, -26);
+            g.lineStyle(4, COL_TRIM_LIGHT, 0.35);
+            g.lineBetween(-175, -26, 175, -26);
+            g.lineStyle(2, 0xffffff, 0.9);
+            g.lineBetween(-175, -26, 175, -26);
+        } else {
+            g.lineStyle(1.5, COL_SLOT_TRIM, 0.3);
+            g.lineBetween(-175, -26, 175, -26);
+        }
     }
 
     // ── Display updates ───────────────────────────────────────────────────────

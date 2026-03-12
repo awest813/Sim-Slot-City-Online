@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
-    COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_UI_BORDER_DIM, COL_TRIM,
+    COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_TRIM,
     FONT, ANIM_MED, PANEL_RADIUS,
 } from '../../game/constants';
 
@@ -77,29 +77,61 @@ export class Panel {
         const px = cx - this.w / 2;
         const py = cy - this.h / 2;
 
-        // Outer shadow
-        g.fillStyle(0x000000, 0.5);
-        g.fillRoundedRect(px + 4, py + 5, this.w, this.h, PANEL_RADIUS + 1);
+        // Outer shadow — larger, more dramatic
+        g.fillStyle(0x000000, 0.6);
+        g.fillRoundedRect(px + 5, py + 7, this.w, this.h, PANEL_RADIUS + 2);
+
+        // Deep outer glow
+        g.lineStyle(8, COL_UI_BORDER, 0.06);
+        g.strokeRoundedRect(px - 2, py - 2, this.w + 4, this.h + 4, PANEL_RADIUS + 3);
 
         // Main background
         g.fillStyle(COL_UI_BG, 1);
         g.fillRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
 
+        // Center highlight simulation
+        g.fillStyle(0x0d1830, 0.5);
+        g.fillCircle(cx, cy - 30, this.w * 0.4);
+        g.fillStyle(COL_UI_BG, 0.7);
+        g.fillRoundedRect(px + 4, py + 4, this.w - 8, this.h - 8, PANEL_RADIUS - 2);
+
         // Top header band
         g.fillStyle(COL_UI_BG2, 1);
-        g.fillRoundedRect(px, py, this.w, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
+        g.fillRoundedRect(px, py, this.w, 54, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
+        // Header inner highlight
+        g.fillStyle(0x1a2840, 0.4);
+        g.fillRoundedRect(px + 2, py + 2, this.w - 4, 24, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
 
-        // Gold border
-        g.lineStyle(1.5, COL_UI_BORDER, 0.85);
+        // Gold border — main
+        g.lineStyle(2, COL_UI_BORDER, 0.9);
         g.strokeRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
-
-        // Inner thin border for depth
-        g.lineStyle(1, COL_UI_BORDER_DIM, 0.25);
+        // Inner border for depth
+        g.lineStyle(1, COL_UI_BORDER, 0.2);
         g.strokeRoundedRect(px + 3, py + 3, this.w - 6, this.h - 6, PANEL_RADIUS - 1);
 
-        // Gold top accent line
-        g.lineStyle(2, COL_TRIM, 0.6);
-        g.lineBetween(px + PANEL_RADIUS, py + 52, px + this.w - PANEL_RADIUS, py + 52);
+        // Gold accent divider line (header/content)
+        g.lineStyle(2, COL_TRIM, 0.7);
+        g.lineBetween(px + PANEL_RADIUS, py + 54, px + this.w - PANEL_RADIUS, py + 54);
+        // Secondary thin divider
+        g.lineStyle(0.5, COL_TRIM, 0.2);
+        g.lineBetween(px + PANEL_RADIUS + 8, py + 57, px + this.w - PANEL_RADIUS - 8, py + 57);
+
+        // Corner ornaments — small L-shapes inside corners
+        const orn    = 12;
+        const ornPad = PANEL_RADIUS + 4;
+        g.lineStyle(1, COL_TRIM, 0.35);
+        // Top-left
+        g.lineBetween(px + ornPad,            py + ornPad,            px + ornPad + orn, py + ornPad);
+        g.lineBetween(px + ornPad,            py + ornPad,            px + ornPad,       py + ornPad + orn);
+        // Top-right
+        g.lineBetween(px + this.w - ornPad,   py + ornPad,            px + this.w - ornPad - orn, py + ornPad);
+        g.lineBetween(px + this.w - ornPad,   py + ornPad,            px + this.w - ornPad,       py + ornPad + orn);
+        // Bottom-left
+        g.lineBetween(px + ornPad,            py + this.h - ornPad,   px + ornPad + orn, py + this.h - ornPad);
+        g.lineBetween(px + ornPad,            py + this.h - ornPad,   px + ornPad,       py + this.h - ornPad - orn);
+        // Bottom-right
+        g.lineBetween(px + this.w - ornPad,   py + this.h - ornPad,   px + this.w - ornPad - orn, py + this.h - ornPad);
+        g.lineBetween(px + this.w - ornPad,   py + this.h - ornPad,   px + this.w - ornPad,       py + this.h - ornPad - orn);
     }
 
     addTitle(text: string): void {

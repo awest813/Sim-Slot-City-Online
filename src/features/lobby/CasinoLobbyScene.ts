@@ -3,8 +3,8 @@ import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, WORLD_W, WORLD_H,
     COL_BG, COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
-    COL_TRIM, COL_TRIM_DIM, COL_FELT, COL_TABLE, COL_BAR,
-    COL_SLOT_BODY, COL_SLOT_TRIM,
+    COL_TRIM, COL_TRIM_DIM,
+    COL_TABLE,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD,
@@ -110,27 +110,42 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillStyle(COL_BG, 1);
         g.fillRect(0, 0, WORLD_W, WORLD_H);
 
+        // Subtle radial gradient from center
+        g.fillStyle(0x080e20, 0.4);
+        g.fillCircle(WORLD_W / 2, WORLD_H / 2, 600);
+        g.fillStyle(0x0a1428, 0.25);
+        g.fillCircle(WORLD_W / 2, WORLD_H / 2, 400);
+
         // === Walls ===
         g.fillStyle(COL_WALL, 1);
-        g.fillRect(0,           0,            WORLD_W, 32);
-        g.fillRect(0,           0,            24,      WORLD_H);
-        g.fillRect(WORLD_W - 24, 0,           24,      WORLD_H);
-        g.fillRect(0,           WORLD_H - 24, WORLD_W, 24);
+        g.fillRect(0,            0,            WORLD_W, 32);
+        g.fillRect(0,            0,            24,      WORLD_H);
+        g.fillRect(WORLD_W - 24, 0,            24,      WORLD_H);
+        g.fillRect(0,            WORLD_H - 24, WORLD_W, 24);
 
         // Wall stripe decoration
         g.fillStyle(COL_WALL_STRIPE, 1);
         g.fillRect(24, 8, WORLD_W - 48, 6);
-
-        // Gold wall trim line
-        g.lineStyle(1, COL_TRIM_DIM, 0.5);
+        // Second amber thin stripe
+        g.lineStyle(1, 0xc9a84c, 0.3);
+        g.lineBetween(24, 14, WORLD_W - 24, 14);
+        // Gold wall trim line — higher opacity
+        g.lineStyle(1, COL_TRIM_DIM, 0.65);
         g.lineBetween(24, 30, WORLD_W - 24, 30);
 
         // === Casino carpet ===
         g.fillStyle(COL_FLOOR, 1);
         g.fillRect(24, 32, WORLD_W - 48, WORLD_H - 56);
 
-        // === Diamond grid pattern ===
-        g.lineStyle(0.5, 0x163016, 0.35);
+        // Diamond diagonal pattern
+        g.lineStyle(0.5, 0x143018, 0.4);
+        const diagSpacing = 40;
+        for (let d = -WORLD_H; d < WORLD_W + WORLD_H; d += diagSpacing) {
+            g.lineBetween(Math.max(24, d), 32, Math.min(WORLD_W - 24, d + WORLD_H), Math.min(WORLD_H - 24, 32 + WORLD_H));
+            g.lineBetween(Math.max(24, WORLD_W - d - diagSpacing), 32, Math.min(WORLD_W - 24, WORLD_W - d), Math.min(WORLD_H - 24, 32 + WORLD_H));
+        }
+        // Subtle grid overlay
+        g.lineStyle(0.3, 0x143018, 0.2);
         const gridSize = 48;
         for (let x = 24; x < WORLD_W - 24; x += gridSize) {
             g.lineBetween(x, 32, x, WORLD_H - 24);
@@ -139,43 +154,58 @@ export class CasinoLobbyScene extends Phaser.Scene {
             g.lineBetween(24, y, WORLD_W - 24, y);
         }
 
-        // === Zone area fills — tinted slightly per zone ===
-        g.fillStyle(0x0c250c, 0.55);
+        // === Zone area fills — two-layer diffuse + focused ===
+        // Slots
+        g.fillStyle(0x0c250c, 0.3);
+        g.fillRect(ZONE_SLOTS.x - 8, ZONE_SLOTS.y - 8, ZONE_SLOTS.w + 16, ZONE_SLOTS.h + 16);
+        g.fillStyle(0x0c250c, 0.6);
         g.fillRect(ZONE_SLOTS.x, ZONE_SLOTS.y, ZONE_SLOTS.w, ZONE_SLOTS.h);
-
-        g.fillStyle(0x0c0c28, 0.55);
+        // Poker
+        g.fillStyle(0x0c0c28, 0.3);
+        g.fillRect(ZONE_POKER.x - 8, ZONE_POKER.y - 8, ZONE_POKER.w + 16, ZONE_POKER.h + 16);
+        g.fillStyle(0x0c0c28, 0.6);
         g.fillRect(ZONE_POKER.x, ZONE_POKER.y, ZONE_POKER.w, ZONE_POKER.h);
-
+        // Bar
+        g.fillStyle(0x1e1008, 0.3);
+        g.fillRect(ZONE_BAR.x - 8, ZONE_BAR.y - 8, ZONE_BAR.w + 16, ZONE_BAR.h + 16);
         g.fillStyle(0x1e1008, 0.5);
         g.fillRect(ZONE_BAR.x, ZONE_BAR.y, ZONE_BAR.w, ZONE_BAR.h);
-
-        g.fillStyle(0x1a0c1a, 0.55);
+        // Blackjack
+        g.fillStyle(0x1a0c1a, 0.3);
+        g.fillRect(ZONE_BLACKJACK.x - 8, ZONE_BLACKJACK.y - 8, ZONE_BLACKJACK.w + 16, ZONE_BLACKJACK.h + 16);
+        g.fillStyle(0x1a0c1a, 0.6);
         g.fillRect(ZONE_BLACKJACK.x, ZONE_BLACKJACK.y, ZONE_BLACKJACK.w, ZONE_BLACKJACK.h);
-
-        g.fillStyle(0x1a0808, 0.55);
+        // Roulette
+        g.fillStyle(0x1a0808, 0.3);
+        g.fillRect(ZONE_ROULETTE.x - 8, ZONE_ROULETTE.y - 8, ZONE_ROULETTE.w + 16, ZONE_ROULETTE.h + 16);
+        g.fillStyle(0x1a0808, 0.6);
         g.fillRect(ZONE_ROULETTE.x, ZONE_ROULETTE.y, ZONE_ROULETTE.w, ZONE_ROULETTE.h);
-
-        g.fillStyle(0x071a14, 0.55);
+        // Plinko
+        g.fillStyle(0x071a14, 0.3);
+        g.fillRect(ZONE_PLINKO.x - 8, ZONE_PLINKO.y - 8, ZONE_PLINKO.w + 16, ZONE_PLINKO.h + 16);
+        g.fillStyle(0x071a14, 0.6);
         g.fillRect(ZONE_PLINKO.x, ZONE_PLINKO.y, ZONE_PLINKO.w, ZONE_PLINKO.h);
 
-        // === Zone accent borders — zone-specific color ===
-        g.lineStyle(1.5, COL_SLOTS_ACCENT, 0.35);
-        g.strokeRect(ZONE_SLOTS.x, ZONE_SLOTS.y, ZONE_SLOTS.w, ZONE_SLOTS.h);
-
-        g.lineStyle(1.5, COL_POKER_ACCENT, 0.35);
-        g.strokeRect(ZONE_POKER.x, ZONE_POKER.y, ZONE_POKER.w, ZONE_POKER.h);
-
-        g.lineStyle(1.5, COL_BAR_ACCENT, 0.35);
-        g.strokeRect(ZONE_BAR.x, ZONE_BAR.y, ZONE_BAR.w, ZONE_BAR.h);
-
-        g.lineStyle(1.5, COL_BLACKJACK_ACCENT, 0.35);
-        g.strokeRect(ZONE_BLACKJACK.x, ZONE_BLACKJACK.y, ZONE_BLACKJACK.w, ZONE_BLACKJACK.h);
-
-        g.lineStyle(1.5, COL_ROULETTE_ACCENT, 0.35);
-        g.strokeRect(ZONE_ROULETTE.x, ZONE_ROULETTE.y, ZONE_ROULETTE.w, ZONE_ROULETTE.h);
-
-        g.lineStyle(1.5, COL_PLINKO_ACCENT, 0.35);
-        g.strokeRect(ZONE_PLINKO.x, ZONE_PLINKO.y, ZONE_PLINKO.w, ZONE_PLINKO.h);
+        // === Zone accent borders — 3-layer neon glow ===
+        const zones: Array<[typeof ZONE_SLOTS, number]> = [
+            [ZONE_SLOTS,      COL_SLOTS_ACCENT],
+            [ZONE_POKER,      COL_POKER_ACCENT],
+            [ZONE_BAR,        COL_BAR_ACCENT],
+            [ZONE_BLACKJACK,  COL_BLACKJACK_ACCENT],
+            [ZONE_ROULETTE,   COL_ROULETTE_ACCENT],
+            [ZONE_PLINKO,     COL_PLINKO_ACCENT],
+        ];
+        for (const [z, col] of zones) {
+            // Outer glow
+            g.lineStyle(4, col, 0.15);
+            g.strokeRect(z.x - 2, z.y - 2, z.w + 4, z.h + 4);
+            // Mid glow
+            g.lineStyle(2, col, 0.4);
+            g.strokeRect(z.x, z.y, z.w, z.h);
+            // Inner accent
+            g.lineStyle(0.5, col, 0.25);
+            g.strokeRect(z.x + 2, z.y + 2, z.w - 4, z.h - 4);
+        }
 
         // === Entrance path ===
         g.fillStyle(0x183818, 1);
@@ -235,49 +265,93 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }
 
     private drawSlotMachine(x: number, y: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS + y * 0.1);
-
-        // Machine body
-        g2.fillStyle(COL_SLOT_BODY, 1);
-        g2.fillRoundedRect(x - 22, y - 38, 44, 70, 4);
-        // Gold trim
-        g2.lineStyle(2, COL_SLOT_TRIM, 1);
-        g2.strokeRoundedRect(x - 22, y - 38, 44, 70, 4);
-        // Inner highlight on top
-        g2.fillStyle(0x1a1a50, 0.5);
-        g2.fillRoundedRect(x - 20, y - 36, 40, 6, { tl: 3, tr: 3, bl: 0, br: 0 });
-
-        // Screen area
-        g2.fillStyle(0x04040e, 1);
-        g2.fillRoundedRect(x - 16, y - 30, 32, 26, 3);
-        g2.lineStyle(1, COL_SLOT_TRIM, 0.4);
-        g2.strokeRoundedRect(x - 16, y - 30, 32, 26, 3);
-
-        // Reel dividers
-        g2.lineStyle(1, COL_SLOT_TRIM, 0.45);
-        g2.lineBetween(x - 5, y - 30, x - 5, y - 4);
-        g2.lineBetween(x + 5, y - 30, x + 5, y - 4);
-
-        // Reel symbols
-        this.add.text(x - 10, y - 22, '7', {
-            fontFamily: FONT, fontSize: '12px', color: '#c9a84c',
-        }).setOrigin(0.5).setDepth(DEPTH_PROPS + y * 0.1 + 1);
-        this.add.text(x, y - 22, '★', {
-            fontFamily: FONT, fontSize: '12px', color: '#e05050',
-        }).setOrigin(0.5).setDepth(DEPTH_PROPS + y * 0.1 + 1);
-        this.add.text(x + 10, y - 22, '◆', {
-            fontFamily: FONT, fontSize: '12px', color: '#5050e0',
-        }).setOrigin(0.5).setDepth(DEPTH_PROPS + y * 0.1 + 1);
-
-        // Spin button (circle, gold)
-        g2.fillStyle(COL_SLOT_TRIM, 1);
-        g2.fillCircle(x, y + 14, 7);
-        g2.fillStyle(0xffffff, 0.15);
-        g2.fillCircle(x - 2, y + 12, 3);
+        const depth = DEPTH_PROPS + y * 0.1;
+        const g2 = this.add.graphics().setDepth(depth);
 
         // Shadow
-        g2.fillStyle(0x000000, 0.18);
-        g2.fillEllipse(x, y + 36, 40, 8);
+        g2.fillStyle(0x000000, 0.3);
+        g2.fillEllipse(x, y + 36, 52, 10);
+
+        // Main cabinet body — deep blue-black metallic
+        g2.fillStyle(0x080824, 1);
+        g2.fillRoundedRect(x - 24, y - 42, 48, 80, 5);
+
+        // Side panel highlights for 3D effect
+        g2.fillStyle(0x1c1c4a, 0.8);
+        g2.fillRoundedRect(x - 24, y - 42, 8, 80, { tl: 5, bl: 5, tr: 0, br: 0 });
+        g2.fillStyle(0x141440, 0.8);
+        g2.fillRoundedRect(x + 16, y - 42, 8, 80, { tl: 0, bl: 0, tr: 5, br: 5 });
+
+        // Gold trim — main border + inner highlight
+        g2.lineStyle(2, 0xc9a84c, 1);
+        g2.strokeRoundedRect(x - 24, y - 42, 48, 80, 5);
+        g2.lineStyle(1, 0xe8c870, 0.4);
+        g2.strokeRoundedRect(x - 22, y - 40, 44, 76, 4);
+
+        // Top marquee area
+        g2.fillStyle(0x10103a, 1);
+        g2.fillRoundedRect(x - 21, y - 40, 42, 16, { tl: 3, tr: 3, bl: 0, br: 0 });
+        g2.lineStyle(1, 0xffb020, 0.8);
+        g2.lineBetween(x - 18, y - 33, x + 18, y - 33);
+
+        // Screen outer bezel
+        g2.fillStyle(0x040410, 1);
+        g2.fillRoundedRect(x - 18, y - 24, 36, 30, 3);
+        // Screen inner glass
+        g2.fillStyle(0x060620, 1);
+        g2.fillRoundedRect(x - 17, y - 23, 34, 28, 2);
+        // Screen inner glow
+        g2.fillStyle(0x0808cc, 0.06);
+        g2.fillCircle(x, y - 9, 18);
+        // Screen border
+        g2.lineStyle(1.5, 0xc9a84c, 0.7);
+        g2.strokeRoundedRect(x - 18, y - 24, 36, 30, 3);
+
+        // Reel dividers
+        g2.lineStyle(1, 0xc9a84c, 0.5);
+        g2.lineBetween(x - 6, y - 23, x - 6, y + 6);
+        g2.lineBetween(x + 6, y - 23, x + 6, y + 6);
+
+        // Reel symbols
+        const symDepth = depth + 1;
+        this.add.text(x - 12, y - 9, '7', {
+            fontFamily: FONT, fontSize: '13px', color: '#ffd040', fontStyle: 'bold',
+        }).setOrigin(0.5).setDepth(symDepth);
+        this.add.text(x, y - 9, '★', {
+            fontFamily: FONT, fontSize: '12px', color: '#ff5050',
+        }).setOrigin(0.5).setDepth(symDepth);
+        this.add.text(x + 12, y - 9, '◆', {
+            fontFamily: FONT, fontSize: '12px', color: '#5080ff',
+        }).setOrigin(0.5).setDepth(symDepth);
+
+        // Payline indicator
+        g2.lineStyle(1, 0xffb020, 0.5);
+        g2.lineBetween(x - 16, y - 9, x + 16, y - 9);
+
+        // Lower panel
+        g2.fillStyle(0x0a0a22, 1);
+        g2.fillRoundedRect(x - 18, y + 8, 36, 16, 2);
+        g2.lineStyle(1, 0xc9a84c, 0.3);
+        g2.strokeRoundedRect(x - 18, y + 8, 36, 16, 2);
+
+        // Spin button — chrome layered
+        g2.fillStyle(0x000000, 0.4);
+        g2.fillCircle(x + 1, y + 17, 8);
+        g2.fillStyle(0x404060, 1);
+        g2.fillCircle(x, y + 16, 8);
+        g2.fillStyle(0xc9a84c, 1);
+        g2.fillCircle(x, y + 16, 6);
+        g2.fillStyle(0xffffff, 0.3);
+        g2.fillCircle(x - 2, y + 14, 2.5);
+        g2.lineStyle(1, 0xe8c870, 0.8);
+        g2.strokeCircle(x, y + 16, 6);
+
+        // Side accent lights
+        g2.fillStyle(0xffb020, 0.6);
+        g2.fillCircle(x - 20, y - 20, 2);
+        g2.fillCircle(x - 20, y - 5, 2);
+        g2.fillCircle(x + 20, y - 20, 2);
+        g2.fillCircle(x + 20, y - 5, 2);
     }
 
     private drawBlackjackTable(cx: number, cy: number): void {
@@ -334,41 +408,73 @@ export class CasinoLobbyScene extends Phaser.Scene {
     private drawPokerTable(cx: number, cy: number): void {
         const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
 
-        g2.fillStyle(0x000000, 0.25);
-        g2.fillEllipse(cx, cy + 10, 230, 100);
-        g2.fillStyle(COL_TABLE, 1);
-        g2.fillEllipse(cx, cy, 220, 120);
-        g2.fillStyle(COL_FELT, 1);
-        g2.fillEllipse(cx, cy, 190, 100);
-        g2.lineStyle(2, 0x2a6a2a, 1);
-        g2.strokeEllipse(cx, cy, 175, 88);
+        // Shadow
+        g2.fillStyle(0x000000, 0.35);
+        g2.fillEllipse(cx + 4, cy + 12, 236, 108);
 
-        // Blue accent ring for poker zone
-        g2.lineStyle(1, COL_POKER_ACCENT, 0.25);
-        g2.strokeEllipse(cx, cy, 192, 102);
+        // Mahogany wood rim — outer dark
+        g2.fillStyle(0x2a1408, 1);
+        g2.fillEllipse(cx, cy, 230, 128);
+        // Rim highlight (lighter on top for 3D)
+        g2.fillStyle(0x5a3018, 0.6);
+        g2.fillEllipse(cx, cy - 8, 225, 110);
+        g2.fillStyle(0x2a1408, 1);
+        g2.fillEllipse(cx, cy + 2, 222, 120);
 
-        g2.lineStyle(1, 0x2a6a2a, 0.4);
-        g2.strokeEllipse(cx, cy, 100, 50);
+        // Felt surface
+        g2.fillStyle(0x0a2a0a, 1);
+        g2.fillEllipse(cx, cy, 200, 108);
+        // Felt center highlight
+        g2.fillStyle(0x0d320d, 0.5);
+        g2.fillEllipse(cx, cy - 8, 170, 80);
 
-        // Card suits decoration
+        // Inner felt ring
+        g2.lineStyle(2.5, 0x3a8a3a, 0.9);
+        g2.strokeEllipse(cx, cy, 184, 96);
+
+        // Poker accent
+        g2.lineStyle(1, COL_POKER_ACCENT, 0.3);
+        g2.strokeEllipse(cx, cy, 202, 110);
+
+        // Center ring
+        g2.lineStyle(1, 0x2a6a2a, 0.5);
+        g2.strokeEllipse(cx, cy, 110, 58);
+
+        // Simulated wood grain on rim
+        g2.lineStyle(0.5, 0x5a3018, 0.2);
+        for (let i = 0; i < 6; i++) {
+            g2.strokeEllipse(cx, cy, 230 - i * 5, 128 - i * 3);
+        }
+
+        // Card suits
         const suits  = ['♠', '♣', '♥', '♦'];
         const angles = [270, 0, 90, 180];
+        const suitColors = ['#1a5a1a', '#1a5a1a', '#5a1a1a', '#5a1a1a'];
         for (let i = 0; i < 4; i++) {
             const rad = (angles[i] * Math.PI) / 180;
             this.add.text(
-                cx + Math.cos(rad) * 50, cy + Math.sin(rad) * 24, suits[i], {
-                    fontFamily: FONT, fontSize: '14px',
-                    color: i < 2 ? '#1a4a1a' : '#3a1a1a',
+                cx + Math.cos(rad) * 52, cy + Math.sin(rad) * 26, suits[i], {
+                    fontFamily: FONT, fontSize: '14px', color: suitColors[i],
                 },
             ).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
         }
 
-        // Chip stacks on table
+        // Chip stacks — layered for height effect
         for (let i = 0; i < 3; i++) {
-            g2.fillStyle(0x2ecc71, 1);
-            g2.fillCircle(cx - 40 + i * 40, cy - 10, 6);
-            g2.lineStyle(1, 0x1a8a1a, 1);
-            g2.strokeCircle(cx - 40 + i * 40, cy - 10, 6);
+            const chipX = cx - 40 + i * 40;
+            const chipY = cy - 12;
+            g2.fillStyle(0x000000, 0.25);
+            g2.fillCircle(chipX + 1, chipY + 2, 7);
+            g2.fillStyle(0x1eaa61, 1);
+            g2.fillCircle(chipX, chipY, 7);
+            g2.fillStyle(0x2ecc71, 0.8);
+            g2.fillCircle(chipX, chipY - 2, 7);
+            g2.fillStyle(0x40ee84, 0.6);
+            g2.fillCircle(chipX, chipY - 4, 7);
+            g2.lineStyle(1, 0x1a7a3a, 0.9);
+            g2.strokeCircle(chipX, chipY - 4, 7);
+            g2.lineStyle(0.5, 0xffffff, 0.2);
+            g2.lineBetween(chipX - 5, chipY - 4, chipX + 5, chipY - 4);
         }
     }
 
@@ -377,52 +483,96 @@ export class CasinoLobbyScene extends Phaser.Scene {
         const bx = ZONE_BAR.x + 20;
         const by = ZONE_BAR.y + 30;
         const bw = ZONE_BAR.w - 40;
-        const bh = 50;
+        const bh = 54;
 
         // Shadow
-        g2.fillStyle(0x000000, 0.25);
-        g2.fillRoundedRect(bx + 4, by + 4, bw, bh, 4);
-        // Counter
-        g2.fillStyle(COL_BAR, 1);
-        g2.fillRoundedRect(bx, by, bw, bh, 4);
-        // Gold trim
-        g2.lineStyle(2, COL_TRIM, 0.65);
-        g2.strokeRoundedRect(bx, by, bw, bh, 4);
-        // Counter top highlight
-        g2.fillStyle(0x4a2a0e, 1);
-        g2.fillRoundedRect(bx, by, bw, 8, { tl: 4, tr: 4, bl: 0, br: 0 });
-        // Bar accent
-        g2.lineStyle(1, COL_BAR_ACCENT, 0.25);
-        g2.strokeRoundedRect(bx + 2, by + 2, bw - 4, bh - 4, 3);
+        g2.fillStyle(0x000000, 0.35);
+        g2.fillRoundedRect(bx + 5, by + 6, bw, bh, 5);
 
-        // Bar stools
+        // Counter body — dark mahogany
+        g2.fillStyle(0x1a0c04, 1);
+        g2.fillRoundedRect(bx, by, bw, bh, 5);
+
+        // Wood grain lines
+        for (let i = 0; i < 4; i++) {
+            g2.fillStyle(0x2a1808, 0.4);
+            g2.fillRect(bx + 4, by + 8 + i * 10, bw - 8, 3);
+        }
+
+        // Counter top — lighter surface
+        g2.fillStyle(0x3a1e0a, 1);
+        g2.fillRoundedRect(bx, by, bw, 10, { tl: 5, tr: 5, bl: 0, br: 0 });
+        // Top edge highlight
+        g2.fillStyle(0x6a3a14, 0.5);
+        g2.fillRoundedRect(bx + 2, by + 1, bw - 4, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
+
+        // Gold trim
+        g2.lineStyle(2, 0xc9a84c, 0.8);
+        g2.strokeRoundedRect(bx, by, bw, bh, 5);
+        g2.lineStyle(1, 0xe8c870, 0.3);
+        g2.strokeRoundedRect(bx + 2, by + 2, bw - 4, bh - 4, 4);
+        // Bar zone accent
+        g2.lineStyle(1, COL_BAR_ACCENT, 0.2);
+        g2.strokeRoundedRect(bx + 3, by + 3, bw - 6, bh - 6, 3);
+
+        // Bar stools — detailed with legs and cushions
         const stoolCount   = 5;
         const stoolSpacing = bw / (stoolCount + 1);
         for (let i = 0; i < stoolCount; i++) {
             const sx = bx + stoolSpacing * (i + 1);
-            const sy = by + bh + 18;
-            g2.fillStyle(0x3a1e08, 1);
-            g2.fillCircle(sx, sy, 10);
-            g2.lineStyle(1, COL_TRIM, 0.45);
-            g2.strokeCircle(sx, sy, 10);
-            g2.lineStyle(2, 0x2a1205, 1);
-            g2.lineBetween(sx, sy + 10, sx, sy + 22);
+            const sy = by + bh + 20;
+            // Stool shadow
+            g2.fillStyle(0x000000, 0.2);
+            g2.fillEllipse(sx, sy + 2, 22, 5);
+            // Stool legs
+            g2.lineStyle(2, 0x2a1408, 1);
+            g2.lineBetween(sx - 4, sy + 12, sx - 6, sy + 26);
+            g2.lineBetween(sx + 4, sy + 12, sx + 6, sy + 26);
+            // Cross brace
+            g2.lineStyle(1, 0x3a2010, 0.8);
+            g2.lineBetween(sx - 5, sy + 18, sx + 5, sy + 18);
+            // Seat cushion
+            g2.fillStyle(0x4a2a10, 1);
+            g2.fillEllipse(sx, sy, 22, 9);
+            g2.fillStyle(0x6a3e1a, 0.6);
+            g2.fillEllipse(sx, sy - 1, 18, 6);
+            g2.lineStyle(1, 0xc9a84c, 0.4);
+            g2.strokeEllipse(sx, sy, 22, 9);
         }
 
-        // Bottle shelf
-        const shelf = by - 12;
-        g2.fillStyle(0x2a1008, 1);
-        g2.fillRect(bx, shelf - 14, bw, 14);
-        g2.lineStyle(1, COL_TRIM, 0.25);
-        g2.strokeRect(bx, shelf - 14, bw, 14);
+        // Bottle shelf (back wall)
+        const shelfY = by - 16;
+        g2.fillStyle(0x1a0c04, 1);
+        g2.fillRect(bx, shelfY - 18, bw, 18);
+        g2.fillStyle(0x3a2010, 0.5);
+        g2.fillRect(bx, shelfY - 18, bw, 4);
+        g2.lineStyle(1, 0xc9a84c, 0.3);
+        g2.strokeRect(bx, shelfY - 18, bw, 18);
 
-        const bottleColors = [0x2040a0, 0x40a020, 0xa04020, 0xc0a000, 0x802080];
+        // Bottles — colorful and detailed
+        const bottleColors: Array<[number, number]> = [
+            [0x2040c0, 0x4060ff],
+            [0x40a020, 0x60d040],
+            [0xa04020, 0xd06040],
+            [0xc0a000, 0xffd040],
+            [0x802080, 0xb030b0],
+            [0x208080, 0x40c0c0],
+            [0xb04000, 0xe06020],
+            [0x4040c0, 0x6060ff],
+            [0x606020, 0xa0a030],
+        ];
         for (let i = 0; i < 9; i++) {
-            const btx = bx + 20 + i * 36;
-            const bty = shelf - 10;
-            g2.fillStyle(bottleColors[i % bottleColors.length], 0.8);
-            g2.fillRect(btx, bty, 10, 8);
-            g2.fillRect(btx + 3, bty - 6, 4, 6);
+            const btx = bx + 16 + i * Math.floor((bw - 32) / 9);
+            const bty = shelfY - 14;
+            const [darkC, lightC] = bottleColors[i % bottleColors.length];
+            g2.fillStyle(darkC, 0.85);
+            g2.fillRoundedRect(btx - 4, bty + 4, 8, 10, 2);
+            g2.fillStyle(lightC, 0.6);
+            g2.fillRoundedRect(btx - 3, bty + 2, 6, 5, 2);
+            g2.fillStyle(darkC, 0.9);
+            g2.fillRect(btx - 1, bty - 4, 3, 8);
+            g2.fillStyle(0xffffff, 0.2);
+            g2.fillRect(btx - 3, bty + 5, 2, 6);
         }
     }
 
@@ -537,46 +687,112 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
     private drawPillar(x: number, y: number): void {
         const g2 = this.add.graphics().setDepth(DEPTH_PROPS + 1);
-        g2.fillStyle(0x2a1c0e, 1);
-        g2.fillRect(x - 10, y - 40, 20, 80);
-        g2.lineStyle(1, COL_TRIM, 0.55);
-        g2.strokeRect(x - 10, y - 40, 20, 80);
-        // Capital/base decorations
-        g2.fillStyle(COL_TRIM, 0.28);
-        g2.fillRect(x - 14, y - 44, 28, 6);
-        g2.fillRect(x - 14, y + 36, 28, 6);
+
+        // Shadow
+        g2.fillStyle(0x000000, 0.25);
+        g2.fillEllipse(x + 3, y + 46, 18, 6);
+
+        // Pillar shaft
+        g2.fillStyle(0x1e1008, 1);
+        g2.fillRect(x - 10, y - 42, 20, 86);
+        // Side highlights for 3D
+        g2.fillStyle(0x3a2010, 0.5);
+        g2.fillRect(x - 10, y - 42, 4, 86);
+        g2.fillStyle(0x0e0804, 0.5);
+        g2.fillRect(x + 6, y - 42, 4, 86);
+        // Main border
+        g2.lineStyle(1.5, COL_TRIM, 0.6);
+        g2.strokeRect(x - 10, y - 42, 20, 86);
+        // Fluting grooves
+        g2.lineStyle(0.5, 0x4a3018, 0.3);
+        g2.lineBetween(x - 4, y - 40, x - 4, y + 42);
+        g2.lineBetween(x + 4, y - 40, x + 4, y + 42);
+
+        // Capital (top ornament)
+        g2.fillStyle(0x2a1808, 1);
+        g2.fillRect(x - 14, y - 46, 28, 8);
+        g2.fillStyle(0x5a3018, 0.4);
+        g2.fillRect(x - 14, y - 46, 28, 3);
+        g2.lineStyle(1.5, COL_TRIM, 0.7);
+        g2.strokeRect(x - 14, y - 46, 28, 8);
+
+        // Base (bottom ornament)
+        g2.fillStyle(0x2a1808, 1);
+        g2.fillRect(x - 14, y + 38, 28, 8);
+        g2.fillStyle(0x5a3018, 0.4);
+        g2.fillRect(x - 14, y + 38, 28, 3);
+        g2.lineStyle(1.5, COL_TRIM, 0.7);
+        g2.strokeRect(x - 14, y + 38, 28, 8);
+
+        // Gold accent lines on shaft
+        g2.lineStyle(1, COL_TRIM, 0.3);
+        g2.lineBetween(x - 8, y - 28, x + 8, y - 28);
+        g2.lineBetween(x - 8, y + 20, x + 8, y + 20);
     }
 
     private drawChandelier(x: number, y: number): void {
         const g2 = this.add.graphics().setDepth(DEPTH_FOREGROUND);
 
         // Hanging chain
-        g2.lineStyle(1, COL_TRIM_DIM, 0.45);
-        g2.lineBetween(x, 0, x, y - 12);
+        g2.lineStyle(1.5, 0xc9a84c, 0.5);
+        g2.lineBetween(x, 0, x, y - 16);
+        g2.lineStyle(1, 0xe8c870, 0.2);
+        g2.lineBetween(x, 0, x, y - 16);
 
-        // Glow rings
+        // Glow rings — outer to inner
+        g2.fillStyle(0xffd700, 0.03);
+        g2.fillCircle(x, y, 80);
         g2.fillStyle(0xffd700, 0.05);
         g2.fillCircle(x, y, 60);
-        g2.fillStyle(0xffd700, 0.08);
-        g2.fillCircle(x, y, 36);
-        g2.fillStyle(COL_TRIM, 0.12);
-        g2.fillCircle(x, y, 18);
+        g2.fillStyle(0xffaa20, 0.08);
+        g2.fillCircle(x, y, 40);
+        g2.fillStyle(0xffcc40, 0.12);
+        g2.fillCircle(x, y, 24);
+        g2.fillStyle(0xffe080, 0.18);
+        g2.fillCircle(x, y, 14);
 
-        // Main body
-        g2.fillStyle(COL_TRIM, 0.9);
-        g2.fillCircle(x, y, 12);
-        g2.lineStyle(1, 0xffd700, 0.7);
-        g2.strokeCircle(x, y, 12);
-        // Inner highlight
-        g2.fillStyle(0xffffff, 0.2);
-        g2.fillCircle(x - 3, y - 3, 4);
-
-        // Light spokes
-        g2.lineStyle(1, COL_TRIM, 0.45);
+        // Crystal arms (spokes)
         for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * Math.PI * 2;
-            g2.lineBetween(x, y, x + Math.cos(angle) * 20, y + Math.sin(angle) * 20);
+            const ax = x + Math.cos(angle) * 22;
+            const ay = y + Math.sin(angle) * 22;
+            g2.lineStyle(1.5, 0xc9a84c, 0.5);
+            g2.lineBetween(x, y, ax, ay);
+            g2.fillStyle(0xffe080, 0.7);
+            g2.fillCircle(ax, ay, 2.5);
+            g2.fillStyle(0xffffff, 0.4);
+            g2.fillCircle(ax - 0.5, ay - 0.5, 1);
         }
+        // Secondary inner ring spokes
+        for (let i = 0; i < 8; i++) {
+            const angle = ((i + 0.5) / 8) * Math.PI * 2;
+            const ax = x + Math.cos(angle) * 14;
+            const ay = y + Math.sin(angle) * 14;
+            g2.lineStyle(1, 0xc9a84c, 0.35);
+            g2.lineBetween(x, y, ax, ay);
+        }
+
+        // Main crystal sphere
+        g2.lineStyle(1.5, 0xe8c870, 0.6);
+        g2.strokeCircle(x, y, 14);
+        g2.fillStyle(0x7a6030, 1);
+        g2.fillCircle(x, y, 13);
+        g2.fillStyle(0xc9a84c, 0.9);
+        g2.fillCircle(x, y, 11);
+        g2.fillStyle(0xffe880, 0.6);
+        g2.fillCircle(x, y, 8);
+        g2.fillStyle(0xffffff, 0.35);
+        g2.fillCircle(x - 3, y - 4, 5);
+        g2.fillStyle(0xffffff, 0.15);
+        g2.fillCircle(x + 2, y + 3, 3);
+
+        // Bottom pendant
+        g2.fillStyle(0xc9a84c, 0.7);
+        g2.fillCircle(x, y + 16, 3);
+        g2.lineStyle(1, 0xe8c870, 0.5);
+        g2.strokeCircle(x, y + 16, 3);
+        g2.lineStyle(1, 0xc9a84c, 0.4);
+        g2.lineBetween(x, y + 14, x, y + 13);
     }
 
     private buildLabels(): void {
@@ -591,22 +807,43 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }
 
     private buildZoneSign(x: number, y: number, text: string, accentColor: number, depth: number): void {
-        const t   = this.add.text(x, y, text, {
+        const t = this.add.text(x, y, text, {
             fontFamily: FONT, fontSize: '13px',
             color: Phaser.Display.Color.IntegerToColor(accentColor).rgba,
             fontStyle: 'bold',
         }).setOrigin(0.5).setDepth(depth);
 
-        // Background pill with zone-specific color accent
-        const pad = 12;
+        const pad = 14;
+        const sw = t.width + pad * 2;
+        const sh = t.height + 10;
+
         const bgGfx = this.add.graphics().setDepth(depth - 1);
-        bgGfx.fillStyle(0x000000, 0.6);
-        bgGfx.fillRoundedRect(x - t.width / 2 - pad, y - t.height / 2 - 3, t.width + pad * 2, t.height + 6, 4);
-        bgGfx.lineStyle(1, accentColor, 0.4);
-        bgGfx.strokeRoundedRect(x - t.width / 2 - pad, y - t.height / 2 - 3, t.width + pad * 2, t.height + 6, 4);
+
+        // Outer neon glow
+        bgGfx.lineStyle(6, accentColor, 0.08);
+        bgGfx.strokeRoundedRect(x - sw / 2 - 3, y - sh / 2 - 3, sw + 6, sh + 6, 7);
+        // Mid glow
+        bgGfx.lineStyle(3, accentColor, 0.15);
+        bgGfx.strokeRoundedRect(x - sw / 2 - 1, y - sh / 2 - 1, sw + 2, sh + 2, 6);
+
+        // Background fill
+        bgGfx.fillStyle(0x000000, 0.7);
+        bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
+        // Zone color tint
+        bgGfx.fillStyle(accentColor, 0.06);
+        bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
+
+        // Neon border
+        bgGfx.lineStyle(1.5, accentColor, 0.8);
+        bgGfx.strokeRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
+
         // Left accent bar
-        bgGfx.fillStyle(accentColor, 0.5);
-        bgGfx.fillRoundedRect(x - t.width / 2 - pad, y - t.height / 2 - 3, 3, t.height + 6, { tl: 4, bl: 4, tr: 0, br: 0 });
+        bgGfx.fillStyle(accentColor, 0.8);
+        bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2, 3, sh, { tl: 5, bl: 5, tr: 0, br: 0 });
+
+        // Bottom highlight reflection
+        bgGfx.lineStyle(1, accentColor, 0.25);
+        bgGfx.lineBetween(x - sw / 2 + 8, y + sh / 2 - 2, x + sw / 2 - 8, y + sh / 2 - 2);
     }
 
     private buildEntranceFx(): void {
@@ -616,18 +853,38 @@ export class CasinoLobbyScene extends Phaser.Scene {
         const ew  = ZONE_ENTRANCE.w;
         const eh  = ZONE_ENTRANCE.h;
 
-        // Welcome mat
-        g3.fillStyle(0x0c200c, 1);
-        g3.fillRoundedRect(ex + 16, ey + 16, ew - 32, eh - 32, 3);
-        // Gold border on mat
-        g3.lineStyle(2, COL_TRIM, 0.45);
-        g3.strokeRoundedRect(ex + 16, ey + 16, ew - 32, eh - 32, 3);
-        // Inner decorative line
-        g3.lineStyle(1, COL_TRIM_DIM, 0.2);
+        // Welcome mat base
+        g3.fillStyle(0x0a1c0a, 1);
+        g3.fillRoundedRect(ex + 12, ey + 12, ew - 24, eh - 24, 4);
+
+        // Mat border strips — layered
+        g3.lineStyle(3, COL_TRIM, 0.5);
+        g3.strokeRoundedRect(ex + 12, ey + 12, ew - 24, eh - 24, 4);
+        g3.lineStyle(1, COL_TRIM, 0.2);
+        g3.strokeRoundedRect(ex + 18, ey + 18, ew - 36, eh - 36, 3);
+        g3.lineStyle(1, COL_TRIM_DIM, 0.15);
         g3.strokeRoundedRect(ex + 22, ey + 22, ew - 44, eh - 44, 2);
 
-        this.add.text(ex + ew / 2, ey + eh / 2, 'WELCOME', {
-            fontFamily: FONT, fontSize: '11px', color: '#3a6a3a', fontStyle: 'bold', letterSpacing: 3,
+        // Mat diagonal pattern — 45° lines clipped to mat inner bounds [ex+14..ex+ew-14, ey+14..ey+eh-14]
+        g3.lineStyle(0.5, 0x1a3a1a, 0.4);
+        const mdiag = 16;
+        const matX1 = ex + 14, matX2 = ex + ew - 14;
+        const matY1 = ey + 14, matY2 = ey + eh - 14;
+        for (let d = -(eh); d < ew + eh; d += mdiag) {
+            // Each diagonal line goes from (ex+d, ey+14) to (ex+d+eh, ey+eh-14), clipped to mat bounds
+            const x1 = Math.max(matX1, ex + d);
+            const y1 = matY1 + Math.max(0, matX1 - (ex + d));   // slide y down if x was clamped left
+            const x2 = Math.min(matX2, ex + d + eh);
+            const y2 = matY2 - Math.max(0, (ex + d + eh) - matX2); // slide y up if x was clamped right
+            if (x1 < x2) g3.lineBetween(x1, y1, x2, y2);
+        }
+
+        // Glow overlay
+        g3.fillStyle(0x1a3a1a, 0.15);
+        g3.fillRoundedRect(ex + 12, ey + 12, ew - 24, eh - 24, 4);
+
+        this.add.text(ex + ew / 2, ey + eh / 2, '✦ WELCOME ✦', {
+            fontFamily: FONT, fontSize: '11px', color: '#5a9a5a', fontStyle: 'bold', letterSpacing: 3,
         }).setOrigin(0.5).setDepth(DEPTH_FLOOR + 2);
     }
 

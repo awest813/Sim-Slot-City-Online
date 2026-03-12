@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { GameState, PlayerState, Zone } from '../../core/state/GameState';
 import {
-    DEPTH_HUD, COL_UI_BG, COL_UI_BG2, COL_UI_BORDER_DIM,
+    DEPTH_HUD, COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_UI_BORDER_DIM,
     COL_TRIM_DIM,
     FONT,
 } from '../../game/constants';

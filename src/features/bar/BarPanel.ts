@@ -137,19 +137,45 @@ export class BarPanel {
         this.container = this.scene.add.container(cx, cy).setScrollFactor(0).setDepth(DEPTH_PANEL + 1);
 
         // Panel BG — warm wood tones
-        const bg = this.scene.add.rectangle(0, 0, pw, ph, 0x1e0f05, 1)
-            .setStrokeStyle(2, COL_TRIM, 1);
+        const bg = this.scene.add.graphics();
+        // Shadow
+        bg.fillStyle(0x000000, 0.5);
+        bg.fillRoundedRect(-pw / 2 + 5, -ph / 2 + 7, pw, ph, 10);
+        // Main body
+        bg.fillStyle(0x1e0f05, 1);
+        bg.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 8);
+        // Gold border
+        bg.lineStyle(2, COL_TRIM, 1);
+        bg.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 8);
+        // Inner border
+        bg.lineStyle(1, 0xe8c870, 0.2);
+        bg.strokeRoundedRect(-pw / 2 + 3, -ph / 2 + 3, pw - 6, ph - 6, 7);
+        // Left accent bar — 4px wide
+        bg.fillStyle(COL_TRIM, 0.4);
+        bg.fillRoundedRect(-pw / 2, -ph / 2, 4, ph, { tl: 8, bl: 8, tr: 0, br: 0 });
         this.container.add(bg);
+
+        // Header panel — polished wood
+        const header = this.scene.add.graphics();
+        header.fillStyle(0x2a1208, 1);
+        header.fillRoundedRect(-pw / 2, -ph / 2, pw, 44, { tl: 8, tr: 8, bl: 0, br: 0 });
+        // Polished surface highlight at top
+        header.fillStyle(0x6a3a14, 0.6);
+        header.fillRoundedRect(-pw / 2 + 2, -ph / 2 + 1, pw - 4, 4, { tl: 7, tr: 7, bl: 0, br: 0 });
+        // Header bottom gold line
+        header.lineStyle(1.5, COL_TRIM, 0.6);
+        header.lineBetween(-pw / 2 + 8, -ph / 2 + 44, pw / 2 - 8, -ph / 2 + 44);
+        this.container.add(header);
 
         // Wood grain stripes (visual texture)
         for (let i = 0; i < 8; i++) {
-            const stripe = this.scene.add.rectangle(0, -ph / 2 + 48 + i * 52, pw - 4, 1, 0x2a1a08, 0.5);
+            const stripe = this.scene.add.rectangle(0, -ph / 2 + 52 + i * 52, pw - 4, 1, 0x2a1a08, 0.5);
             this.container.add(stripe);
         }
 
-        // Title
+        // Title — 20px
         const title = this.scene.add.text(0, -ph / 2 + 22, '🍹  BAR & LOUNGE', {
-            fontFamily: 'monospace', fontSize: '18px', color: '#c9a84c', fontStyle: 'bold',
+            fontFamily: 'monospace', fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
         const divider = this.scene.add.rectangle(0, -ph / 2 + 40, pw - 40, 1, COL_TRIM, 0.5);
         this.container.add([title, divider]);
@@ -202,9 +228,18 @@ export class BarPanel {
                 .setStrokeStyle(isSpecial ? 2 : 1, borderCol, 1)
                 .setInteractive({ useHandCursor: true });
 
+            // Colored halo/reflection around the bottle emoji
+            const haloGfx = this.scene.add.graphics();
+            const haloX = -pw / 2 + 36;
+            if (!alreadyDisabled) {
+                haloGfx.fillStyle(isSpecial ? 0xffd040 : 0xc9a84c, 0.12);
+                haloGfx.fillCircle(haloX, by, 14);
+                haloGfx.lineStyle(0.5, isSpecial ? 0xffd040 : 0xc9a84c, 0.25);
+                haloGfx.strokeCircle(haloX, by, 14);
+            }
+
             const nameLabel = this.scene.add.text(-pw / 2 + 46, by - 8, `${drink.emoji}  ${drink.name}`, {
                 fontFamily: 'monospace', fontSize: '12px',
-                // Dim name immediately if already claimed
                 color: alreadyDisabled ? '#444444' : (isSpecial ? '#e0c060' : '#d4b070'),
             }).setOrigin(0, 0.5);
 
@@ -237,7 +272,7 @@ export class BarPanel {
                 if (!this.isDisabled(drink)) rect.setFillStyle(hoverColor);
             });
 
-            this.container.add([rect, nameLabel, descLabel, costLabel]);
+            this.container.add([rect, haloGfx, nameLabel, descLabel, costLabel]);
         });
 
         // Gambling Tip button
