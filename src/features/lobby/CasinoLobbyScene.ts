@@ -865,15 +865,18 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g3.lineStyle(1, COL_TRIM_DIM, 0.15);
         g3.strokeRoundedRect(ex + 22, ey + 22, ew - 44, eh - 44, 2);
 
-        // Mat diagonal pattern
+        // Mat diagonal pattern — 45° lines clipped to mat inner bounds [ex+14..ex+ew-14, ey+14..ey+eh-14]
         g3.lineStyle(0.5, 0x1a3a1a, 0.4);
         const mdiag = 16;
-        for (let d = -eh; d < ew + eh; d += mdiag) {
-            const x1 = Math.max(ex + 14, ex + d);
-            const y1 = d < 0 ? ey + 14 - d : ey + 14;
-            const x2 = Math.min(ex + ew - 14, ex + d + eh);
-            const y2 = d + eh > eh - 24 ? ey + eh - 14 : ey + 14 + eh - mdiag;
-            g3.lineBetween(x1, y1, x2, y2);
+        const matX1 = ex + 14, matX2 = ex + ew - 14;
+        const matY1 = ey + 14, matY2 = ey + eh - 14;
+        for (let d = -(eh); d < ew + eh; d += mdiag) {
+            // Each diagonal line goes from (ex+d, ey+14) to (ex+d+eh, ey+eh-14), clipped to mat bounds
+            const x1 = Math.max(matX1, ex + d);
+            const y1 = matY1 + Math.max(0, matX1 - (ex + d));   // slide y down if x was clamped left
+            const x2 = Math.min(matX2, ex + d + eh);
+            const y2 = matY2 - Math.max(0, (ex + d + eh) - matX2); // slide y up if x was clamped right
+            if (x1 < x2) g3.lineBetween(x1, y1, x2, y2);
         }
 
         // Glow overlay
