@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import { GameState } from '../../core/state/GameState';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
-    COL_FELT, COL_TRIM, COL_TABLE,
+    COL_FELT, COL_TRIM,
 } from '../../game/constants';
 import {
     PokerGameState, PokerPlayer, PlayerAction,
@@ -164,12 +164,33 @@ export class PokerPanel {
         }).setOrigin(1, 0.5);
         this.container.add([this.handNumText, this.chipsText]);
 
-        // Oval felt table
-        const tableEllipse = this.scene.add.ellipse(0, -20, 360, 160, COL_FELT, 1);
-        tableEllipse.setStrokeStyle(5, COL_TABLE, 1);
-        const tableRing = this.scene.add.ellipse(0, -20, 318, 132, 0x000000, 0);
-        tableRing.setStrokeStyle(1, 0x2a6a2a, 0.5);
-        this.container.add([tableEllipse, tableRing]);
+        // Oval felt table — premium layered look
+        // Wood rim — outer shadow
+        const tableShadow = this.scene.add.graphics();
+        tableShadow.fillStyle(0x000000, 0.35);
+        tableShadow.fillEllipse(4, -16, 374, 174);
+        this.container.add(tableShadow);
+        // Wood rim layers — mahogany 3D effect
+        const tableRimDark = this.scene.add.ellipse(0, -20, 372, 170, 0x2a1408, 1);
+        const tableRimLight = this.scene.add.ellipse(0, -28, 366, 158, 0x5a3018, 1);
+        const tableRimMid = this.scene.add.ellipse(0, -20, 366, 164, 0x2a1408, 1);
+        this.container.add([tableRimDark, tableRimLight, tableRimMid]);
+        // Felt surface
+        const tableEllipse = this.scene.add.ellipse(0, -20, 340, 148, COL_FELT, 1);
+        tableEllipse.setStrokeStyle(2.5, 0x3a8a3a, 0.9);
+        this.container.add(tableEllipse);
+        // Felt center highlight — subtle radial
+        const feltHighlight = this.scene.add.ellipse(0, -30, 270, 100, 0x0d320d, 1);
+        feltHighlight.setAlpha(0.5);
+        this.container.add(feltHighlight);
+        // Felt texture rings
+        const tableRing = this.scene.add.graphics();
+        tableRing.lineStyle(0.5, 0x2a6a2a, 0.4);
+        tableRing.strokeEllipse(0, -20, 300, 125);
+        tableRing.strokeEllipse(0, -20, 200, 84);
+        tableRing.lineStyle(1, 0x2a6a2a, 0.5);
+        tableRing.strokeEllipse(0, -20, 318, 132);
+        this.container.add(tableRing);
 
         // Pot display
         this.potText = this.scene.add.text(0, -66, '', {

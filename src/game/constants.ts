@@ -91,6 +91,28 @@ export const DEPTH_HUD         = 900;
 export const DEPTH_PANEL       = 1000;
 export const DEPTH_OVERLAY     = 1100;
 
+// ── Neon & Metallic Palette ───────────────────────────────────────────────────
+export const COL_NEON_AMBER   = 0xffb020;
+export const COL_NEON_BLUE    = 0x40b0ff;
+export const COL_NEON_GREEN   = 0x40ff80;
+export const COL_NEON_PINK    = 0xff40a0;
+export const COL_NEON_PURPLE  = 0xc040ff;
+export const COL_NEON_RED     = 0xff4040;
+export const COL_NEON_TEAL    = 0x20ffe0;
+export const COL_GOLD_BRIGHT  = 0xffd040;
+export const COL_GOLD_MID     = 0xc9a84c;
+export const COL_METALLIC_HI  = 0xe0e8f0;
+export const COL_METALLIC_MID = 0x9090a8;
+export const COL_METALLIC_LO  = 0x303040;
+export const COL_FELT_DARK    = 0x0a2a0a;
+export const COL_FELT_LIGHT   = 0x147014;
+export const COL_WOOD_DARK    = 0x2a1408;
+export const COL_WOOD_MID     = 0x4a2e18;
+export const COL_WOOD_LIGHT   = 0x7a4e2a;
+export const COL_CARPET_DARK  = 0x071408;
+export const COL_CARPET_MID   = 0x0c2010;
+export const COL_CARPET_LIGHT = 0x143018;
+
 // ── Zone definitions (world-space) ────────────────────────────────────────────
 export const ZONE_ENTRANCE   = { x: 380, y: 580, w: 200, h: 120 };
 export const ZONE_SLOTS      = { x: 30,  y: 60,  w: 260, h: 380 };
