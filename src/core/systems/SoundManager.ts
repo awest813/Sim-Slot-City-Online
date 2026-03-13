@@ -13,7 +13,7 @@ let _muted = false;
 function getCtx(): AudioCtx | null {
     if (!_ctx) {
         try {
-            _ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+            _ctx = new AudioContext();
             _masterGain = _ctx.createGain();
             _masterGain.gain.value = 0.38;
             _masterGain.connect(_ctx.destination);
@@ -324,9 +324,9 @@ export const SoundManager = {
         };
 
         playBar();
-        // High-hat tick every 500 ms
+        // High-hat tick every 500 ms — noiseBurst already checks _muted internally
         const hihatTick = (): void => {
-            if (!_ambientPlaying || _muted) return;
+            if (!_ambientPlaying) return;
             noiseBurst(0.04, 0.025, 8000, 12);
         };
         const scheduleHihat = (): void => {

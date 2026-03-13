@@ -906,9 +906,9 @@ export class PokerPanel {
         const winnerSeatIds = this.game.lastWinnerSeatIds;
 
         winnerSeatIds.forEach(seatId => {
-            const seatIdx = seatId; // SEAT_POSITIONS index = seatId (0-5)
-            if (seatIdx < 0 || seatIdx >= SEAT_POSITIONS.length) return;
-            const [tx, ty] = SEAT_POSITIONS[seatIdx];
+            // SEAT_POSITIONS index equals seatId (both are 0-5)
+            if (seatId < 0 || seatId >= SEAT_POSITIONS.length) return;
+            const [tx, ty] = SEAT_POSITIONS[seatId];
 
             for (let c = 0; c < CHIP_COUNT; c++) {
                 // Spread the start positions slightly around pot centre
@@ -952,9 +952,13 @@ export class PokerPanel {
         });
     }
 
-    /** Remove any chip-animation objects still attached to the container. */
+    /** Remove any chip-animation objects still attached to the container.
+     * Guards with isActive() because a tween's onComplete callback may run
+     * after close() has already destroyed the container hierarchy. */
     private clearPotChips(): void {
-        this.potChipObjs.forEach(c => { try { c.destroy(); } catch { /* ignore */ } });
+        this.potChipObjs.forEach(c => {
+            if (c.active) c.destroy();
+        });
         this.potChipObjs = [];
     }
 

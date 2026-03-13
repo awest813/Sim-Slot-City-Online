@@ -319,6 +319,9 @@ export class SlotsPanel {
             // ── Geometry mask — clips the strip to the 96×96 slot window ────────
             // scrollFactor=0 keeps it anchored to the fixed screen position of the
             // slot window even when the lobby camera has scrolled.
+            // NOTE: mask coordinates are derived from containerScreenX/Y which equal
+            // (GAME_WIDTH/2, GAME_HEIGHT/2) — the fixed screen position of this.container.
+            // If the container position is ever changed, these must be updated to match.
             const maskGfx = this.scene.add.graphics();
             maskGfx.setScrollFactor(0);
             const msx = containerScreenX + reelXs[i] - rSlotW / 2;
@@ -868,8 +871,9 @@ export class SlotsPanel {
         // Cancel any active spin tweens
         this.reelSpinTweens.forEach(t => { if (t && t.isPlaying()) t.stop(); });
         this.spinTimers.forEach(t => t.remove());
-        // Destroy mask graphics (created outside display list, must be cleaned up manually)
-        this.reelMaskGfxs.forEach(g => { try { g.destroy(); } catch { /* ignore */ } });
+        // Destroy mask graphics — they live outside the container and must be
+        // cleaned up explicitly.  Guard with active check as a safety net.
+        this.reelMaskGfxs.forEach(g => { if (g.active) g.destroy(); });
         this.escKey.destroy();
         this.spaceKey.destroy();
         this.overlay.destroy();
