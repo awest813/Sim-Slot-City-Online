@@ -47,6 +47,13 @@ export class PreloadScene extends Phaser.Scene {
         bgGfx.fillCircle(cx, cy, 140);
         bgGfx.fillStyle(0x122448, 0.08);
         bgGfx.fillCircle(cx, cy, 70);
+        // 3 additional inner layers for smoother centre transition
+        bgGfx.fillStyle(0x162040, 0.06);
+        bgGfx.fillCircle(cx, cy, 50);
+        bgGfx.fillStyle(0x1a2a4a, 0.04);
+        bgGfx.fillCircle(cx, cy, 32);
+        bgGfx.fillStyle(0xc9a84c, 0.02);  // warm gold tint at very centre
+        bgGfx.fillCircle(cx, cy, 18);
 
         // Diagonal diamond-grid carpet pattern
         bgGfx.lineStyle(0.5, COL_TRIM_DIM, 0.07);
@@ -72,8 +79,8 @@ export class PreloadScene extends Phaser.Scene {
             bgGfx.fillRect(dx, GAME_HEIGHT - 15, 2, 2);
         }
 
-        // Corner ornaments — 3-line elaborated L-shapes
-        const orn = 22;
+        // Corner ornaments — elaborate L-shapes with diamond + 3 diagonals
+        const orn = 40;   // longer arms
         const orn2 = 14;
         const ornOff = 10;
         const corners: Array<[number, number]> = [
@@ -85,15 +92,29 @@ export class PreloadScene extends Phaser.Scene {
         corners.forEach(([ox, oy]) => {
             const sx = ox < GAME_WIDTH / 2 ? 1 : -1;
             const sy = oy < GAME_HEIGHT / 2 ? 1 : -1;
+            // Main L-shape arms (longer)
             bgGfx.lineStyle(1.5, COL_TRIM, 0.7);
             bgGfx.lineBetween(ox, oy, ox + sx * orn, oy);
             bgGfx.lineBetween(ox, oy, ox, oy + sy * orn);
+            // Secondary inner L-shape
             bgGfx.lineStyle(1, COL_TRIM, 0.4);
             bgGfx.lineBetween(ox + sx * orn2, oy + sy * 4, ox + sx * orn2, oy + sy * orn2);
             bgGfx.lineBetween(ox + sx * 4, oy + sy * orn2, ox + sx * orn2, oy + sy * orn2);
-            // Diagonal accent
+            // Diagonal accent 1: corner to arm-end
             bgGfx.lineStyle(0.5, COL_TRIM, 0.3);
             bgGfx.lineBetween(ox + sx * 8, oy + sy * 8, ox + sx * orn, oy + sy * orn);
+            // Diagonal accent 2: short cross inside the corner notch
+            bgGfx.lineStyle(0.5, COL_TRIM, 0.2);
+            bgGfx.lineBetween(ox + sx * 14, oy + sy * 6, ox + sx * 6, oy + sy * 14);
+            // Filled diamond at the corner tip (single polygon)
+            const ds = 4;
+            bgGfx.fillStyle(COL_TRIM, 0.8);
+            bgGfx.fillPoints([
+                { x: ox,      y: oy - ds },
+                { x: ox + ds, y: oy      },
+                { x: ox,      y: oy + ds },
+                { x: ox - ds, y: oy      },
+            ], true);
         });
 
         // ── Slot emoji logo with glow ────────────────────────────────────────
@@ -112,12 +133,27 @@ export class PreloadScene extends Phaser.Scene {
         glowGfx.strokeCircle(cx, logoY, 30);
         glowGfx.lineStyle(0.5, COL_TRIM, 0.2);
         glowGfx.strokeCircle(cx, logoY, 34);
+        // Second slightly larger ring (pulse-visible companion)
+        glowGfx.lineStyle(0.8, COL_TRIM, 0.3);
+        glowGfx.strokeCircle(cx, logoY, 40);
+        // 6-ray starburst halo around logo (every 60°)
+        glowGfx.lineStyle(0.5, 0xc9a84c, 0.15);
+        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 3) {
+            const x2 = cx     + Math.cos(angle) * 50;
+            const y2 = logoY  + Math.sin(angle) * 50;
+            glowGfx.lineBetween(cx, logoY, x2, y2);
+        }
 
         this.add.text(cx, logoY, '🎰', {
             fontFamily: 'monospace', fontSize: '48px',
         }).setOrigin(0.5);
 
-        // ── Title — 3-layer neon effect ────────────────────────────────────
+        // ── Title — 4-layer neon effect ────────────────────────────────────
+        // Layer 0: outer amber glow (bottommost, drawn first)
+        this.add.text(cx, cy - 96, 'SLOT  CITY', {
+            fontFamily: FONT, fontSize: '46px', color: '#ffd040', fontStyle: 'bold',
+            letterSpacing: 12,
+        }).setOrigin(0.5).setAlpha(0.4);
         // Layer 1: black shadow
         this.add.text(cx + 3, cy - 96 + 3, 'SLOT  CITY', {
             fontFamily: FONT, fontSize: '46px', color: '#000000', fontStyle: 'bold',
@@ -194,6 +230,12 @@ export class PreloadScene extends Phaser.Scene {
             // Border
             pillGfx.lineStyle(1, f.color, 0.35);
             pillGfx.strokeRoundedRect(px, pillY, pillW, pillH, 5);
+            // 1px inner border inset 3px (subtle depth)
+            pillGfx.lineStyle(1, f.color, 0.1);
+            pillGfx.strokeRoundedRect(px + 3, pillY + 3, pillW - 6, pillH - 6, 3);
+            // Top-left corner highlight triangle (6×6 semi-transparent white)
+            pillGfx.fillStyle(0xffffff, 0.05);
+            pillGfx.fillTriangle(px, pillY, px + 6, pillY, px, pillY + 6);
 
             this.add.text(px + pillW / 2 + 2, pillY + 10, f.icon, {
                 fontFamily: FONT, fontSize: '16px',
@@ -217,6 +259,11 @@ export class PreloadScene extends Phaser.Scene {
             // Fill
             barBg.fillStyle(COL_TRIM, 0.85);
             barBg.fillRoundedRect(cx - 100, cy + 37, Math.max(0, 200 * v), 3, 1);
+            // Leading-edge bright white highlight at right end of fill
+            if (v > 0.005) {
+                barBg.fillStyle(0xffffff, 0.8);
+                barBg.fillRect(cx - 100 + Math.max(0, 200 * v) - 3, cy + 37, 3, 3);
+            }
         });
     }
 
@@ -367,8 +414,6 @@ export class PreloadScene extends Phaser.Scene {
             g.lineStyle(3, COL_TRIM, 0.15);
             g.strokeRoundedRect(cx - 161, inputSectionY + 9, 322, 38, 7);
         }
-
-        // Inner bg — slightly lighter when focused
         g.fillStyle(focused ? 0x141e30 : COL_UI_BG3, 1);
         g.fillRoundedRect(cx - 160, inputSectionY + 10, 320, 36, 5);
 
@@ -378,6 +423,16 @@ export class PreloadScene extends Phaser.Scene {
         const lineW = focused ? 1.5 : 1;
         g.lineStyle(lineW, borderCol, borderAlpha);
         g.strokeRoundedRect(cx - 160, inputSectionY + 10, 320, 36, 5);
+
+        // 5th innermost glow + scanning line (focused only)
+        if (focused) {
+            g.lineStyle(1, 0xc9a84c, 0.45);
+            g.strokeRoundedRect(cx - 160, inputSectionY + 10, 320, 36, 5);
+            // Subtle scanning line near the bottom of the input field
+            const scanY = inputSectionY + 10 + 36 - 8;
+            g.lineStyle(1, 0xc9a84c, 0.1);
+            g.lineBetween(cx - 160, scanY, cx + 160, scanY);
+        }
     }
 
     private drawStartButton(hover: boolean): void {
