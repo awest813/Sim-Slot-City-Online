@@ -151,6 +151,17 @@ export class BarPanel {
         // Main body
         bg.fillStyle(0x1e0f05, 1);
         bg.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 8);
+        // Warm amber radial glow at center-bottom (simulates bar under-lighting)
+        const GLOW_LAYERS = [
+            { alpha: 0.04, radius: 200 },
+            { alpha: 0.06, radius: 150 },
+            { alpha: 0.08, radius: 100 },
+            { alpha: 0.06, radius: 60 },
+        ];
+        for (const layer of GLOW_LAYERS) {
+            bg.fillStyle(0xff8800, layer.alpha);
+            bg.fillEllipse(0, ph / 2 - 40, layer.radius * 2, layer.radius * 0.7);
+        }
         // Gold border
         bg.lineStyle(2, COL_TRIM, 1);
         bg.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 8);
@@ -169,6 +180,11 @@ export class BarPanel {
         // Polished surface highlight at top
         header.fillStyle(0x6a3a14, 0.6);
         header.fillRoundedRect(-pw / 2 + 2, -ph / 2 + 1, pw - 4, 4, { tl: 7, tr: 7, bl: 0, br: 0 });
+        // Neon amber glow behind header text area (simulates neon bar sign)
+        header.fillStyle(0xff8800, 0.04);
+        header.fillRoundedRect(-pw / 2 + 20, -ph / 2 + 4, pw - 40, 36, 4);
+        header.lineStyle(1, 0xff9900, 0.18);
+        header.strokeRoundedRect(-pw / 2 + 20, -ph / 2 + 4, pw - 40, 36, 4);
         // Header bottom gold line
         header.lineStyle(1.5, COL_TRIM, 0.6);
         header.lineBetween(-pw / 2 + 8, -ph / 2 + 44, pw / 2 - 8, -ph / 2 + 44);
@@ -235,14 +251,37 @@ export class BarPanel {
                 .setStrokeStyle(isSpecial ? 2 : 1, borderCol, 1)
                 .setInteractive({ useHandCursor: true });
 
-            // Colored halo/reflection around the bottle emoji
+            // Colored halo/reflection around the bottle emoji — glow circle
             const haloGfx = this.scene.add.graphics();
             const haloX = -pw / 2 + 36;
             if (!alreadyDisabled) {
-                haloGfx.fillStyle(isSpecial ? 0xffd040 : 0xc9a84c, 0.12);
-                haloGfx.fillCircle(haloX, by, 14);
-                haloGfx.lineStyle(0.5, isSpecial ? 0xffd040 : 0xc9a84c, 0.25);
-                haloGfx.strokeCircle(haloX, by, 14);
+                const haloColor = isSpecial ? 0xffd040 : 0xc9a84c;
+                // Multi-layer glow
+                haloGfx.fillStyle(haloColor, 0.06);
+                haloGfx.fillCircle(haloX, by, 18);
+                haloGfx.fillStyle(haloColor, 0.10);
+                haloGfx.fillCircle(haloX, by, 13);
+                haloGfx.lineStyle(0.5, haloColor, 0.35);
+                haloGfx.strokeCircle(haloX, by, 13);
+            }
+
+            // Cocktail glass silhouette on the left side of each button
+            const glassGfx = this.scene.add.graphics();
+            const gx = haloX + 26;  // position relative to halo
+            if (!alreadyDisabled) {
+                const glassColor = isSpecial ? 0xe0c060 : 0x8a6a30;
+                const glassAlpha = 0.45;
+                // Triangular glass body (wide at top, narrow at bottom)
+                glassGfx.fillStyle(glassColor, glassAlpha);
+                glassGfx.fillTriangle(gx - 7, by - 11, gx + 7, by - 11, gx, by + 3);
+                // Stem
+                glassGfx.lineStyle(1, glassColor, glassAlpha);
+                glassGfx.lineBetween(gx, by + 3, gx, by + 9);
+                // Base
+                glassGfx.lineBetween(gx - 5, by + 9, gx + 5, by + 9);
+                // Top rim
+                glassGfx.lineStyle(0.5, glassColor, glassAlpha * 0.6);
+                glassGfx.lineBetween(gx - 7, by - 11, gx + 7, by - 11);
             }
 
             const nameLabel = this.scene.add.text(-pw / 2 + 46, by - 8, `${drink.emoji}  ${drink.name}`, {
@@ -279,7 +318,7 @@ export class BarPanel {
                 if (!this.isDisabled(drink)) rect.setFillStyle(hoverColor);
             });
 
-            this.container.add([rect, haloGfx, nameLabel, descLabel, costLabel]);
+            this.container.add([rect, haloGfx, glassGfx, nameLabel, descLabel, costLabel]);
         });
 
         // Gambling Tip button

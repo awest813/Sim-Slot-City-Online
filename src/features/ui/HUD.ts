@@ -1,10 +1,22 @@
 import Phaser from 'phaser';
 import { GameState, PlayerState, Zone } from '../../core/state/GameState';
 import {
-    DEPTH_HUD, COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_UI_BORDER_DIM,
+    DEPTH_HUD, COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     COL_TRIM_DIM,
     FONT,
 } from '../../game/constants';
+
+// Accent color (fill + border) for each zone badge background
+const ZONE_ACCENT: Record<Zone, { fill: number; border: number; text: string }> = {
+    entrance:  { fill: 0x0d1820, border: 0x445566, text: '#7a8a9a' },
+    slots:     { fill: 0x1a0d2a, border: 0x6a3a8a, text: '#c080ff' },
+    poker:     { fill: 0x0a1a0a, border: 0x3a7a3a, text: '#70cc70' },
+    bar:       { fill: 0x1e0f05, border: 0x7a4a10, text: '#c9a84c' },
+    blackjack: { fill: 0x0a1520, border: 0x3a6a8a, text: '#60b0d0' },
+    roulette:  { fill: 0x1a0808, border: 0x8a2a2a, text: '#e06060' },
+    plinko:    { fill: 0x081a10, border: 0x2a7a4a, text: '#50cc80' },
+    floor:     { fill: 0x101018, border: 0x445577, text: '#8090aa' },
+};
 import { SoundManager } from '../../core/systems/SoundManager';
 
 const ZONE_LABELS: Record<Zone, string> = {
@@ -73,9 +85,10 @@ export class HUD {
             .setDepth(DEPTH_HUD + 1)
             .setOrigin(0, 0.5);
 
-        // Chip counter — slightly larger and distinct color
-        this.chipsText = this.scene.add.text(barX + 14, barY + 33, '', {
-            fontFamily: FONT, fontSize: '13px', color: '#2ecc71', fontStyle: 'bold',
+        // Chip counter — larger text with drop shadow
+        this.chipsText = this.scene.add.text(barX + 42, barY + 33, '', {
+            fontFamily: FONT, fontSize: '14px', color: '#2ecc71', fontStyle: 'bold',
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 3, fill: true },
         })
             .setScrollFactor(0)
             .setDepth(DEPTH_HUD + 1)
@@ -91,11 +104,8 @@ export class HUD {
             .setScrollFactor(0)
             .setDepth(DEPTH_HUD);
 
-        // Zone badge bg (drawn once; text update triggers redraw only if zone changes)
-        this.zoneGfx.fillStyle(COL_UI_BG, 0.88);
-        this.zoneGfx.fillRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
-        this.zoneGfx.lineStyle(1, COL_UI_BORDER_DIM, 0.5);
-        this.zoneGfx.strokeRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
+        // Zone badge bg — redrawn per zone in drawZoneBadge()
+        this.drawZoneBadge('floor');
 
         this.zoneText = this.scene.add.text(zoneX + zoneW / 2, zoneY + zoneH / 2, '', {
             fontFamily: FONT, fontSize: '10px', color: '#7a8a9a',
@@ -189,6 +199,10 @@ export class HUD {
         const barH = 48;
         g.clear();
 
+        // Outer glow halo at low opacity
+        g.lineStyle(6, COL_UI_BORDER, 0.08);
+        g.strokeRoundedRect(-2, -2, barW + 4, barH + 4, { tl: 0, tr: 0, bl: 8, br: 8 });
+
         // Drop shadow
         g.fillStyle(0x000000, 0.4);
         g.fillRoundedRect(2, 2, barW, barH, { tl: 0, tr: 0, bl: 6, br: 6 });
@@ -201,13 +215,57 @@ export class HUD {
         g.fillStyle(COL_UI_BG2, 0.7);
         g.fillRoundedRect(8, barH / 2 + 4, barW - 16, barH / 2 - 8, 3);
 
-        // Border — bottom + right sides only (top-left corner, hugs edge)
+        // Border
         g.lineStyle(1, COL_UI_BORDER, chipFlash ? 0.9 : 0.55);
         g.strokeRoundedRect(0, 0, barW, barH, { tl: 0, tr: 0, bl: 6, br: 6 });
 
         // Gold accent line at bottom
         g.lineStyle(1.5, chipFlash ? (flashGain ? COL_TRIM_DIM : 0xe74c3c) : COL_TRIM_DIM, chipFlash ? 0.8 : 0.35);
         g.lineBetween(0, barH - 1, barW, barH - 1);
+
+        // ── Detailed chip icon (gold circle + cross-hatch lines) ──────────
+        const iconX = 26;
+        const iconY = barH / 2 + 6;
+        const iconR = 8;
+        // Outer ring
+        g.fillStyle(0xc9a84c, 0.9);
+        g.fillCircle(iconX, iconY, iconR);
+        // Inner rim
+        g.lineStyle(1.5, 0x8a6020, 0.9);
+        g.strokeCircle(iconX, iconY, iconR);
+        // Inner fill slightly darker
+        g.fillStyle(0xa07830, 0.6);
+        g.fillCircle(iconX, iconY, iconR - 3);
+        // 4 radiating cross-hatch lines
+        g.lineStyle(1, 0x604c10, 0.7);
+        g.lineBetween(iconX - iconR + 2, iconY, iconX + iconR - 2, iconY);
+        g.lineBetween(iconX, iconY - iconR + 2, iconX, iconY + iconR - 2);
+        g.lineBetween(iconX - 5, iconY - 5, iconX + 5, iconY + 5);
+        g.lineBetween(iconX + 5, iconY - 5, iconX - 5, iconY + 5);
+    }
+
+    private drawZoneBadge(zone: Zone): void {
+        const zoneW = 168;
+        const zoneH = 28;
+        const zoneX = 960 - zoneW - 8;
+        const zoneY = 8;
+        const acc = ZONE_ACCENT[zone] ?? ZONE_ACCENT['floor'];
+        const g = this.zoneGfx;
+        g.clear();
+        // Outer halo glow
+        g.lineStyle(6, acc.border, 0.12);
+        g.strokeRoundedRect(zoneX - 2, zoneY - 2, zoneW + 4, zoneH + 4, 16);
+        // Background fill with zone accent
+        g.fillStyle(acc.fill, 0.92);
+        g.fillRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
+        // Border
+        g.lineStyle(1, acc.border, 0.7);
+        g.strokeRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
+        // Inner border tint
+        g.lineStyle(0.5, acc.border, 0.3);
+        g.strokeRoundedRect(zoneX + 2, zoneY + 2, zoneW - 4, zoneH - 4, 12);
+        // Update text color to match accent
+        if (this.zoneText) this.zoneText.setColor(acc.text);
     }
 
     private drawFreeChipsBtn(hover: boolean): void {
@@ -238,10 +296,18 @@ export class HUD {
         else this.freeChipsGfx.clear();
     }
 
+    private prevZone: Zone = 'floor';
+
     private refresh(s: PlayerState): void {
         this.nameText.setText(`★ ${s.displayName}`);
         this.chipsText.setText(`◈ ${s.chips.toLocaleString()} chips`);
         this.zoneText.setText(ZONE_LABELS[s.zone] ?? s.zone);
+
+        // Redraw zone badge when zone changes (accent color update)
+        if (s.zone !== this.prevZone) {
+            this.drawZoneBadge(s.zone);
+            this.prevZone = s.zone;
+        }
 
         // Chip flash on change
         if (this.prevChips >= 0 && s.chips !== this.prevChips) {

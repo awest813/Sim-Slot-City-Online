@@ -197,6 +197,21 @@ export class PokerPanel {
         const tableEllipse = this.scene.add.ellipse(0, -20, 340, 148, COL_FELT, 1);
         tableEllipse.setStrokeStyle(2.5, 0x3a8a3a, 0.9);
         this.container.add(tableEllipse);
+        // ── Subtle felt texture — thin diagonal lines at very low opacity ──
+        const FELT_LINE_COUNT       = 8;
+        const FELT_OFFSET_START     = -140;
+        const FELT_LINE_SPACING     = 40;
+        const FELT_LINE_ALPHA_EVEN  = 0.05;
+        const FELT_LINE_ALPHA_ODD   = 0.03;
+        const feltLines = this.scene.add.graphics();
+        for (let fi = 0; fi < FELT_LINE_COUNT; fi++) {
+            const fAlpha = fi % 2 === 0 ? FELT_LINE_ALPHA_EVEN : FELT_LINE_ALPHA_ODD;
+            feltLines.lineStyle(0.5, 0xffffff, fAlpha);
+            const offset = FELT_OFFSET_START + fi * FELT_LINE_SPACING;
+            // Diagonal lines clipped visually by the ellipse (drawn across its bounding box)
+            feltLines.lineBetween(offset - 60, -20 - 74, offset + 60, -20 + 74);
+        }
+        this.container.add(feltLines);
         // Felt center highlight — subtle radial
         const feltHighlight = this.scene.add.ellipse(0, -30, 270, 100, 0x0d320d, 1);
         feltHighlight.setAlpha(0.5);
@@ -210,7 +225,32 @@ export class PokerPanel {
         tableRing.strokeEllipse(0, -20, 318, 132);
         this.container.add(tableRing);
 
-        // Pot display
+        // Pot display — concentric gold chip icon to the left of the pot text
+        const potIconGfx = this.scene.add.graphics();
+        const potIconX = -42;
+        const potIconY = -66;
+        // Outer chip ring
+        potIconGfx.fillStyle(0xc9a84c, 0.9);
+        potIconGfx.fillCircle(potIconX, potIconY, 9);
+        potIconGfx.lineStyle(1.5, 0x7a5010, 0.9);
+        potIconGfx.strokeCircle(potIconX, potIconY, 9);
+        // Middle ring
+        potIconGfx.fillStyle(0xa07030, 0.7);
+        potIconGfx.fillCircle(potIconX, potIconY, 6);
+        // Center dot
+        potIconGfx.fillStyle(0xc9a84c, 1);
+        potIconGfx.fillCircle(potIconX, potIconY, 3);
+        // Notch marks on outer ring
+        potIconGfx.lineStyle(1, 0x7a5010, 0.6);
+        for (let ni = 0; ni < 4; ni++) {
+            const angle = (ni / 4) * Math.PI * 2;
+            potIconGfx.lineBetween(
+                potIconX + Math.cos(angle) * 7, potIconY + Math.sin(angle) * 7,
+                potIconX + Math.cos(angle) * 9, potIconY + Math.sin(angle) * 9,
+            );
+        }
+        this.container.add(potIconGfx);
+
         this.potText = this.scene.add.text(0, -66, '', {
             fontFamily: 'monospace', fontSize: '12px', color: '#c9a84c',
         }).setOrigin(0.5);
@@ -237,6 +277,15 @@ export class PokerPanel {
 
         // Community card placeholder slots — track in communityCardObjs so they are
         // properly destroyed and replaced when updateCommunityCards() first runs.
+
+        // ── Felt-green highlight oval behind community card area ──────────
+        const commHighlight = this.scene.add.graphics();
+        commHighlight.fillStyle(0x1a4a1a, 0.35);
+        commHighlight.fillEllipse(0, COMM_Y, 210, 60);
+        commHighlight.lineStyle(1, 0x3a8a3a, 0.25);
+        commHighlight.strokeEllipse(0, COMM_Y, 218, 66);
+        this.container.add(commHighlight);
+
         for (let i = 0; i < 5; i++) {
             const placeholder = this.scene.add.rectangle(COMM_XS[i], COMM_Y, 32, 44, 0x0d2a0d, 1)
                 .setStrokeStyle(1, 0x2a5a2a, 0.6);
@@ -404,6 +453,20 @@ export class PokerPanel {
         }).setOrigin(0.5);
 
         const btn = this.scene.add.container(x, y, [rect, topLabel, midLabel, botLabel]);
+
+        // Card suit symbols at seat corners (subtle decorative touch)
+        const SUITS = ['♠', '♥', '♣', '♦'];
+        const suitColor = folded ? '#333333' : isActive ? '#4a3a10' : '#1a2a1a';
+        const cornerOffsets: [number, number, string][] = [
+            [-W / 2 + 5, -H / 2 + 5, SUITS[sc.id % 4]],
+            [ W / 2 - 5,  H / 2 - 5, SUITS[(sc.id + 2) % 4]],
+        ];
+        cornerOffsets.forEach(([cx, cy, suit]) => {
+            const suitText = this.scene.add.text(cx, cy, suit, {
+                fontFamily: 'monospace', fontSize: '7px', color: suitColor,
+            }).setOrigin(0.5);
+            btn.add(suitText);
+        });
 
         // Dealer / blind position badge
         const badge = this.getPositionBadge(sc.id);

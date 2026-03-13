@@ -61,6 +61,7 @@ export class SlotsPanel {
     private reelSpinTweens: (Phaser.Tweens.Tween | null)[] = [null, null, null];
 
     private payLineGfx!:   Phaser.GameObjects.Graphics;
+    private winGlowGfx!:   Phaser.GameObjects.Graphics;
     private resultText!:   Phaser.GameObjects.Text;
     private chipsText!:    Phaser.GameObjects.Text;
     private betText!:      Phaser.GameObjects.Text;
@@ -143,8 +144,12 @@ export class SlotsPanel {
         const reelPanelY = -26;
         this.buildReelWindow(reelPanelY);
 
-        // ── Result text ────────────────────────────────────────────────────
-        this.resultText = this.scene.add.text(0, reelPanelY + 76, '', {
+        // ── Result text with neon glow backing ────────────────────────────
+        const resultY = reelPanelY + 76;
+        this.winGlowGfx = this.scene.add.graphics();
+        this.winGlowGfx.setVisible(false);
+        this.container.add(this.winGlowGfx);
+        this.resultText = this.scene.add.text(0, resultY, '', {
             fontFamily: FONT, fontSize: '15px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
         this.container.add(this.resultText);
@@ -196,12 +201,54 @@ export class SlotsPanel {
         // Metallic right edge shadow
         g.fillStyle(0x000000, 0.2);
         g.fillRoundedRect(px + PW - 6, py, 6, PH, { tl: 0, bl: 0, tr: PANEL_RADIUS, br: PANEL_RADIUS });
+
+        // ── Vertical chrome stripe decorations on panel sides ─────────────
+        // Left side chrome stripes (above/below reel area)
+        const stripeX1 = px + 10;
+        const stripeX2 = px + PW - 14;
+        const stripesAboveY = py + 56;    // below header
+        const stripesAboveH = 46;         // above reel (~reelPanelY - reelH/2 from container center)
+        const stripesBelowY = cy - 26 + 59 + 20;  // below reel window
+        const stripesBelowH = 46;
+        const STRIPE_COUNT  = 3;
+        const STRIPE_STEP   = 5;
+        const STRIPE_ALPHAS = [0.18, 0.10, 0.06];
+        const sColor        = 0x4444aa;
+        for (let si = 0; si < STRIPE_COUNT; si++) {
+            const sx1    = stripeX1 + si * STRIPE_STEP;
+            const sx2    = stripeX2 - si * STRIPE_STEP;
+            const sAlpha = STRIPE_ALPHAS[si];
+            // Left side — above reel
+            g.fillStyle(sColor, sAlpha);
+            g.fillRect(sx1, stripesAboveY, 3, stripesAboveH);
+            // Left side — below reel
+            g.fillStyle(sColor, sAlpha);
+            g.fillRect(sx1, stripesBelowY, 3, stripesBelowH);
+            // Right side — above reel
+            g.fillStyle(sColor, sAlpha);
+            g.fillRect(sx2, stripesAboveY, 3, stripesAboveH);
+            // Right side — below reel
+            g.fillStyle(sColor, sAlpha);
+            g.fillRect(sx2, stripesBelowY, 3, stripesBelowH);
+        }
+
         // Header band
         g.fillStyle(0x0d0d28, 1);
         g.fillRoundedRect(px, py, PW, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
         // Header inner highlight
         g.fillStyle(0x1a1a4a, 0.4);
         g.fillRoundedRect(px + 2, py + 2, PW - 4, 20, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
+        // Scan lines over header band — low-opacity horizontal lines
+        for (let sl = 0; sl < 6; sl++) {
+            g.lineStyle(0.5, 0xffffff, 0.03);
+            g.lineBetween(px + PANEL_RADIUS, py + 6 + sl * 7, px + PW - PANEL_RADIUS, py + 6 + sl * 7);
+        }
+        // Amber/gold gradient simulation — draw faint colored overlays at different vertical bands
+        g.fillStyle(0xff9900, 0.04);
+        g.fillRoundedRect(px + PANEL_RADIUS - 2, py + 2, PW - (PANEL_RADIUS - 2) * 2, 26, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
+        g.fillStyle(0xffcc44, 0.03);
+        g.fillRoundedRect(px + PANEL_RADIUS - 2, py + 28, PW - (PANEL_RADIUS - 2) * 2, 22, { tl: 0, tr: 0, bl: 0, br: 0 });
+
         // Gold border
         g.lineStyle(2, COL_SLOT_TRIM, 0.9);
         g.strokeRoundedRect(px, py, PW, PH, PANEL_RADIUS);
@@ -266,6 +313,21 @@ export class SlotsPanel {
         // Inner center glow
         reelBgGfx.fillStyle(0x0808cc, 0.04);
         reelBgGfx.fillCircle(0, reelPanelY, reelW * 0.35);
+        // Bright inner chrome ring just inside the main border
+        reelBgGfx.lineStyle(2, 0x8888ff, 0.35);
+        reelBgGfx.strokeRoundedRect(-reelW / 2 + 6, reelPanelY - reelH / 2 + 6, reelW - 12, reelH - 12, 5);
+        // Specular highlight dots at the four corners of the reel window
+        const dotAlphas = [0.55, 0.40, 0.40, 0.55];
+        const dotPositions: [number, number][] = [
+            [-reelW / 2 + 12, reelPanelY - reelH / 2 + 12],
+            [ reelW / 2 - 12, reelPanelY - reelH / 2 + 12],
+            [-reelW / 2 + 12, reelPanelY + reelH / 2 - 12],
+            [ reelW / 2 - 12, reelPanelY + reelH / 2 - 12],
+        ];
+        dotPositions.forEach(([dx, dy], di) => {
+            reelBgGfx.fillStyle(0xffffff, dotAlphas[di]);
+            reelBgGfx.fillCircle(dx, dy, 3);
+        });
         this.container.add(reelBgGfx);
 
         // Individual reel slots
@@ -808,6 +870,25 @@ export class SlotsPanel {
 
     private showResult(msg: string, color: string): void {
         this.resultText.setText(msg).setColor(color);
+
+        // Neon glow halo behind result text (visible for wins)
+        const isWin = msg.includes('+') || msg.toUpperCase().includes('JACKPOT') || msg.includes('🎉') || msg.includes('✨');
+        const g = this.winGlowGfx;
+        g.clear();
+        if (isWin && msg.trim().length > 0) {
+            const ry = this.resultText.y;
+            const glowColor = 0xc9a84c;
+            g.fillStyle(glowColor, 0.06);
+            g.fillEllipse(0, ry, 280, 44);
+            g.fillStyle(glowColor, 0.10);
+            g.fillEllipse(0, ry, 200, 32);
+            g.lineStyle(1, glowColor, 0.25);
+            g.strokeEllipse(0, ry, 210, 34);
+            g.setVisible(true);
+        } else {
+            g.setVisible(false);
+        }
+
         this.scene.tweens.add({
             targets: this.resultText,
             scaleX: [1.15, 1], scaleY: [1.15, 1],
