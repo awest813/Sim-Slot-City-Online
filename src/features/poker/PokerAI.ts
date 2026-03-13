@@ -1,6 +1,55 @@
 // ── Poker AI — rule-based decision making ────────────────────────────────────
 import { PokerGameState, PokerPlayer, PlayerAction, evalBestHand, callAmount } from './PokerEngine';
 
+// ── Personality system ────────────────────────────────────────────────────────
+
+/**
+ * Each AI seat can have a distinct personality that adjusts thresholds and
+ * play-style tendencies. All fields have sensible defaults via DEFAULT_PERSONALITY.
+ */
+export interface AIPersonality {
+    /** Hand-strength required before raising (0–1). Lower = raises more often. */
+    raiseThreshold: number;
+    /** Base fold threshold before pot-odds adjustment (0–1). Lower = looser. */
+    foldThresholdBase: number;
+    /** Half-amplitude of gaussian noise added to raw strength (±noiseScale). */
+    noiseScale: number;
+    /** Probability of a random "bluff" raise, ignoring hand strength. */
+    bluffChance?: number;
+    /** Multiplier applied to raise sizes (>1 = bigger bets). */
+    raiseSizeBoost?: number;
+}
+
+/** Mirrors original behaviour exactly — used as the fallback. */
+export const DEFAULT_PERSONALITY: AIPersonality = {
+    raiseThreshold:    0.68,
+    foldThresholdBase: 0.28,
+    noiseScale:        0.09,
+};
+
+/** Tight / patient — only raises premiums, folds borderline hands quickly. */
+export const PERSONALITY_TIGHT: AIPersonality = {
+    raiseThreshold:    0.76,
+    foldThresholdBase: 0.34,
+    noiseScale:        0.06,
+};
+
+/** Bluffer / unpredictable — raises often, rarely folds, occasional pure bluffs. */
+export const PERSONALITY_BLUFFER: AIPersonality = {
+    raiseThreshold:    0.55,
+    foldThresholdBase: 0.20,
+    noiseScale:        0.22,
+    bluffChance:       0.12,
+};
+
+/** Aggressive / loose — very hard to bluff off a hand; bets big. */
+export const PERSONALITY_AGGRESSIVE: AIPersonality = {
+    raiseThreshold:    0.52,
+    foldThresholdBase: 0.18,
+    noiseScale:        0.12,
+    raiseSizeBoost:    1.5,
+};
+
 // ── Pre-flop hand strength (0–1) based on hole cards only ────────────────────
 
 function preflopStrength(player: PokerPlayer): number {
@@ -54,28 +103,45 @@ export interface AIDecision {
     raiseTotal?: number;  // total bet amount when raising
 }
 
-export function getAIDecision(state: PokerGameState, playerIdx: number): AIDecision {
+export function getAIDecision(
+    state: PokerGameState,
+    playerIdx: number,
+    personality: AIPersonality = DEFAULT_PERSONALITY,
+): AIDecision {
     const player = state.players[playerIdx];
     const { phase, community, currentBet, minRaise, pot } = state;
     const toCall = callAmount(state, playerIdx);
     const canCheck = toCall === 0;
+
+    // Occasional bluff: raise regardless of hand strength
+    if (personality.bluffChance && Math.random() < personality.bluffChance && player.chips > toCall) {
+        const sizeMult = 1 + (personality.raiseSizeBoost ?? 1);
+        const raiseTotal = Math.min(
+            player.chips + player.roundBet,
+            currentBet + minRaise * sizeMult,
+        );
+        if (raiseTotal > currentBet) {
+            return { action: 'raise', raiseTotal };
+        }
+    }
 
     const rawStrength = phase === 'preflop'
         ? preflopStrength(player)
         : postflopStrength(player, community);
 
     // Add personality noise so AI isn't perfectly deterministic
-    const noise = (Math.random() - 0.5) * 0.18;
+    const noise = (Math.random() - 0.5) * personality.noiseScale * 2;
     const strength = Math.max(0, Math.min(1, rawStrength + noise));
 
     // Pot-odds adjustment: cheaper to call → lower threshold to continue
     const potOdds = pot > 0 ? toCall / (pot + toCall) : 0;
-    const foldThreshold = 0.28 + potOdds * 0.25;
-    const raiseThreshold = 0.68;
+    const foldThreshold = personality.foldThresholdBase + potOdds * 0.25;
+    const raiseThreshold = personality.raiseThreshold;
 
     if (strength >= raiseThreshold && player.chips > toCall) {
-        // Decide raise size: 1–3× big blind above current bet
-        const mult = strength > 0.85 ? 3 : strength > 0.75 ? 2 : 1;
+        // Decide raise size: 1–3× big blind above current bet, scaled by personality
+        const baseMult = strength > 0.85 ? 3 : strength > 0.75 ? 2 : 1;
+        const mult = baseMult * (personality.raiseSizeBoost ?? 1);
         const raiseTotal = Math.min(
             player.chips + player.roundBet,
             currentBet + minRaise * mult,
