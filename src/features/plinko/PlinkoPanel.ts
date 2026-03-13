@@ -17,9 +17,17 @@ const BOARD_H       = 240;
 const PEG_RADIUS    = 4;
 const BALL_RADIUS   = 7;
 
-// Multiplier slots at the bottom (symmetric, center is best)
-const SLOT_MULTIPLIERS = [0.2, 0.5, 1, 2, 5, 10, 5, 2, 1, 0.5, 0.2];
-const SLOT_COUNT = SLOT_MULTIPLIERS.length;
+// ── Risk levels ───────────────────────────────────────────────────────────────
+type RiskLevel = 'low' | 'medium' | 'high';
+
+const RISK_MULTIPLIERS: Record<RiskLevel, number[]> = {
+    low:    [0.4, 0.5, 0.7, 1.0, 1.5, 3.0, 1.5, 1.0, 0.7, 0.5, 0.4],
+    medium: [0.2, 0.5, 1.0, 2.0, 5.0, 10,  5.0, 2.0, 1.0, 0.5, 0.2],
+    high:   [0,   0,   0.2, 0.5, 2.0, 50,  2.0, 0.5, 0.2, 0,   0  ],
+};
+
+// SLOT_COUNT is constant regardless of risk level
+const SLOT_COUNT = RISK_MULTIPLIERS.medium.length;
 
 // Colors for slots based on multiplier value
 function slotColor(mult: number): number {
@@ -27,7 +35,8 @@ function slotColor(mult: number): number {
     if (mult >= 5)  return 0xf5a020;
     if (mult >= 2)  return 0x2ecc71;
     if (mult >= 1)  return 0x3a90e0;
-    return 0x445060;
+    if (mult > 0)   return 0x445060;
+    return 0x1a1a1a;  // 0× = near-black
 }
 
 const BET_OPTIONS = [10, 25, 50, 100];
@@ -65,6 +74,12 @@ export class PlinkoPanel {
     private pegs:        Peg[]    = [];
     private boardOffsetX = 0;
     private boardOffsetY = 0;
+
+    // Risk level
+    private riskLevel:      RiskLevel = 'medium';
+    private slotGfx!:       Phaser.GameObjects.Graphics;
+    private slotLabelObjs:  Phaser.GameObjects.Text[] = [];
+    private riskBtns: Array<{ gfx: Phaser.GameObjects.Graphics; lbl: Phaser.GameObjects.Text; level: RiskLevel }> = [];
 
     // Ball animation
     private ballX        = 0;
@@ -156,6 +171,7 @@ export class PlinkoPanel {
 
         // ── Bet controls ──────────────────────────────────────────────────────
         this.buildBetControls();
+        this.buildRiskSelector();
         this.buildDropButton();
 
         // ── Keyboard shortcuts ────────────────────────────────────────────────
@@ -244,7 +260,7 @@ export class PlinkoPanel {
         bgGfx.strokeRoundedRect(ox - BOARD_W / 2, oy, BOARD_W, BOARD_H, 6);
         this.container.add(bgGfx);
 
-        // Board graphics for static elements (pegs + slot labels)
+        // Board graphics for static elements (pegs only)
         this.boardGfx = this.scene.add.graphics();
         this.container.add(this.boardGfx);
 
@@ -271,24 +287,46 @@ export class PlinkoPanel {
             g.fillCircle(peg.x - 1, peg.y - 1, 1.5);
         }
 
-        // ── Slot bins at the bottom ────────────────────────────────────────────
+        // Drop zone indicator (top center arrow)
+        g.fillStyle(COL_PLINKO_ACCENT, 0.7);
+        g.fillTriangle(
+            ox, oy + 6,
+            ox - 8, oy - 4,
+            ox + 8, oy - 4,
+        );
+
+        // ── Slot display (built separately so it can be rebuilt on risk change) ─
+        this.buildSlotDisplay();
+    }
+
+    /** Returns the multiplier array for the current risk level. */
+    private getMultipliers(): number[] {
+        return RISK_MULTIPLIERS[this.riskLevel];
+    }
+
+    /** Build (or rebuild) the slot backgrounds + multiplier labels. */
+    private buildSlotDisplay(): void {
+        const ox    = this.boardOffsetX;
+        const oy    = this.boardOffsetY;
+        const slotH = 26;
         const slotW = BOARD_W / SLOT_COUNT;
         const slotY = oy + BOARD_H - slotH;
+        const mults = this.getMultipliers();
+
+        this.slotGfx = this.scene.add.graphics();
+        this.container.add(this.slotGfx);
 
         for (let i = 0; i < SLOT_COUNT; i++) {
-            const sx = ox - BOARD_W / 2 + i * slotW;
-            const mult = SLOT_MULTIPLIERS[i];
+            const sx   = ox - BOARD_W / 2 + i * slotW;
+            const mult = mults[i];
             const col  = slotColor(mult);
 
-            // Slot background
-            g.fillStyle(col, 0.18);
-            g.fillRect(sx + 1, slotY + 1, slotW - 2, slotH - 2);
-            // Slot border
-            g.lineStyle(1, col, 0.55);
-            g.strokeRect(sx + 1, slotY + 1, slotW - 2, slotH - 2);
+            this.slotGfx.fillStyle(col, mult === 0 ? 0.06 : 0.18);
+            this.slotGfx.fillRect(sx + 1, slotY + 1, slotW - 2, slotH - 2);
+            this.slotGfx.lineStyle(1, col, mult === 0 ? 0.25 : 0.55);
+            this.slotGfx.strokeRect(sx + 1, slotY + 1, slotW - 2, slotH - 2);
 
-            // Multiplier label
-            const labelStr = `${mult}×`;
+            const labelStr = mult === 0 ? '0×' : `${mult}×`;
             const labelCol = Phaser.Display.Color.IntegerToColor(col).rgba;
             const lbl = this.scene.add.text(sx + slotW / 2, slotY + slotH / 2, labelStr, {
                 fontFamily: FONT,
@@ -297,15 +335,80 @@ export class PlinkoPanel {
                 fontStyle: mult >= 5 ? 'bold' : 'normal',
             }).setOrigin(0.5);
             this.container.add(lbl);
+            this.slotLabelObjs.push(lbl);
         }
+    }
 
-        // Drop zone indicator (top center arrow)
-        g.fillStyle(COL_PLINKO_ACCENT, 0.7);
-        g.fillTriangle(
-            ox, oy + 6,
-            ox - 8, oy - 4,
-            ox + 8, oy - 4,
-        );
+    /** Destroy and recreate the slot display with the current risk multipliers. */
+    private rebuildSlotDisplay(): void {
+        this.slotGfx.destroy();
+        for (const obj of this.slotLabelObjs) obj.destroy();
+        this.slotLabelObjs = [];
+        this.slotHighlightGfx.clear();
+        this.buildSlotDisplay();
+        // Ensure the ball / highlight graphics stay on top
+        this.container.bringToTop(this.slotHighlightGfx);
+        this.container.bringToTop(this.ballGfx);
+    }
+
+    /** Three-button risk selector (Low / Med / High) placed right of the bet buttons. */
+    private buildRiskSelector(): void {
+        const { PW, PH } = this;
+        const btnY   = PH / 2 - 94;   // same row as bet buttons
+        const startX = PW / 2 - 130;  // right-aligned
+
+        const RISK_LABELS: Record<RiskLevel, string> = { low: 'LOW', medium: 'MED', high: 'HIGH' };
+        const levels: RiskLevel[] = ['low', 'medium', 'high'];
+
+        const riskHeader = this.scene.add.text(startX - 4, btnY - 18, 'RISK:', {
+            fontFamily: FONT, fontSize: '9px', color: '#446688', fontStyle: 'bold', letterSpacing: 1,
+        }).setOrigin(0, 0.5);
+        this.container.add(riskHeader);
+
+        const bw = 36;
+        const bh = 22;
+        const gap = 4;
+
+        levels.forEach((level, i) => {
+            const bx = startX + i * (bw + gap) + bw / 2;
+            const gfx = this.scene.add.graphics();
+            const lbl = this.scene.add.text(bx, btnY, RISK_LABELS[level], {
+                fontFamily: FONT, fontSize: '9px', color: '#20d4a0',
+            }).setOrigin(0.5);
+
+            const drawBtn = (): void => {
+                gfx.clear();
+                const sel = this.riskLevel === level;
+                gfx.fillStyle(sel ? 0x0e3028 : 0x041008, 1);
+                gfx.fillRoundedRect(bx - bw / 2, btnY - bh / 2, bw, bh, 3);
+                gfx.lineStyle(sel ? 1.5 : 1, sel ? COL_PLINKO_ACCENT : 0x1a4030, sel ? 1 : 0.5);
+                gfx.strokeRoundedRect(bx - bw / 2, btnY - bh / 2, bw, bh, 3);
+                lbl.setColor(sel ? '#20d4a0' : '#2a6050');
+            };
+            drawBtn();
+
+            const hitRect = this.scene.add.rectangle(bx, btnY, bw, bh, 0x000000, 0)
+                .setInteractive({ useHandCursor: true });
+            hitRect.on('pointerdown', () => {
+                if (this.dropState !== 'idle') return;
+                this.riskLevel = level;
+                this.riskBtns.forEach(b => b.gfx.clear() || (b.level === level ? undefined : undefined));
+                this.riskBtns.forEach(({ gfx: g2, lbl: l2, level: lv }) => {
+                    const sel = lv === this.riskLevel;
+                    g2.clear();
+                    const bx2 = l2.x;
+                    g2.fillStyle(sel ? 0x0e3028 : 0x041008, 1);
+                    g2.fillRoundedRect(bx2 - bw / 2, btnY - bh / 2, bw, bh, 3);
+                    g2.lineStyle(sel ? 1.5 : 1, sel ? COL_PLINKO_ACCENT : 0x1a4030, sel ? 1 : 0.5);
+                    g2.strokeRoundedRect(bx2 - bw / 2, btnY - bh / 2, bw, bh, 3);
+                    l2.setColor(sel ? '#20d4a0' : '#2a6050');
+                });
+                this.rebuildSlotDisplay();
+            });
+
+            this.container.add([gfx, lbl, hitRect]);
+            this.riskBtns.push({ gfx, lbl, level });
+        });
     }
 
     private buildBetControls(): void {
@@ -553,9 +656,10 @@ export class PlinkoPanel {
     private onBallLanded(slotIdx: number): void {
         if (this.closed) return;
 
-        const mult   = SLOT_MULTIPLIERS[slotIdx];
+        const mults  = this.getMultipliers();
+        const mult   = mults[slotIdx];
         const payout = Math.round(this.currentBet * mult);
-        const col    = slotColor(SLOT_MULTIPLIERS[slotIdx]);
+        const col    = slotColor(mults[slotIdx]);
 
         // Highlight the winning slot
         this.highlightSlot(slotIdx);
@@ -649,7 +753,7 @@ export class PlinkoPanel {
         const slotH = 26;
         const slotY = oy + BOARD_H - slotH;
         const sx    = ox - BOARD_W / 2 + slotIdx * slotW;
-        const col   = slotColor(SLOT_MULTIPLIERS[slotIdx]);
+        const col   = slotColor(this.getMultipliers()[slotIdx]);
 
         // Bright border flash
         g.lineStyle(2, col, 1);

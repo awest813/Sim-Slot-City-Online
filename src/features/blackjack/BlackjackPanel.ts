@@ -70,6 +70,10 @@ export class BlackjackPanel {
     private betDeducted:     boolean = false;
     private splitDeducted:   boolean = false;  // tracks if split bet was taken
 
+    // Dealer animation — controls step-by-step card reveal
+    private dealerRevealCount: number = Infinity;  // Infinity = show all (normal)
+    private dealerAnimTimers:  Phaser.Time.TimerEvent[] = [];
+
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene   = scene;
         this.onClose = onClose;
@@ -357,7 +361,16 @@ export class BlackjackPanel {
         this.bjState = hit(this.bjState);
         this.showPhaseUI();
         this.refreshDisplay();
-        if (this.bjState.phase === 'result') this.resolveResult();
+        if (this.bjState.phase === 'result') {
+            // If player busted with no split, dealer didn't play — resolve immediately.
+            // If dealer played (e.g. split-hand bust triggered dealer), animate reveal.
+            const purePlayerBust = this.bjState.result === 'bust' && this.bjState.splitHand === null;
+            if (purePlayerBust) {
+                this.resolveResult();
+            } else {
+                this.animateDealerReveal();
+            }
+        }
     }
 
     private doStand(): void {
@@ -368,8 +381,8 @@ export class BlackjackPanel {
             this.showPhaseUI();
             this.refreshDisplay();
         } else {
-            this.refreshDisplay();
-            this.resolveResult();
+            this.showPhaseUI();  // hide action buttons before animation
+            this.animateDealerReveal();
         }
     }
 
@@ -383,8 +396,14 @@ export class BlackjackPanel {
         }
         GameState.addChips(-this.bjState.bet);
         this.bjState = doubleDown(this.bjState);
-        this.refreshDisplay();
-        this.resolveResult();
+        // If player busted on double, no dealer animation needed
+        if (this.bjState.result === 'bust') {
+            this.refreshDisplay();
+            this.resolveResult();
+        } else {
+            this.showPhaseUI();
+            this.animateDealerReveal();
+        }
     }
 
     private doSplit(): void {
@@ -437,11 +456,91 @@ export class BlackjackPanel {
 
     private resolveResult(): void {
         const delta = chipDelta(this.bjState);
+        // Show floating net chip change
+        const totalDeducted = this.bjState.bet
+            + (this.bjState.splitHand !== null ? this.bjState.splitBet : 0)
+            + this.bjState.insuranceBet;
+        const net = delta - totalDeducted;
+        if (net !== 0) {
+            const dText = net > 0 ? `+${net}◈` : `${net}◈`;
+            this.showChipDelta(dText, net > 0 ? '#2ecc71' : '#e74c3c');
+        }
         if (delta > 0) GameState.addChips(delta);
         this.betDeducted  = false;
         this.splitDeducted = false;
         this.showResultUI();
         this.refreshDisplay();
+    }
+
+    /**
+     * Reveal the dealer's cards one by one with a short delay between each,
+     * then apply the chip result. Triggered after stand / double-down.
+     */
+    private animateDealerReveal(): void {
+        if (this.closed) return;
+        const dealerHand = this.bjState.dealerHand;
+
+        // Start by showing only the first card (hole card hidden)
+        this.dealerRevealCount = 1;
+        this.renderDealerCards();
+        this.updateHandValues();
+
+        let step = 2;  // next reveal target: card index < step is shown
+
+        const doStep = (): void => {
+            if (this.closed) return;
+            this.dealerRevealCount = step;
+            this.renderDealerCards();
+            this.updateHandValues();
+
+            // Brief pop animation on newly revealed card
+            const cardObj = this.dealerCardObjs[this.dealerCardObjs.length - 1];
+            if (cardObj) {
+                this.scene.tweens.add({
+                    targets: cardObj, scaleX: [1.1, 1], scaleY: [1.1, 1],
+                    duration: 140, ease: 'Back.Out',
+                });
+            }
+
+            if (step < dealerHand.length) {
+                // More cards to reveal
+                step++;
+                const t = this.scene.time.delayedCall(560, doStep);
+                this.dealerAnimTimers.push(t);
+            } else {
+                // All revealed — show dealer status then resolve
+                const dv = handValue(dealerHand);
+                let msg = '';
+                if (dv > 21)                                msg = `Dealer busts with ${dv}!`;
+                else if (isBlackjack(dealerHand))           msg = 'Dealer Blackjack!';
+                else                                        msg = `Dealer stands on ${dv}`;
+                this.statsText.setText(msg).setColor('#c9a84c');
+
+                const t = this.scene.time.delayedCall(420, () => {
+                    if (this.closed) return;
+                    this.dealerRevealCount = Infinity;
+                    this.resolveResult();
+                });
+                this.dealerAnimTimers.push(t);
+            }
+        };
+
+        // Pause briefly then start revealing the hole card
+        const t = this.scene.time.delayedCall(380, doStep);
+        this.dealerAnimTimers.push(t);
+    }
+
+    /** Floating chip gain / loss indicator near the result area. */
+    private showChipDelta(text: string, color: string): void {
+        const delta = this.scene.add.text(0, -4, text, {
+            fontFamily: FONT, fontSize: '22px', color, fontStyle: 'bold',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_PANEL + 5);
+        this.container.add(delta);
+        this.scene.tweens.add({
+            targets: delta, y: delta.y - 52, alpha: 0,
+            duration: 1100, ease: 'Quad.easeOut',
+            onComplete: () => delta.destroy(),
+        });
     }
 
     private prepareNextHand(): void {
@@ -585,7 +684,11 @@ export class BlackjackPanel {
         const startX = -((hand.length - 1) * 46) / 2;
         const baseY  = -PH / 2 + 110;
         for (let i = 0; i < hand.length; i++) {
-            const hidden = i === 1 && !this.bjState.dealerRevealed;
+            // During animation: hide cards at or beyond the reveal count.
+            // Outside animation: use engine's dealerRevealed flag (hole card hidden).
+            const hidden = this.dealerRevealCount < Infinity
+                ? i >= this.dealerRevealCount
+                : (i === 1 && !this.bjState.dealerRevealed);
             this.dealerCardObjs.push(...this.renderCard(startX + i * 46, baseY, hand[i], hidden));
         }
     }
@@ -743,8 +846,12 @@ export class BlackjackPanel {
         }
 
         if (bjState.dealerHand.length > 0) {
-            if (bjState.dealerRevealed) {
-                const dv = handValue(bjState.dealerHand);
+            if (bjState.dealerRevealed || this.dealerRevealCount < Infinity) {
+                // Show value of currently-revealed cards only
+                const revealedCards = this.dealerRevealCount < Infinity
+                    ? bjState.dealerHand.slice(0, this.dealerRevealCount)
+                    : bjState.dealerHand;
+                const dv = handValue(revealedCards);
                 this.dealerValueText.setText(String(dv));
                 this.dealerValueText.setColor(dv > 21 ? '#e74c3c' : '#ede0cc');
             } else {
@@ -855,14 +962,27 @@ export class BlackjackPanel {
     close(): void {
         if (this.closed) return;
         this.closed = true;
-        // Refund if closed mid-hand before result
-        if (this.betDeducted && this.bjState.result === null) {
-            GameState.addChips(this.bjState.bet);
+
+        // Cancel any pending dealer reveal timers
+        this.dealerAnimTimers.forEach(t => t.remove());
+        this.dealerAnimTimers = [];
+
+        // If closed during dealer animation, the result is already computed —
+        // apply chip delta now so the player doesn't lose chips they've won.
+        if (this.dealerRevealCount < Infinity && this.bjState.phase === 'result') {
+            const delta = chipDelta(this.bjState);
+            if (delta > 0) GameState.addChips(delta);
+        } else {
+            // Refund if closed mid-hand before result
+            if (this.betDeducted && this.bjState.result === null) {
+                GameState.addChips(this.bjState.bet);
+            }
+            // Refund split bet if split is in progress (no final result yet)
+            if (this.splitDeducted && this.bjState.phase === 'playing') {
+                GameState.addChips(this.bjState.splitBet);
+            }
         }
-        // Refund split bet if split is in progress (no final result yet)
-        if (this.splitDeducted && this.bjState.phase === 'playing') {
-            GameState.addChips(this.bjState.splitBet);
-        }
+
         this.escKey.destroy();
         this.spaceKey.destroy();
         this.hKey.destroy();

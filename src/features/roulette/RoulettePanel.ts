@@ -100,6 +100,10 @@ export class RoulettePanel {
     private totalWon     = 0;
     private totalWagered = 0;
 
+    // Spin history — last 8 results shown as coloured badges
+    private spinHistory: number[] = [];
+    private historyObjs: Phaser.GameObjects.GameObject[] = [];
+
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene   = scene;
         this.onClose = onClose;
@@ -140,6 +144,7 @@ export class RoulettePanel {
         this.buildSpinButton();
         this.buildClearButton();
         this.buildStatusRow();
+        this.buildHistoryRow();
 
         // Keyboard
         this.escKey   = this.scene.input.keyboard!.addKey('ESC');
@@ -616,7 +621,61 @@ export class RoulettePanel {
         this.container.add([this.betTotalText, this.msgText, this.statsText]);
     }
 
-    // ── Bet management ────────────────────────────────────────────────────────
+    // ── Spin history row ──────────────────────────────────────────────────────
+
+    private buildHistoryRow(): void {
+        // Header label (persists)
+        const lbl = this.scene.add.text(-PW / 2 + 18, PH / 2 - 8, 'LAST SPINS:', {
+            fontFamily: FONT, fontSize: '9px', color: '#3a6a3a', letterSpacing: 1,
+        }).setOrigin(0, 0.5);
+        this.container.add(lbl);
+    }
+
+    private updateHistory(result: number): void {
+        // Destroy old badge objects
+        for (const obj of this.historyObjs) obj.destroy();
+        this.historyObjs = [];
+
+        // Update history array (max 8 entries, newest first)
+        this.spinHistory.unshift(result);
+        if (this.spinHistory.length > 8) this.spinHistory.length = 8;
+
+        const startX = -PW / 2 + 90;
+        const y      = PH / 2 - 8;
+        const radius = 9;
+        const gap    = 22;
+
+        this.spinHistory.forEach((num, i) => {
+            const cx  = startX + i * gap;
+            const col = getNumberColor(num);
+            const fillCol = col === 'green' ? COL_GREEN
+                : col === 'red'   ? COL_RED
+                : COL_BLACK;
+            const borderCol = col === 'green' ? 0x50ee80
+                : col === 'red'   ? 0xff5555
+                : 0x888888;
+            const alpha = 1 - i * 0.09;  // fade out older results subtly
+
+            const g = this.scene.add.graphics();
+            g.fillStyle(0x000000, 0.5);
+            g.fillCircle(cx + 1, y + 1, radius);
+            g.fillStyle(fillCol, alpha);
+            g.fillCircle(cx, y, radius);
+            g.lineStyle(1, borderCol, alpha * 0.9);
+            g.strokeCircle(cx, y, radius);
+            this.container.add(g);
+            this.historyObjs.push(g);
+
+            const t = this.scene.add.text(cx, y, `${num}`, {
+                fontFamily: FONT, fontSize: num < 10 ? '9px' : '8px',
+                color: col === 'black' ? '#cccccc' : '#ffffff', fontStyle: 'bold',
+            }).setOrigin(0.5).setAlpha(alpha);
+            this.container.add(t);
+            this.historyObjs.push(t);
+        });
+    }
+
+
 
     private getBetKey(type: BetType, number?: number): string {
         return type === 'straight' ? `straight:${number}` : type;
@@ -778,6 +837,7 @@ export class RoulettePanel {
         this.refreshBetDisplay();
         this.refreshBoardHighlights(true, result);
         this.updateStats();
+        this.updateHistory(result);
 
         // Restore betting state after a short delay
         this.scene.time.delayedCall(2000, () => {

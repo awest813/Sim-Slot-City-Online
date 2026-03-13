@@ -12,7 +12,14 @@ import {
     cardLabel, isRed,
     Card, evalBestHand,
 } from './PokerEngine';
-import { getAIDecision } from './PokerAI';
+import {
+    getAIDecision,
+    AIPersonality,
+    DEFAULT_PERSONALITY,
+    PERSONALITY_TIGHT,
+    PERSONALITY_BLUFFER,
+    PERSONALITY_AGGRESSIVE,
+} from './PokerAI';
 
 // ── Seat configuration ────────────────────────────────────────────────────────
 
@@ -21,14 +28,15 @@ interface SeatConfig {
     label: string;
     aiName?: string;
     aiChips?: number;
+    personality?: AIPersonality;
 }
 
 const SEAT_CONFIGS: SeatConfig[] = [
-    { id: 0, label: 'Seat 1', aiName: 'RoyalFlush88', aiChips: 450 },
+    { id: 0, label: 'Seat 1', aiName: 'RoyalFlush88', aiChips: 450,  personality: PERSONALITY_TIGHT },
     { id: 1, label: 'Seat 2' },
-    { id: 2, label: 'Seat 3', aiName: 'BluffMaster',  aiChips: 1200 },
+    { id: 2, label: 'Seat 3', aiName: 'BluffMaster',  aiChips: 1200, personality: PERSONALITY_BLUFFER },
     { id: 3, label: 'Seat 4' },
-    { id: 4, label: 'Seat 5', aiName: 'AllInAlice',   aiChips: 780 },
+    { id: 4, label: 'Seat 5', aiName: 'AllInAlice',   aiChips: 780,  personality: PERSONALITY_AGGRESSIVE },
     { id: 5, label: 'Seat 6' },
 ];
 
@@ -563,7 +571,10 @@ export class PokerPanel {
 
     private doAIAction(idx: number): void {
         if (this.closed || !this.game) return;
-        const decision = getAIDecision(this.game, idx);
+        const player = this.game.players[idx];
+        const sc = SEAT_CONFIGS.find(s => s.id === player.seatId);
+        const personality = sc?.personality ?? DEFAULT_PERSONALITY;
+        const decision = getAIDecision(this.game, idx, personality);
         this.game = processAction(this.game, decision.action, decision.raiseTotal);
         this.afterAction();
     }
