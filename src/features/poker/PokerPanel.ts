@@ -20,6 +20,7 @@ import {
     PERSONALITY_BLUFFER,
     PERSONALITY_AGGRESSIVE,
 } from './PokerAI';
+import { SoundManager } from '../../core/systems/SoundManager';
 
 // ── Seat configuration ────────────────────────────────────────────────────────
 
@@ -119,6 +120,9 @@ export class PokerPanel {
     private dealButtonVisible = false;
     private closed = false;
     private customRaiseAmount: number = 0;
+
+    /** Chip-disc objects used in the pot-distribution animation. */
+    private potChipObjs: Phaser.GameObjects.Container[] = [];
 
     // Hand history (last 5 hands)
     private handHistory: Array<{ hand: number; result: string; delta: number }> = [];
@@ -557,6 +561,7 @@ export class PokerPanel {
         this.setStatus(this.game.statusMessage, '#c9a84c');
         this.handNumText.setText(`Hand #${this.game.handNumber}`);
 
+        SoundManager.playDeal();
         this.scheduleNextAction();
     }
 
@@ -795,6 +800,13 @@ export class PokerPanel {
     private playerAction(action: PlayerAction, raiseTotal?: number): void {
         if (!this.game || this.waitingForAI) return;
         this.hidePlayerActions();
+        if (action === 'fold') {
+            SoundManager.playFold();
+        } else if (action === 'call' || action === 'raise') {
+            SoundManager.playChipSlide();
+        } else {
+            SoundManager.playClick();
+        }
         this.game = processAction(this.game, action, raiseTotal);
         this.afterAction();
     }
@@ -837,6 +849,9 @@ export class PokerPanel {
             scaleX: 1.08, scaleY: 1.08, yoyo: true, duration: 200, repeat: 2,
         });
 
+        // Pot-distribution chip animation
+        this.animatePotDistribution();
+
         // Record hand history
         const gpHistory = this.game.players.find(p => p.seatId === this.playerSeatId);
         if (gpHistory !== undefined && this.handStartChips !== -1) {
@@ -868,6 +883,83 @@ export class PokerPanel {
             this.handStrengthText.setText('');
         });
         this.aiTimers.push(t);
+    }
+
+    /**
+     * Animate chip discs sliding from the pot centre toward each winner's seat.
+     * Chips fan out in a staggered arc for an organic feel.
+     */
+    private animatePotDistribution(): void {
+        if (!this.game || this.game.lastWinnerSeatIds.length === 0) return;
+
+        const POT_X = 0;    // potText is at (0, -66) relative to container
+        const POT_Y = -66;
+        const CHIP_COUNT = 9;   // discs per winner
+        const CHIP_R = 6;       // disc radius
+
+        // Chip colours (alternating gold / green for visual variety)
+        const chipColors = [0xc9a84c, 0x2ecc71, 0xc9a84c, 0xe8c870, 0x2ecc71];
+
+        // Clean up any previous leftover chip objects
+        this.clearPotChips();
+
+        const winnerSeatIds = this.game.lastWinnerSeatIds;
+
+        winnerSeatIds.forEach(seatId => {
+            // SEAT_POSITIONS index equals seatId (both are 0-5)
+            if (seatId < 0 || seatId >= SEAT_POSITIONS.length) return;
+            const [tx, ty] = SEAT_POSITIONS[seatId];
+
+            for (let c = 0; c < CHIP_COUNT; c++) {
+                // Spread the start positions slightly around pot centre
+                const spreadAngle = (c / CHIP_COUNT) * Math.PI * 2;
+                const spreadR = 4 + Math.random() * 6;
+                const sx = POT_X + Math.cos(spreadAngle) * spreadR;
+                const sy = POT_Y + Math.sin(spreadAngle) * spreadR;
+
+                // Draw a chip disc
+                const gfx = this.scene.add.graphics();
+                gfx.fillStyle(chipColors[c % chipColors.length], 1);
+                gfx.fillCircle(0, 0, CHIP_R);
+                gfx.lineStyle(1, 0x000000, 0.5);
+                gfx.strokeCircle(0, 0, CHIP_R);
+                // Inner ring for realism
+                gfx.lineStyle(1, 0xffffff, 0.25);
+                gfx.strokeCircle(0, 0, CHIP_R - 2);
+
+                const chip = this.scene.add.container(sx, sy, [gfx]);
+                this.container.add(chip);
+                this.potChipObjs.push(chip);
+
+                // Stagger each chip by 35 ms, then slide to seat position
+                const delay = c * 35;
+                this.scene.tweens.add({
+                    targets: chip,
+                    x: tx + (Math.random() - 0.5) * 14,  // slight landing scatter
+                    y: ty + (Math.random() - 0.5) * 8,
+                    alpha: { from: 1, to: 0 },
+                    duration: 520,
+                    delay,
+                    ease: 'Cubic.easeIn',
+                    onStart: () => {
+                        if (c === 0) SoundManager.playChipSlide();
+                    },
+                    onComplete: () => {
+                        if (c === CHIP_COUNT - 1) SoundManager.playChipLand();
+                    },
+                });
+            }
+        });
+    }
+
+    /** Remove any chip-animation objects still attached to the container.
+     * Guards with isActive() because a tween's onComplete callback may run
+     * after close() has already destroyed the container hierarchy. */
+    private clearPotChips(): void {
+        this.potChipObjs.forEach(c => {
+            if (c.active) c.destroy();
+        });
+        this.potChipObjs = [];
     }
 
     // ── Community Cards ───────────────────────────────────────────────────────
@@ -1102,6 +1194,7 @@ export class PokerPanel {
         this.closed = true;
 
         this.aiTimers.forEach(t => t.remove());
+        this.clearPotChips();
 
         if (this.rankingsPopup) {
             this.rankingsPopup.destroy();

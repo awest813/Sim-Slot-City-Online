@@ -9,6 +9,7 @@ import {
     COL_SLOT_BODY, COL_SLOT_TRIM,
     FONT, PANEL_RADIUS, ANIM_MED,
 } from '../../game/constants';
+import { SoundManager } from '../../core/systems/SoundManager';
 
 const SYMBOLS  = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
 const WEIGHTS  = [30, 25, 20, 12, 7, 4, 2];  // weighted rarity (lower = rarer)
@@ -40,7 +41,25 @@ export class SlotsPanel {
     private overlay!:      Phaser.GameObjects.Rectangle;
     private panelGfx!:     Phaser.GameObjects.Graphics;
     private container!:    Phaser.GameObjects.Container;
-    private reelTexts:     Phaser.GameObjects.Text[] = [];
+
+    // ── Vertical-scroll reel strips ────────────────────────────────────────────
+    // Each reel is a scrolling container (strip) masked to the 96×96 slot window.
+    // STRIP_LENGTH symbols are stacked at y = 0, -SYMBOL_H, -2*SYMBOL_H, ...
+    // Spinning tweens strip.y from 0 to (STRIP_LENGTH-1)*SYMBOL_H so the final
+    // symbol (always at the last slot) descends into the visible window.
+    private readonly STRIP_LENGTH = 14;
+    private readonly SYMBOL_H = 96;
+    /** Outer fixed container for each reel (used as coordinate anchor). */
+    private reelOuters:  Phaser.GameObjects.Container[] = [];
+    /** Inner scrolling strip — its .y is animated during a spin. */
+    private reelStrips:  Phaser.GameObjects.Container[] = [];
+    /** Text objects inside each strip, STRIP_LENGTH per reel. */
+    private reelStripSymbols: Phaser.GameObjects.Text[][] = [];
+    /** Geometry-mask graphics pinned to the slot window (scrollFactor=0). */
+    private reelMaskGfxs: Phaser.GameObjects.Graphics[] = [];
+    /** Active spin tweens for early-cancel if panel closes. */
+    private reelSpinTweens: (Phaser.Tweens.Tween | null)[] = [null, null, null];
+
     private payLineGfx!:   Phaser.GameObjects.Graphics;
     private resultText!:   Phaser.GameObjects.Text;
     private chipsText!:    Phaser.GameObjects.Text;
@@ -226,6 +245,7 @@ export class SlotsPanel {
     private buildReelWindow(reelPanelY: number): void {
         const reelW = 350;
         const reelH = 118;
+        const { SYMBOL_H, STRIP_LENGTH } = this;
 
         const reelBgGfx = this.scene.add.graphics();
         // Outer shadow
@@ -253,7 +273,13 @@ export class SlotsPanel {
         const rSlotW = 96;
         const rSlotH = 96;
 
+        // The main container is at (GAME_WIDTH/2, GAME_HEIGHT/2) in screen space.
+        // Reel i screen centre = (GAME_WIDTH/2 + reelXs[i], GAME_HEIGHT/2 + reelPanelY).
+        const containerScreenX = GAME_WIDTH  / 2;
+        const containerScreenY = GAME_HEIGHT / 2;
+
         for (let i = 0; i < 3; i++) {
+            // ── Slot background graphics (stays fixed, drawn on main container) ──
             const rgfx = this.scene.add.graphics();
             // Slot bg
             rgfx.fillStyle(0x07071a, 1);
@@ -261,20 +287,62 @@ export class SlotsPanel {
             // Slot border
             rgfx.lineStyle(1, COL_SLOT_TRIM, 0.4);
             rgfx.strokeRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY - rSlotH / 2, rSlotW, rSlotH, 5);
-            // Inner shadow at top/bottom
-            rgfx.fillStyle(0x000000, 0.45);
-            rgfx.fillRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY - rSlotH / 2, rSlotW, 14, { tl: 5, tr: 5, bl: 0, br: 0 });
-            rgfx.fillRoundedRect(reelXs[i] - rSlotW / 2, reelPanelY + rSlotH / 2 - 14, rSlotW, 14, { tl: 0, tr: 0, bl: 5, br: 5 });
             // Inner glow center
             rgfx.fillStyle(0x3030ff, 0.04);
             rgfx.fillCircle(reelXs[i], reelPanelY, 36);
             this.container.add(rgfx);
 
-            const reel = this.scene.add.text(reelXs[i], reelPanelY, '🎰', {
-                fontFamily: FONT, fontSize: '44px',
-            }).setOrigin(0.5);
-            this.container.add(reel);
-            this.reelTexts.push(reel);
+            // ── Outer fixed container (anchor for the reel) ────────────────────
+            const reelOuter = this.scene.add.container(reelXs[i], reelPanelY);
+            this.container.add(reelOuter);
+            this.reelOuters.push(reelOuter);
+
+            // ── Scrolling strip container (its .y is animated during spin) ─────
+            // Symbol[0..N-2] = random pre-spin filler; Symbol[N-1] = final result.
+            // Positions: y = 0, -SYMBOL_H, -2*SYMBOL_H, …
+            // Tween strip.y from 0 → (STRIP_LENGTH-1)*SYMBOL_H so symbol[N-1]
+            // descends into the centre of the window.
+            const reelStrip = this.scene.add.container(0, 0);
+            reelOuter.add(reelStrip);
+            this.reelStrips.push(reelStrip);
+
+            const stripSymbols: Phaser.GameObjects.Text[] = [];
+            for (let j = 0; j < STRIP_LENGTH; j++) {
+                const sym = this.scene.add.text(0, -j * SYMBOL_H, SYMBOLS[j % SYMBOLS.length], {
+                    fontFamily: FONT, fontSize: '44px',
+                }).setOrigin(0.5);
+                reelStrip.add(sym);
+                stripSymbols.push(sym);
+            }
+            this.reelStripSymbols.push(stripSymbols);
+
+            // ── Geometry mask — clips the strip to the 96×96 slot window ────────
+            // scrollFactor=0 keeps it anchored to the fixed screen position of the
+            // slot window even when the lobby camera has scrolled.
+            // NOTE: mask coordinates are derived from containerScreenX/Y which equal
+            // (GAME_WIDTH/2, GAME_HEIGHT/2) — the fixed screen position of this.container.
+            // If the container position is ever changed, these must be updated to match.
+            const maskGfx = this.scene.add.graphics();
+            maskGfx.setScrollFactor(0);
+            const msx = containerScreenX + reelXs[i] - rSlotW / 2;
+            const msy = containerScreenY + reelPanelY - rSlotH / 2;
+            maskGfx.fillStyle(0xffffff, 1);
+            maskGfx.fillRect(msx, msy, rSlotW, rSlotH);
+            const mask = maskGfx.createGeometryMask();
+            reelStrip.setMask(mask);
+            this.reelMaskGfxs.push(maskGfx);
+
+            // ── Shadow bands drawn OVER the strip to hide overflow symbols ──────
+            // These render on top of the strip, reinforcing the clip at edges.
+            const bandGfx = this.scene.add.graphics();
+            bandGfx.fillStyle(0x07071a, 1);
+            // Top band
+            bandGfx.fillRect(reelXs[i] - rSlotW / 2, reelPanelY - rSlotH / 2,
+                rSlotW, rSlotH / 2 - 24);
+            // Bottom band
+            bandGfx.fillRect(reelXs[i] - rSlotW / 2, reelPanelY + 24,
+                rSlotW, rSlotH / 2 - 24);
+            this.container.add(bandGfx);
         }
 
         // Pay-line
@@ -557,8 +625,15 @@ export class SlotsPanel {
             return;
         }
 
-        // Clear any stale timer references before new spin
+        // Determine all three final symbols BEFORE animation begins.
+        // (Real slot machines pre-compute outcomes before reels spin.)
+        const finalSymbols = [weightedRandom(), weightedRandom(), weightedRandom()];
+
+        // Clear stale timer refs
         this.spinTimers = [];
+        // Cancel any previous spin tweens
+        this.reelSpinTweens.forEach(t => { if (t && t.isPlaying()) t.stop(); });
+        this.reelSpinTweens = [null, null, null];
 
         GameState.addChips(-this.currentBet);
         this.totalSpins++;
@@ -572,34 +647,52 @@ export class SlotsPanel {
         this.drawPayLine(false);
         this.spinDone = [false, false, false];
 
+        SoundManager.playSlotSpin();
+
+        const { STRIP_LENGTH, SYMBOL_H } = this;
+        // Reel 0 stops first (620 ms), reel 1 second (1080 ms), reel 2 last (1540 ms)
         const stopDelays = [620, 1080, 1540];
+        // Total scroll distance = (STRIP_LENGTH-1) * SYMBOL_H
+        const totalTravel = (STRIP_LENGTH - 1) * SYMBOL_H;
 
         for (let i = 0; i < 3; i++) {
-            const rollTimer = this.scene.time.addEvent({
-                delay: 75,
-                repeat: -1,
-                callback: () => {
-                    this.reelTexts[i].setText(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
+            // Populate strip: random symbols for 0..N-2, final symbol at N-1
+            const symbols = this.reelStripSymbols[i];
+            for (let j = 0; j < STRIP_LENGTH - 1; j++) {
+                symbols[j].setText(SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)]);
+            }
+            symbols[STRIP_LENGTH - 1].setText(finalSymbols[i]);
+
+            // Reset strip to top (symbol[0] visible at centre of window)
+            this.reelStrips[i].setY(0);
+
+            // Tween strip.y from 0 → totalTravel.
+            // Power3.easeOut: starts fast (simulates high momentum), decelerates to a
+            // clean stop with symbol[N-1] perfectly centred in the slot window.
+            const reelIdx = i;
+            const spinTween = this.scene.tweens.add({
+                targets: this.reelStrips[i],
+                y: totalTravel,
+                duration: stopDelays[i],
+                ease: 'Power3.easeOut',
+                onComplete: () => {
+                    if (this.closed) return;
+                    this.reelValues[reelIdx] = finalSymbols[reelIdx];
+
+                    // Bounce scale on landing symbol
+                    this.scene.tweens.add({
+                        targets: symbols[STRIP_LENGTH - 1],
+                        scaleX: 1.14, scaleY: 1.14,
+                        yoyo: true, duration: 80, ease: 'Quad.easeOut',
+                    });
+
+                    SoundManager.playReelStop(reelIdx);
+
+                    this.spinDone[reelIdx] = true;
+                    if (this.spinDone.every(d => d)) this.evalResult();
                 },
             });
-
-            const stopTimer = this.scene.time.delayedCall(stopDelays[i], () => {
-                rollTimer.remove();
-                if (this.closed) return;
-                const final = weightedRandom();
-                this.reelValues[i] = final;
-                this.reelTexts[i].setText(final);
-                // Bounce on stop
-                this.scene.tweens.add({
-                    targets: this.reelTexts[i],
-                    scaleX: 1.12, scaleY: 1.12,
-                    yoyo: true, duration: 80, ease: 'Quad.easeOut',
-                });
-                this.spinDone[i] = true;
-                if (this.spinDone.every(d => d)) this.evalResult();
-            });
-
-            this.spinTimers.push(rollTimer, stopTimer);
+            this.reelSpinTweens[i] = spinTween;
         }
     }
 
@@ -658,9 +751,12 @@ export class SlotsPanel {
             this.showChipDelta(`+${payout}◈`, '#2ecc71');
             this.drawPayLine(true);
 
+            // Animate the final (landing) symbol in each strip
+            const finalSymTexts = this.reelStripSymbols.map(s => s[this.STRIP_LENGTH - 1]);
+
             if (jackpot) {
                 this.scene.tweens.add({
-                    targets: this.reelTexts, scaleX: 1.4, scaleY: 1.4,
+                    targets: finalSymTexts, scaleX: 1.4, scaleY: 1.4,
                     yoyo: true, duration: 100, repeat: 6,
                 });
                 this.scene.tweens.add({
@@ -668,12 +764,14 @@ export class SlotsPanel {
                     yoyo: true, duration: 70, repeat: 10,
                     onComplete: () => { this.drawPayLine(false); this.payLineGfx.setAlpha(1); },
                 });
+                SoundManager.playJackpot();
             } else {
                 this.scene.tweens.add({
-                    targets: this.reelTexts, scaleX: 1.14, scaleY: 1.14,
+                    targets: finalSymTexts, scaleX: 1.14, scaleY: 1.14,
                     yoyo: true, duration: 130, repeat: 2,
                 });
                 this.scene.time.delayedCall(600, () => this.drawPayLine(false));
+                SoundManager.playWin(payout);
             }
         } else {
             this.winStreak = 0;
@@ -770,7 +868,12 @@ export class SlotsPanel {
     private close(): void {
         if (this.closed) return;
         this.closed = true;
+        // Cancel any active spin tweens
+        this.reelSpinTweens.forEach(t => { if (t && t.isPlaying()) t.stop(); });
         this.spinTimers.forEach(t => t.remove());
+        // Destroy mask graphics — they live outside the container and must be
+        // cleaned up explicitly.  Guard with active check as a safety net.
+        this.reelMaskGfxs.forEach(g => { if (g.active) g.destroy(); });
         this.escKey.destroy();
         this.spaceKey.destroy();
         this.overlay.destroy();

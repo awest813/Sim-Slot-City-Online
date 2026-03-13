@@ -123,6 +123,8 @@ export interface PokerGameState {
     smallBlind: number;
     handNumber: number;
     statusMessage: string;
+    /** Seat IDs of winner(s) after showdown — used for pot-distribution animation. */
+    lastWinnerSeatIds: number[];
 }
 
 // ── Game Lifecycle ────────────────────────────────────────────────────────────
@@ -147,6 +149,7 @@ export function createGame(
         smallBlind: 10,
         handNumber: 0,
         statusMessage: 'Press Deal to start.',
+        lastWinnerSeatIds: [],
     };
 }
 
@@ -365,14 +368,16 @@ function resolveShowdown(state: PokerGameState): PokerGameState {
         ? `${names} split the pot (${state.pot}◈) — ${handName}`
         : `${names} wins ${state.pot}◈ with ${handName}!`;
 
-    return { ...state, players, phase: 'showdown', activePlayerIdx: -1, pendingActors: [], statusMessage: msg };
+    return { ...state, players, phase: 'showdown', activePlayerIdx: -1, pendingActors: [],
+        statusMessage: msg, lastWinnerSeatIds: winners.map(w => w.seatId) };
 }
 
 function awardPot(state: PokerGameState, winnerSeatId: number, msg: string): PokerGameState {
     const players = state.players.map(p => ({ ...p }));
     const winner = players.find(p => p.seatId === winnerSeatId)!;
     winner.chips += state.pot;
-    return { ...state, players, phase: 'showdown', activePlayerIdx: -1, pendingActors: [], statusMessage: msg };
+    return { ...state, players, phase: 'showdown', activePlayerIdx: -1, pendingActors: [],
+        statusMessage: msg, lastWinnerSeatIds: [winnerSeatId] };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
