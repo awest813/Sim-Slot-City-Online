@@ -15,6 +15,7 @@ import { GameState, Zone } from '../../core/state/GameState';
 import { AvatarController } from '../../core/systems/AvatarController';
 import { AIWalker, AI_NAMES, AI_COLORS } from '../../core/systems/AIWalker';
 import { InteractionSystem } from '../../core/systems/InteractionSystem';
+import { SoundManager } from '../../core/systems/SoundManager';
 import { HUD } from '../ui/HUD';
 import { SlotsPanel } from '../slots/SlotsPanel';
 import { BarPanel, resetBarSession } from '../bar/BarPanel';
@@ -70,6 +71,10 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         // HUD
         new HUD(this);
+
+        // Initialise sound engine on the first pointer-down (browser autoplay policy
+        // requires a user gesture before creating / resuming an AudioContext).
+        this.input.once('pointerdown', () => SoundManager.init());
 
         // Welcome tutorial overlay
         this.showWelcomeBanner();

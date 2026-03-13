@@ -5,6 +5,7 @@ import {
     COL_TRIM_DIM,
     FONT,
 } from '../../game/constants';
+import { SoundManager } from '../../core/systems/SoundManager';
 
 const ZONE_LABELS: Record<Zone, string> = {
     entrance:  '↑ Entrance',
@@ -36,6 +37,11 @@ export class HUD {
     private freeChipsLabel!: Phaser.GameObjects.Text;
     private freeChipsHit!: Phaser.GameObjects.Rectangle;
     private freeChipsVisible = false;
+
+    // Sound mute toggle
+    private muteGfx!: Phaser.GameObjects.Graphics;
+    private muteLabel!: Phaser.GameObjects.Text;
+    private muteHit!: Phaser.GameObjects.Rectangle;
 
     private unsub!: () => void;
     private prevChips = -1;
@@ -127,6 +133,48 @@ export class HUD {
         });
 
         this.setFreeChipsVisible(false);
+
+        // ── Sound mute toggle (top-left, to the right of player bar) ──────
+        const muteSize = 28;
+        const muteX = 228;
+        const muteY = 8;
+
+        this.muteGfx = this.scene.add.graphics()
+            .setScrollFactor(0)
+            .setDepth(DEPTH_HUD);
+
+        this.muteLabel = this.scene.add.text(muteX + muteSize / 2, muteY + muteSize / 2, '🔊', {
+            fontFamily: FONT, fontSize: '13px',
+        })
+            .setScrollFactor(0)
+            .setDepth(DEPTH_HUD + 2)
+            .setOrigin(0.5);
+
+        this.muteHit = this.scene.add.rectangle(muteX + muteSize / 2, muteY + muteSize / 2,
+            muteSize, muteSize, 0x000000, 0)
+            .setScrollFactor(0)
+            .setDepth(DEPTH_HUD + 3)
+            .setInteractive({ useHandCursor: true });
+
+        const drawMuteBtn = (hover: boolean): void => {
+            this.muteGfx.clear();
+            this.muteGfx.fillStyle(hover ? 0x2a2a3a : 0x141420, 0.88);
+            this.muteGfx.fillRoundedRect(muteX, muteY, muteSize, muteSize, 5);
+            this.muteGfx.lineStyle(1, 0x445566, 0.55);
+            this.muteGfx.strokeRoundedRect(muteX, muteY, muteSize, muteSize, 5);
+        };
+        drawMuteBtn(false);
+
+        this.muteHit.on('pointerover',  () => drawMuteBtn(true));
+        this.muteHit.on('pointerout',   () => drawMuteBtn(false));
+        this.muteHit.on('pointerdown', () => {
+            // First click initialises the AudioContext (browser autoplay policy)
+            SoundManager.init();
+            const nowMuted = !SoundManager.isMuted();
+            SoundManager.setMuted(nowMuted);
+            this.muteLabel.setText(nowMuted ? '🔇' : '🔊');
+            if (!nowMuted) SoundManager.playClick();
+        });
 
         // ── Subscribe to state changes ─────────────────────────────────────
         this.unsub = GameState.subscribe(s => this.refresh(s));
@@ -235,5 +283,8 @@ export class HUD {
         this.freeChipsGfx.destroy();
         this.freeChipsLabel.destroy();
         this.freeChipsHit.destroy();
+        this.muteGfx.destroy();
+        this.muteLabel.destroy();
+        this.muteHit.destroy();
     }
 }
