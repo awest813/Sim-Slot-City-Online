@@ -90,6 +90,13 @@ const GAMBLING_TIPS = [
     '💡 Tip: The slot machine pays back over time — stay patient!',
     '💡 Tip: Min-raise early in poker — don\'t give your hand away.',
     '💡 Tip: In poker, the dealer button rotates — position matters.',
+    '💡 Tip: Blackjack basic strategy — always split Aces and 8s.',
+    '💡 Tip: Blackjack — double down on 11 when dealer shows 2-10.',
+    '💡 Tip: Blackjack — never take insurance; the house edge is high.',
+    '💡 Tip: Blackjack — stand on 17+ regardless of dealer\'s card.',
+    '💡 Tip: Blackjack — "Soft" means you have an Ace counting as 11.',
+    '💡 Tip: In blackjack, dealer must hit on 16 and stand on 17+.',
+    '💡 Tip: Two matching cards in blackjack? Split them for two hands!',
 ];
 
 export class BarPanel {

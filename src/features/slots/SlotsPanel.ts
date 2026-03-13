@@ -455,13 +455,13 @@ export class SlotsPanel {
 
     private buildPayoutHint(): void {
         const { PH, PW } = this;
-        const tableY = PH / 2 - 40;
+        const tableY = PH / 2 - 34;
 
         const tgfx = this.scene.add.graphics();
         tgfx.fillStyle(COL_UI_BG2, 0.7);
-        tgfx.fillRoundedRect(-PW / 2 + 14, tableY - 18, PW - 28, 22, 4);
+        tgfx.fillRoundedRect(-PW / 2 + 14, tableY - 26, PW - 28, 36, 4);
         tgfx.lineStyle(1, COL_UI_BORDER_DIM, 0.2);
-        tgfx.strokeRoundedRect(-PW / 2 + 14, tableY - 18, PW - 28, 22, 4);
+        tgfx.strokeRoundedRect(-PW / 2 + 14, tableY - 26, PW - 28, 36, 4);
         this.container.add(tgfx);
 
         const allPayouts = [
@@ -475,9 +475,17 @@ export class SlotsPanel {
             { s: '🍒×2', m: '1×',  c: '#c04040' },
         ];
         const colW = (PW - 40) / 4;
+        // Row 1: first 4 (highest payouts)
         allPayouts.slice(0, 4).forEach((p, i) => {
             const px = -PW / 2 + 20 + i * colW + colW / 2;
-            this.container.add(this.scene.add.text(px, tableY - 8, `${p.s}=${p.m}`, {
+            this.container.add(this.scene.add.text(px, tableY - 15, `${p.s}=${p.m}`, {
+                fontFamily: FONT, fontSize: '8px', color: p.c,
+            }).setOrigin(0.5));
+        });
+        // Row 2: last 4 (lower payouts)
+        allPayouts.slice(4).forEach((p, i) => {
+            const px = -PW / 2 + 20 + i * colW + colW / 2;
+            this.container.add(this.scene.add.text(px, tableY - 4, `${p.s}=${p.m}`, {
                 fontFamily: FONT, fontSize: '8px', color: p.c,
             }).setOrigin(0.5));
         });
@@ -608,6 +616,7 @@ export class SlotsPanel {
         let msgCol = '#c9a84c';
         let jackpot = false;
 
+        // ── Three of a kind ───────────────────────────────────────────────────
         if (a === b && b === c) {
             const mult = PAYOUTS[a] ?? 2;
             payout  = this.currentBet * mult;
@@ -615,6 +624,7 @@ export class SlotsPanel {
             msg     = jackpot ? `★ JACKPOT!  7️⃣×3  +${payout}◈ ★` : `3×${a}  +${payout}◈`;
             msgCol  = '#2ecc71';
         } else if (a === b || b === c || a === c) {
+            // ── Two of a kind ─────────────────────────────────────────────────
             const cherryPair =
                 (a === b && a === '🍒') || (b === c && b === '🍒') || (a === c && a === '🍒');
             if (cherryPair) {
@@ -622,8 +632,18 @@ export class SlotsPanel {
                 msg    = `Cherry pair!  +${payout}◈`;
                 msgCol = '#f0a040';
             } else {
-                msg    = 'No match — try again';
-                msgCol = '#666688';
+                // Near-miss: two premium symbols
+                const premiumMatch =
+                    (a === b && (PAYOUTS[a] ?? 0) >= 6) ||
+                    (b === c && (PAYOUTS[b] ?? 0) >= 6) ||
+                    (a === c && (PAYOUTS[a] ?? 0) >= 6);
+                if (premiumMatch) {
+                    msg    = `So close!  ${a}${b}${c} — almost! 😤`;
+                    msgCol = '#f0a040';
+                } else {
+                    msg    = 'No match — try again';
+                    msgCol = '#666688';
+                }
             }
         } else {
             msg    = 'No match — try again';
