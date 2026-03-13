@@ -539,13 +539,17 @@ export class BlackjackPanel {
             fontFamily: FONT, fontSize: '9px', color: canAfford ? '#8a9aaa' : '#aa4040',
         }).setOrigin(0.5);
 
-        const yesBtn = this.makeButton(-60, 36, 88, 26, 'YES  (Y)', COL_BTN_PRIMARY, () => this.doTakeInsurance());
-        const noBtn  = this.makeButton( 60, 36, 88, 26, 'NO   (N)', COL_BTN_DANGER,  () => this.doDeclineInsurance());
+        // YES button: only interactive when player can afford insurance
+        const yesBtn = canAfford
+            ? this.makeButton(-60, 36, 88, 26, 'YES  (Y)', COL_BTN_PRIMARY, () => this.doTakeInsurance())
+            : this.makeButton(-60, 36, 88, 26, 'YES  (Y)', 0x1a1a1a, () => { /* cannot afford */ });
         if (!canAfford) {
-            // Visually disable YES button
-            const yGfx = yesBtn.getAt(0) as Phaser.GameObjects.Graphics;
-            yGfx?.clear();
+            // Remove interactivity from the disabled YES button
+            const hitRect = yesBtn.getAt(1) as Phaser.GameObjects.Rectangle;
+            hitRect?.disableInteractive();
+            yesBtn.setAlpha(0.4);
         }
+        const noBtn = this.makeButton(60, 36, 88, 26, 'NO   (N)', COL_BTN_DANGER, () => this.doDeclineInsurance());
 
         this.insuranceUI = this.scene.add.container(0, PH / 2 - 145, [bg, prompt, costLbl, yesBtn, noBtn]);
         this.container.add(this.insuranceUI);

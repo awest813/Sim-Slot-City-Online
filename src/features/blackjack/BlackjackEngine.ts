@@ -267,7 +267,8 @@ export function hit(state: BlackjackState): BlackjackState {
         const splitHand = [...state.splitHand, card];
         if (isBust(splitHand)) {
             if (state.result === 'bust') {
-                // Both hands busted — no dealer play needed
+                // Main hand already busted during this split (state.result set in hit() on main);
+                // both hands are now bust — skip dealer play and count both losses here.
                 return {
                     ...state, deck, splitHand,
                     splitResult:    'bust',
@@ -390,12 +391,13 @@ function runDealer(state: BlackjackState): BlackjackState {
     let sessionPushes = state.sessionPushes;
 
     // ── Resolve main hand ─────────────────────────────────────────────────────
-    // When main busted during a split flow, result is already 'bust' and was
-    // NOT counted in hit() — count it here.
+    // When the main hand busted during split play, hit() set result='bust' but
+    // intentionally deferred incrementing sessionLosses (so we count it here,
+    // alongside any split-hand outcome, in one place).
     let mainResult: BJResult;
     if (state.result === 'bust') {
         mainResult = 'bust';
-        sessionLosses++;  // deferred count from split-flow bust
+        sessionLosses++;  // deferred loss from split-flow bust in hit()
     } else {
         const playerVal = handValue(state.playerHand);
         if (dealerVal > 21 || playerVal > dealerVal) {

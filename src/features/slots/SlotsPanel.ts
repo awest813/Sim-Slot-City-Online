@@ -633,12 +633,11 @@ export class SlotsPanel {
                 msgCol = '#f0a040';
             } else {
                 // Near-miss: two premium symbols
-                const premiumMatch =
-                    (a === b && (PAYOUTS[a] ?? 0) >= 6) ||
-                    (b === c && (PAYOUTS[b] ?? 0) >= 6) ||
-                    (a === c && (PAYOUTS[a] ?? 0) >= 6);
+                const matchPair =
+                    a === b ? a : b === c ? b : a === c ? a : null;
+                const premiumMatch = matchPair !== null && (PAYOUTS[matchPair] ?? 0) >= 6;
                 if (premiumMatch) {
-                    msg    = `So close!  ${a}${b}${c} — almost! 😤`;
+                    msg    = `So close!  ${matchPair}${matchPair} and a ${matchPair === a ? c : a} — almost! 😤`;
                     msgCol = '#f0a040';
                 } else {
                     msg    = 'No match — try again';
