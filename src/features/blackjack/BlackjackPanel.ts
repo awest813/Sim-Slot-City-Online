@@ -13,6 +13,7 @@ import {
 import {
     BlackjackState, BJResult,
     createGame, deal, hit, stand, doubleDown, nextHand,
+    split, canSplit, takeInsurance, declineInsurance, isSoftHand,
     handValue, isBlackjack, cardLabel, isRed, chipDelta,
     Card,
 } from './BlackjackEngine';
@@ -41,27 +42,33 @@ export class BlackjackPanel {
     // Dynamic card display groups (rebuilt each hand)
     private dealerCardObjs: Phaser.GameObjects.GameObject[] = [];
     private playerCardObjs: Phaser.GameObjects.GameObject[] = [];
+    private splitCardObjs:  Phaser.GameObjects.GameObject[] = [];
 
     // Persistent text nodes
     private dealerValueText!: Phaser.GameObjects.Text;
     private playerValueText!: Phaser.GameObjects.Text;
+    private splitValueText!:  Phaser.GameObjects.Text;
     private chipsText!:       Phaser.GameObjects.Text;
     private betText!:         Phaser.GameObjects.Text;
     private resultText!:      Phaser.GameObjects.Text;
+    private splitResultText!: Phaser.GameObjects.Text;
     private statsText!:       Phaser.GameObjects.Text;
 
     // Button groups (shown/hidden per phase)
-    private betBtns:    Phaser.GameObjects.Container[] = [];
-    private actionBtns: Phaser.GameObjects.Container[] = [];
-    private doubleBtn:  Phaser.GameObjects.Container | null = null;
-    private newHandBtn: Phaser.GameObjects.Container | null = null;
-    private freeBtn:    Phaser.GameObjects.Container | null = null;
+    private betBtns:      Phaser.GameObjects.Container[] = [];
+    private actionBtns:   Phaser.GameObjects.Container[] = [];
+    private doubleBtn:    Phaser.GameObjects.Container | null = null;
+    private splitBtn:     Phaser.GameObjects.Container | null = null;
+    private newHandBtn:   Phaser.GameObjects.Container | null = null;
+    private freeBtn:      Phaser.GameObjects.Container | null = null;
+    private insuranceUI:  Phaser.GameObjects.Container | null = null;
 
     // State
-    private bjState!:     BlackjackState;
-    private currentBet:   number  = 25;
-    private closed:       boolean = false;
-    private betDeducted:  boolean = false;
+    private bjState!:        BlackjackState;
+    private currentBet:      number  = 25;
+    private closed:          boolean = false;
+    private betDeducted:     boolean = false;
+    private splitDeducted:   boolean = false;  // tracks if split bet was taken
 
     constructor(scene: Phaser.Scene, onClose: () => void) {
         this.scene   = scene;
@@ -136,11 +143,23 @@ export class BlackjackPanel {
         }).setOrigin(1, 0.5);
         this.container.add(this.playerValueText);
 
+        // Split hand value text (hidden until split occurs)
+        this.splitValueText = this.scene.add.text(0, 36, '', {
+            ...TEXT_MD, fontSize: '13px',
+        }).setOrigin(0.5, 0.5).setAlpha(0);
+        this.container.add(this.splitValueText);
+
         // ── Result text ────────────────────────────────────────────────────
         this.resultText = this.scene.add.text(0, -4, '', {
             fontFamily: FONT, fontSize: '22px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5).setAlpha(0);
         this.container.add(this.resultText);
+
+        // Split result text (appears right of center when split is active)
+        this.splitResultText = this.scene.add.text(0, -4, '', {
+            fontFamily: FONT, fontSize: '16px', color: '#c9a84c', fontStyle: 'bold',
+        }).setOrigin(0.5).setAlpha(0);
+        this.container.add(this.splitResultText);
 
         // ── Bottom bar ─────────────────────────────────────────────────────
         const barGfx = this.scene.add.graphics();
@@ -181,7 +200,6 @@ export class BlackjackPanel {
         this.spaceKey.on('down', () => { if (this.bjState.phase === 'betting') this.startHand(); });
         this.hKey.on('down',     () => { if (this.bjState.phase === 'playing') this.doHit(); });
         this.sKey.on('down',     () => { if (this.bjState.phase === 'playing') this.doStand(); });
-
         this.showPhaseUI();
         this.refreshDisplay();
     }
@@ -287,14 +305,15 @@ export class BlackjackPanel {
         this.refreshDisplay();
     }
 
-    // ── Action buttons (Hit / Stand / Double) ─────────────────────────────────
+    // ── Action buttons (Hit / Stand / Double / Split) ─────────────────────────
 
     private buildActionButtons(): void {
         const ay = PH / 2 - 100;
         const hitBtn   = this.makeButton(-PW / 2 + 90,  ay, 90, 28, 'HIT  [H]',    COL_BTN_PRIMARY, () => this.doHit());
         const standBtn = this.makeButton(-PW / 2 + 194, ay, 90, 28, 'STAND [S]',   COL_BTN_BLUE,    () => this.doStand());
         this.doubleBtn = this.makeButton(-PW / 2 + 298, ay, 116, 28, 'DOUBLE DOWN', 0x3a3a14,        () => this.doDouble());
-        this.actionBtns.push(hitBtn, standBtn, this.doubleBtn);
+        this.splitBtn  = this.makeButton(-PW / 2 + 428, ay, 90,  28, 'SPLIT ✂',     0x2a1050,        () => this.doSplit());
+        this.actionBtns.push(hitBtn, standBtn, this.doubleBtn, this.splitBtn);
 
         for (const b of this.actionBtns) {
             b.setVisible(false);
@@ -344,8 +363,14 @@ export class BlackjackPanel {
     private doStand(): void {
         if (this.bjState.phase !== 'playing') return;
         this.bjState = stand(this.bjState);
-        this.refreshDisplay();
-        this.resolveResult();
+        // After stand on main hand with split, still in 'playing' (switched to split)
+        if (this.bjState.phase === 'playing') {
+            this.showPhaseUI();
+            this.refreshDisplay();
+        } else {
+            this.refreshDisplay();
+            this.resolveResult();
+        }
     }
 
     private doDouble(): void {
@@ -362,10 +387,59 @@ export class BlackjackPanel {
         this.resolveResult();
     }
 
+    private doSplit(): void {
+        if (!canSplit(this.bjState)) return;
+        const chips = GameState.get().chips;
+        if (chips < this.bjState.bet) {
+            this.statsText.setText('Not enough chips to split!').setColor('#e74c3c');
+            this.scene.time.delayedCall(1200, () => this.updateStats());
+            return;
+        }
+        GameState.addChips(-this.bjState.bet);   // deduct split bet
+        this.splitDeducted = true;
+        this.bjState = split(this.bjState);
+        this.showPhaseUI();
+        this.refreshDisplay();
+    }
+
+    private doTakeInsurance(): void {
+        if (this.bjState.phase !== 'insurance') return;
+        const insuranceBet = Math.floor(this.bjState.bet / 2);
+        const chips = GameState.get().chips;
+        if (insuranceBet > chips) {
+            this.dismissInsuranceUI();
+            this.bjState = declineInsurance(this.bjState);
+            this.showPhaseUI();
+            return;
+        }
+        GameState.addChips(-insuranceBet);
+        this.bjState = takeInsurance(this.bjState, insuranceBet);
+        this.dismissInsuranceUI();
+        this.showPhaseUI();
+        this.refreshDisplay();
+        if (this.bjState.phase === 'result') this.resolveResult();
+    }
+
+    private doDeclineInsurance(): void {
+        if (this.bjState.phase !== 'insurance') return;
+        this.bjState = declineInsurance(this.bjState);
+        this.dismissInsuranceUI();
+        this.showPhaseUI();
+        this.refreshDisplay();
+    }
+
+    private dismissInsuranceUI(): void {
+        if (this.insuranceUI) {
+            this.insuranceUI.destroy();
+            this.insuranceUI = null;
+        }
+    }
+
     private resolveResult(): void {
         const delta = chipDelta(this.bjState);
         if (delta > 0) GameState.addChips(delta);
-        this.betDeducted = false;
+        this.betDeducted  = false;
+        this.splitDeducted = false;
         this.showResultUI();
         this.refreshDisplay();
     }
@@ -373,8 +447,14 @@ export class BlackjackPanel {
     private prepareNextHand(): void {
         if (this.newHandBtn) { this.newHandBtn.destroy(); this.newHandBtn = null; }
         if (this.freeBtn)    { this.freeBtn.destroy();    this.freeBtn    = null; }
-        this.bjState    = nextHand(this.bjState);
-        this.betDeducted = false;
+        this.bjState     = nextHand(this.bjState);
+        this.betDeducted  = false;
+        this.splitDeducted = false;
+        // Clear split card display
+        for (const obj of this.splitCardObjs) obj.destroy();
+        this.splitCardObjs = [];
+        this.splitValueText.setAlpha(0);
+        this.splitResultText.setAlpha(0);
         this.showPhaseUI();
         this.refreshDisplay();
     }
@@ -409,8 +489,22 @@ export class BlackjackPanel {
         if (this.doubleBtn) {
             const canDouble = playing
                 && this.bjState.playerHand.length === 2
+                && this.bjState.splitHand === null   // no double after split
                 && GameState.get().chips >= this.bjState.bet;
             this.doubleBtn.setVisible(canDouble);
+        }
+
+        if (this.splitBtn) {
+            this.splitBtn.setVisible(playing && canSplit(this.bjState));
+        }
+
+        // Show insurance prompt when dealer shows Ace
+        if (phase === 'insurance') {
+            this.betBtns.forEach(b => b.setVisible(false));
+            for (const b of this.actionBtns) b.setVisible(false);
+            this.buildInsuranceUI();
+        } else {
+            this.dismissInsuranceUI();
         }
     }
 
@@ -420,12 +514,54 @@ export class BlackjackPanel {
         this.buildNewHandButton();
     }
 
+    // ── Insurance overlay ─────────────────────────────────────────────────────
+
+    private buildInsuranceUI(): void {
+        if (this.insuranceUI) return;
+
+        const insuranceCost = Math.floor(this.bjState.bet / 2);
+        const canAfford     = GameState.get().chips >= insuranceCost;
+
+        const bg = this.scene.add.graphics();
+        bg.fillStyle(0x0a0a20, 0.92);
+        bg.fillRoundedRect(-200, -30, 400, 90, 6);
+        bg.lineStyle(1.5, 0xc9a84c, 0.7);
+        bg.strokeRoundedRect(-200, -30, 400, 90, 6);
+
+        const prompt = this.scene.add.text(0, -12, '🎴  Dealer shows Ace — Take Insurance?', {
+            fontFamily: FONT, fontSize: '11px', color: '#c9a84c',
+        }).setOrigin(0.5);
+
+        const costStr = canAfford
+            ? `Cost: ◈ ${insuranceCost}  (pays 2:1 if dealer has Blackjack)`
+            : 'Not enough chips for insurance';
+        const costLbl = this.scene.add.text(0, 6, costStr, {
+            fontFamily: FONT, fontSize: '9px', color: canAfford ? '#8a9aaa' : '#aa4040',
+        }).setOrigin(0.5);
+
+        // YES button: only interactive when player can afford insurance
+        const yesBtn = canAfford
+            ? this.makeButton(-60, 36, 88, 26, 'YES  (Y)', COL_BTN_PRIMARY, () => this.doTakeInsurance())
+            : this.makeButton(-60, 36, 88, 26, 'YES  (Y)', 0x1a1a1a, () => { /* cannot afford */ });
+        if (!canAfford) {
+            // Remove interactivity from the disabled YES button
+            const hitRect = yesBtn.getAt(1) as Phaser.GameObjects.Rectangle;
+            hitRect?.disableInteractive();
+            yesBtn.setAlpha(0.4);
+        }
+        const noBtn = this.makeButton(60, 36, 88, 26, 'NO   (N)', COL_BTN_DANGER, () => this.doDeclineInsurance());
+
+        this.insuranceUI = this.scene.add.container(0, PH / 2 - 145, [bg, prompt, costLbl, yesBtn, noBtn]);
+        this.container.add(this.insuranceUI);
+    }
+
     // ── Display refresh ───────────────────────────────────────────────────────
 
     private refreshDisplay(): void {
         this.updateChipBet();
         this.renderDealerCards();
         this.renderPlayerCards();
+        this.renderSplitCards();
         this.updateHandValues();
         this.updateResultBanner();
         this.updateStats();
@@ -459,10 +595,66 @@ export class BlackjackPanel {
         this.playerCardObjs = [];
         const hand = this.bjState.playerHand;
         if (hand.length === 0) return;
-        const startX = -((hand.length - 1) * 46) / 2;
-        const baseY  = 78;
+
+        // When split is active, offset main hand to the left
+        const hasSplit = this.bjState.splitHand !== null;
+        const centerX  = hasSplit ? -90 : 0;
+        const startX   = centerX - ((hand.length - 1) * 46) / 2;
+        const baseY    = 78;
+
+        // Active-hand highlight ring
+        if (hasSplit) {
+            const isActive = this.bjState.activeHand === 'main' && this.bjState.phase === 'playing';
+            const gfx = this.scene.add.graphics();
+            gfx.lineStyle(2, isActive ? 0xffd700 : 0x445566, isActive ? 0.9 : 0.3);
+            gfx.strokeRoundedRect(centerX - 56, baseY - 42, 112, 68, 4);
+            this.container.add(gfx);
+            this.playerCardObjs.push(gfx);
+            if (isActive) {
+                const lbl = this.scene.add.text(centerX, baseY - 52, '▸ MAIN', {
+                    fontFamily: FONT, fontSize: '9px', color: '#ffd700',
+                }).setOrigin(0.5);
+                this.container.add(lbl);
+                this.playerCardObjs.push(lbl);
+            }
+        }
+
         for (let i = 0; i < hand.length; i++) {
             this.playerCardObjs.push(...this.renderCard(startX + i * 46, baseY, hand[i], false));
+        }
+    }
+
+    private renderSplitCards(): void {
+        for (const obj of this.splitCardObjs) obj.destroy();
+        this.splitCardObjs = [];
+        const hand = this.bjState.splitHand;
+        if (!hand || hand.length === 0) {
+            this.splitValueText.setAlpha(0);
+            this.splitResultText.setAlpha(0);
+            return;
+        }
+
+        const centerX = 90;
+        const startX  = centerX - ((hand.length - 1) * 46) / 2;
+        const baseY   = 78;
+
+        // Active-hand highlight ring
+        const isActive = this.bjState.activeHand === 'split' && this.bjState.phase === 'playing';
+        const gfx = this.scene.add.graphics();
+        gfx.lineStyle(2, isActive ? 0xffd700 : 0x445566, isActive ? 0.9 : 0.3);
+        gfx.strokeRoundedRect(centerX - 56, baseY - 42, 112, 68, 4);
+        this.container.add(gfx);
+        this.splitCardObjs.push(gfx);
+        if (isActive) {
+            const lbl = this.scene.add.text(centerX, baseY - 52, '▸ SPLIT', {
+                fontFamily: FONT, fontSize: '9px', color: '#ffd700',
+            }).setOrigin(0.5);
+            this.container.add(lbl);
+            this.splitCardObjs.push(lbl);
+        }
+
+        for (let i = 0; i < hand.length; i++) {
+            this.splitCardObjs.push(...this.renderCard(startX + i * 46, baseY, hand[i], false));
         }
     }
 
@@ -523,13 +715,33 @@ export class BlackjackPanel {
     private updateHandValues(): void {
         const { bjState } = this;
         if (bjState.playerHand.length > 0) {
-            const pv = handValue(bjState.playerHand);
-            const bj = isBlackjack(bjState.playerHand);
-            this.playerValueText.setText(bj ? 'BLACKJACK!' : String(pv));
-            this.playerValueText.setColor(pv > 21 ? '#e74c3c' : bj ? '#ffd700' : '#ede0cc');
+            const pv   = handValue(bjState.playerHand);
+            const bj   = isBlackjack(bjState.playerHand);
+            const soft = !bj && isSoftHand(bjState.playerHand);
+            const label = bj ? 'BLACKJACK!' : soft ? `Soft ${pv}` : String(pv);
+            this.playerValueText.setText(label);
+            this.playerValueText.setColor(pv > 21 ? '#e74c3c' : bj ? '#ffd700' : soft ? '#80d8ff' : '#ede0cc');
+            // Position: left side if split, default if no split
+            this.playerValueText.setX(bjState.splitHand ? -24 : PW / 2 - 24);
+            this.playerValueText.setOrigin(bjState.splitHand ? 1 : 1, 0.5);
         } else {
             this.playerValueText.setText('');
         }
+
+        // Split hand value
+        if (bjState.splitHand && bjState.splitHand.length > 0) {
+            const sv   = handValue(bjState.splitHand);
+            const soft = isSoftHand(bjState.splitHand);
+            const label = soft ? `Soft ${sv}` : String(sv);
+            this.splitValueText.setText(label);
+            this.splitValueText.setX(PW / 2 - 24);
+            this.splitValueText.setOrigin(1, 0.5);
+            this.splitValueText.setColor(sv > 21 ? '#e74c3c' : soft ? '#80d8ff' : '#ede0cc');
+            this.splitValueText.setAlpha(1);
+        } else {
+            this.splitValueText.setAlpha(0);
+        }
+
         if (bjState.dealerHand.length > 0) {
             if (bjState.dealerRevealed) {
                 const dv = handValue(bjState.dealerHand);
@@ -547,27 +759,51 @@ export class BlackjackPanel {
 
     private updateResultBanner(): void {
         const result: BJResult = this.bjState.result;
-        if (!result) { this.resultText.setAlpha(0); return; }
+        if (!result) {
+            this.resultText.setAlpha(0);
+            this.splitResultText.setAlpha(0);
+            return;
+        }
 
-        const bonus = Math.floor(this.bjState.bet * 1.5);
+        const hasSplit = this.bjState.splitHand !== null;
+        const bonus    = Math.floor(this.bjState.bet * 1.5);
+
         const messages: Record<NonNullable<BJResult>, [string, string]> = {
-            blackjack: [`🎉 BLACKJACK! +${bonus} bonus`, '#ffd700'],
+            blackjack: [`🎉 BLACKJACK! +${bonus}`, '#ffd700'],
             win:       ['✓  YOU WIN!',    '#2ecc71'],
             push:      ['➤  PUSH',        '#aaaaaa'],
             lose:      ['✗  DEALER WINS', '#e74c3c'],
             bust:      ['✗  BUST!',       '#e74c3c'],
         };
+
         const [msg, col] = messages[result];
-        this.resultText.setText(msg).setColor(col).setAlpha(1);
+        // When split, position main result left of center
+        const rx = hasSplit ? -90 : 0;
+        this.resultText.setX(rx).setOrigin(0.5).setText(msg).setColor(col).setAlpha(1);
         this.scene.tweens.add({
             targets: this.resultText, scaleX: [1.2, 1], scaleY: [1.2, 1], duration: 280, ease: 'Back.Out',
         });
+
+        // Split hand result
+        if (hasSplit && this.bjState.splitResult) {
+            const [smsg, scol] = messages[this.bjState.splitResult];
+            this.splitResultText.setX(90).setOrigin(0.5)
+                .setText(smsg).setColor(scol).setAlpha(1);
+            this.scene.tweens.add({
+                targets: this.splitResultText, scaleX: [1.2, 1], scaleY: [1.2, 1], duration: 280, ease: 'Back.Out',
+            });
+        } else {
+            this.splitResultText.setAlpha(0);
+        }
     }
 
     private updateStats(): void {
         const s = this.bjState;
         if (s.handsPlayed === 0) {
-            this.statsText.setText('ESC close  ·  Select bet and press DEAL or SPACE  ·  H=Hit  S=Stand');
+            this.statsText.setText('ESC close  ·  Select bet and press DEAL or SPACE  ·  H=Hit  S=Stand  ·  Split pairs with ✂');
+        } else if (s.phase === 'playing' && s.splitHand !== null) {
+            const active = s.activeHand === 'main' ? 'MAIN' : 'SPLIT';
+            this.statsText.setText(`Playing ${active} hand  ·  Hands: ${s.handsPlayed}  ·  W:${s.sessionWins}  L:${s.sessionLosses}`);
         } else {
             this.statsText.setText(
                 `Hands: ${s.handsPlayed}  ·  Wins: ${s.sessionWins}  ·  Losses: ${s.sessionLosses}  ·  Pushes: ${s.sessionPushes}`,
@@ -622,6 +858,10 @@ export class BlackjackPanel {
         // Refund if closed mid-hand before result
         if (this.betDeducted && this.bjState.result === null) {
             GameState.addChips(this.bjState.bet);
+        }
+        // Refund split bet if split is in progress (no final result yet)
+        if (this.splitDeducted && this.bjState.phase === 'playing') {
+            GameState.addChips(this.bjState.splitBet);
         }
         this.escKey.destroy();
         this.spaceKey.destroy();
