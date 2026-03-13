@@ -210,11 +210,14 @@ export class SlotsPanel {
         const stripesAboveH = 46;         // above reel (~reelPanelY - reelH/2 from container center)
         const stripesBelowY = cy - 26 + 59 + 20;  // below reel window
         const stripesBelowH = 46;
-        for (let si = 0; si < 3; si++) {
-            const sx1 = stripeX1 + si * 5;
-            const sx2 = stripeX2 - si * 5;
-            const sAlpha = [0.18, 0.10, 0.06][si];
-            const sColor = 0x4444aa;
+        const STRIPE_COUNT  = 3;
+        const STRIPE_STEP   = 5;
+        const STRIPE_ALPHAS = [0.18, 0.10, 0.06];
+        const sColor        = 0x4444aa;
+        for (let si = 0; si < STRIPE_COUNT; si++) {
+            const sx1    = stripeX1 + si * STRIPE_STEP;
+            const sx2    = stripeX2 - si * STRIPE_STEP;
+            const sAlpha = STRIPE_ALPHAS[si];
             // Left side — above reel
             g.fillStyle(sColor, sAlpha);
             g.fillRect(sx1, stripesAboveY, 3, stripesAboveH);

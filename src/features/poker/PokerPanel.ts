@@ -197,12 +197,17 @@ export class PokerPanel {
         const tableEllipse = this.scene.add.ellipse(0, -20, 340, 148, COL_FELT, 1);
         tableEllipse.setStrokeStyle(2.5, 0x3a8a3a, 0.9);
         this.container.add(tableEllipse);
-        // ── Subtle felt texture — 8 thin diagonal lines at very low opacity ──
+        // ── Subtle felt texture — thin diagonal lines at very low opacity ──
+        const FELT_LINE_COUNT       = 8;
+        const FELT_OFFSET_START     = -140;
+        const FELT_LINE_SPACING     = 40;
+        const FELT_LINE_ALPHA_EVEN  = 0.05;
+        const FELT_LINE_ALPHA_ODD   = 0.03;
         const feltLines = this.scene.add.graphics();
-        for (let fi = 0; fi < 8; fi++) {
-            const fAlpha = fi % 2 === 0 ? 0.05 : 0.03;
+        for (let fi = 0; fi < FELT_LINE_COUNT; fi++) {
+            const fAlpha = fi % 2 === 0 ? FELT_LINE_ALPHA_EVEN : FELT_LINE_ALPHA_ODD;
             feltLines.lineStyle(0.5, 0xffffff, fAlpha);
-            const offset = -140 + fi * 40;
+            const offset = FELT_OFFSET_START + fi * FELT_LINE_SPACING;
             // Diagonal lines clipped visually by the ellipse (drawn across its bounding box)
             feltLines.lineBetween(offset - 60, -20 - 74, offset + 60, -20 + 74);
         }

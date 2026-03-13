@@ -163,11 +163,16 @@ export class Panel {
 
         // Diamond dots at each primary L-junction
         const dotR = 2;
+        const dotPositions: Array<[number, number]> = [
+            [px + ornPad,           py + ornPad],
+            [px + this.w - ornPad,  py + ornPad],
+            [px + ornPad,           py + this.h - ornPad],
+            [px + this.w - ornPad,  py + this.h - ornPad],
+        ];
         g.fillStyle(COL_TRIM, 0.5);
-        g.fillRect(px + ornPad - dotR,          py + ornPad - dotR,          dotR * 2, dotR * 2);
-        g.fillRect(px + this.w - ornPad - dotR, py + ornPad - dotR,          dotR * 2, dotR * 2);
-        g.fillRect(px + ornPad - dotR,          py + this.h - ornPad - dotR, dotR * 2, dotR * 2);
-        g.fillRect(px + this.w - ornPad - dotR, py + this.h - ornPad - dotR, dotR * 2, dotR * 2);
+        for (const [dx, dy] of dotPositions) {
+            g.fillRect(dx - dotR, dy - dotR, dotR * 2, dotR * 2);
+        }
     }
 
     addTitle(text: string): void {

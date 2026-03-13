@@ -163,11 +163,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillRect(24, 32, WORLD_W - 48, WORLD_H - 56);
 
         // === Marble tile checkerboard ===
-        const tileSize = 48;
+        const tileSize    = 48;
+        const TILE_LIGHT  = 0x0d2212;   // lighter marble tile shade
+        const TILE_DARK   = 0x0b1e0f;   // darker marble tile shade
         for (let ty = 32; ty < WORLD_H - 24; ty += tileSize) {
             for (let tx = 24; tx < WORLD_W - 24; tx += tileSize) {
                 const col = (((tx - 24) / tileSize) + ((ty - 32) / tileSize)) % 2 === 0
-                    ? 0x0d2212 : 0x0b1e0f;
+                    ? TILE_LIGHT : TILE_DARK;
                 g.fillStyle(col, 1);
                 g.fillRect(tx, ty, tileSize, tileSize);
                 // Top-left inner highlight to simulate 3D marble edge
@@ -826,10 +828,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g2.lineBetween(x, 0, x, y - 16);
 
         // Long radial light rays (star burst)
-        for (let i = 0; i < 12; i++) {
-            const angle = (i / 12) * Math.PI * 2;
+        const RAY_COUNT  = 12;
+        const RAY_LENGTH = 70;
+        for (let i = 0; i < RAY_COUNT; i++) {
+            const angle = (i / RAY_COUNT) * Math.PI * 2;
             g2.lineStyle(0.5, 0xffd700, 0.06);
-            g2.lineBetween(x, y, x + Math.cos(angle) * 70, y + Math.sin(angle) * 70);
+            g2.lineBetween(x, y, x + Math.cos(angle) * RAY_LENGTH, y + Math.sin(angle) * RAY_LENGTH);
         }
 
         // Glow rings — outer to inner

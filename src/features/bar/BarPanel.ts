@@ -152,11 +152,15 @@ export class BarPanel {
         bg.fillStyle(0x1e0f05, 1);
         bg.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 8);
         // Warm amber radial glow at center-bottom (simulates bar under-lighting)
-        for (let ri = 3; ri >= 0; ri--) {
-            const rAlpha = [0.04, 0.06, 0.08, 0.06][ri];
-            const rRadius = [200, 150, 100, 60][ri];
-            bg.fillStyle(0xff8800, rAlpha);
-            bg.fillEllipse(0, ph / 2 - 40, rRadius * 2, rRadius * 0.7);
+        const GLOW_LAYERS = [
+            { alpha: 0.04, radius: 200 },
+            { alpha: 0.06, radius: 150 },
+            { alpha: 0.08, radius: 100 },
+            { alpha: 0.06, radius: 60 },
+        ];
+        for (const layer of GLOW_LAYERS) {
+            bg.fillStyle(0xff8800, layer.alpha);
+            bg.fillEllipse(0, ph / 2 - 40, layer.radius * 2, layer.radius * 0.7);
         }
         // Gold border
         bg.lineStyle(2, COL_TRIM, 1);
