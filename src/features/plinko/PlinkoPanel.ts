@@ -392,7 +392,6 @@ export class PlinkoPanel {
             hitRect.on('pointerdown', () => {
                 if (this.dropState !== 'idle') return;
                 this.riskLevel = level;
-                this.riskBtns.forEach(b => b.gfx.clear() || (b.level === level ? undefined : undefined));
                 this.riskBtns.forEach(({ gfx: g2, lbl: l2, level: lv }) => {
                     const sel = lv === this.riskLevel;
                     g2.clear();
