@@ -118,6 +118,12 @@ export class PokerPanel {
     private spaceKey!: Phaser.Input.Keyboard.Key;
     private dealButtonVisible = false;
     private closed = false;
+    private customRaiseAmount: number = 0;
+
+    // Hand history (last 5 hands)
+    private handHistory: Array<{ hand: number; result: string; delta: number }> = [];
+    private historyContainer!: Phaser.GameObjects.Container;
+    private handStartChips: number = -1;
     private rankingsPopup: Phaser.GameObjects.Container | undefined = undefined;
 
     // Session tracking
@@ -258,6 +264,10 @@ export class PokerPanel {
         // Action area
         this.actionArea = this.scene.add.container(0, 155);
         this.container.add(this.actionArea);
+
+        // Hand history panel (shows last 5 hands after first hand is played)
+        this.historyContainer = this.scene.add.container(PANEL_W / 2 - 90, 60);
+        this.container.add(this.historyContainer);
 
         // Status bar
         const statusBg = this.scene.add.rectangle(0, ph / 2 - 52, pw - 40, 26, 0x020a02, 0.92)
@@ -407,6 +417,19 @@ export class PokerPanel {
             btn.add([badgeRect, badgeText]);
         }
 
+        // Chip stack graphic — visual nicety next to the chip count
+        if (gamePlayer && !folded && gamePlayer.chips > 0) {
+            const stackGfx = this.scene.add.graphics();
+            const sx = W / 2 - 12, sy = 0;
+            [4, 2, 0].forEach((offset, j) => {
+                stackGfx.fillStyle(j === 0 ? 0xc9a84c : j === 1 ? 0xb8943c : 0xa07830, 1);
+                stackGfx.fillRoundedRect(sx - 6, sy - 8 + offset * 3, 12, 5, 2);
+                stackGfx.lineStyle(0.5, 0x604c10, 0.8);
+                stackGfx.strokeRoundedRect(sx - 6, sy - 8 + offset * 3, 12, 5, 2);
+            });
+            btn.add(stackGfx);
+        }
+
         // Clickable only for empty non-AI seats while not in a game and player has not yet chosen a seat
         if (!sc.aiName && !isYou && !this.game && this.playerSeatId === null) {
             rect.setInteractive({ useHandCursor: true });
@@ -502,6 +525,10 @@ export class PokerPanel {
             this.aiTimers.push(t);
             return;
         }
+
+        // Track chips at the start of this hand for hand-history delta calculation
+        const playerEntry = activePlayers.find(p => p.seatId === this.playerSeatId);
+        this.handStartChips = playerEntry ? playerEntry.chips : -1;
 
         const prevHandNum   = this.game?.handNumber ?? 0;
         const prevDealerIdx = this.game?.dealerIdx ?? 0;
@@ -695,6 +722,66 @@ export class PokerPanel {
             fontFamily: 'monospace', fontSize: '9px', color: '#445544',
         }).setOrigin(0.5);
         this.actionArea.add(hint);
+
+        // Custom raise slider (only when there's a range between min raise and all-in)
+        if (canRaise && allInTotal > raiseMin) {
+            this.customRaiseAmount = raiseMin;
+            const sliderW    = 220;
+            const sliderY    = 42;
+            const btnY       = 66;
+            const thumbRange = sliderW - 20;
+
+            // Track background
+            const trackBg = this.scene.add.graphics();
+            trackBg.fillStyle(0x1a1a2a, 1);
+            trackBg.fillRoundedRect(-sliderW / 2, sliderY - 5, sliderW, 10, 5);
+            trackBg.lineStyle(1, 0x444466, 0.8);
+            trackBg.strokeRoundedRect(-sliderW / 2, sliderY - 5, sliderW, 10, 5);
+
+            // Fill track (shows progress)
+            const trackFill = this.scene.add.graphics();
+
+            const raiseBtn = this.scene.add.rectangle(0, btnY, 160, 26, 0x2a1a0a, 1)
+                .setStrokeStyle(1, 0xc9a84c, 1).setInteractive({ useHandCursor: true });
+            const raiseBtnLabel = this.scene.add.text(0, btnY, `RAISE  ${raiseMin}◈`, {
+                fontFamily: 'monospace', fontSize: '10px', color: '#c9a84c',
+            }).setOrigin(0.5);
+
+            const thumb = this.scene.add.circle(-thumbRange / 2, sliderY, 10, 0xc9a84c, 1)
+                .setStrokeStyle(1.5, 0xffd070, 1).setInteractive({ useHandCursor: true, draggable: true });
+
+            const updateSlider = (thumbX: number): void => {
+                const clampedX = Phaser.Math.Clamp(thumbX, -thumbRange / 2, thumbRange / 2);
+                thumb.setPosition(clampedX, sliderY);
+                const t = (clampedX + thumbRange / 2) / thumbRange;
+                this.customRaiseAmount = Math.round(raiseMin + t * (allInTotal - raiseMin));
+                // Fill track
+                trackFill.clear();
+                trackFill.fillStyle(0xc9a84c, 0.5);
+                const fillW = clampedX + thumbRange / 2 + 10;
+                trackFill.fillRoundedRect(-sliderW / 2, sliderY - 4, fillW, 8, 4);
+                raiseBtnLabel.setText(`RAISE  ${this.customRaiseAmount}◈`);
+            };
+
+            this.scene.input.setDraggable(thumb);
+            thumb.on('drag', (_ptr: Phaser.Input.Pointer, dragX: number) => {
+                updateSlider(dragX);
+            });
+            raiseBtn.on('pointerover',  () => raiseBtn.setFillStyle(0x3a2a1a));
+            raiseBtn.on('pointerout',   () => raiseBtn.setFillStyle(0x2a1a0a));
+            raiseBtn.on('pointerdown', () => {
+                raiseBtn.setFillStyle(0x1a0a00);
+                this.playerAction('raise', this.customRaiseAmount);
+            });
+
+            updateSlider(-thumbRange / 2); // initialise at raiseMin
+
+            const sliderLabel = this.scene.add.text(0, sliderY - 14, 'Custom Raise', {
+                fontFamily: 'monospace', fontSize: '9px', color: '#666688',
+            }).setOrigin(0.5);
+
+            this.actionArea.add([trackBg, trackFill, sliderLabel, thumb, raiseBtn, raiseBtnLabel]);
+        }
     }
 
     private hidePlayerActions(): void {
@@ -750,6 +837,19 @@ export class PokerPanel {
             scaleX: 1.08, scaleY: 1.08, yoyo: true, duration: 200, repeat: 2,
         });
 
+        // Record hand history
+        const gpHistory = this.game.players.find(p => p.seatId === this.playerSeatId);
+        if (gpHistory !== undefined && this.handStartChips !== -1) {
+            const delta = gpHistory.chips - this.handStartChips;
+            this.handHistory.push({
+                hand: this.handsPlayed,
+                result: delta > 0 ? 'Won' : delta < 0 ? 'Lost' : 'Even',
+                delta,
+            });
+            if (this.handHistory.length > 5) this.handHistory.shift();
+            this.refreshHandHistory();
+        }
+
         const t = this.scene.time.delayedCall(3000, () => {
             const gp = this.game.players.find(p => p.seatId === this.playerSeatId);
             if (!gp || gp.chips === 0) {
@@ -787,6 +887,18 @@ export class PokerPanel {
                   ]);
             this.communityCardObjs.push(obj);
             this.container.add(obj);
+
+            // Flip-in animation for real (non-placeholder) cards
+            if (card) {
+                obj.setScale(0.05, 1);
+                this.scene.tweens.add({
+                    targets: obj,
+                    scaleX: 1,
+                    duration: 160,
+                    ease: 'Back.easeOut',
+                    delay: i * 80,
+                });
+            }
         }
 
         this.updatePlayerHandCards();
@@ -903,6 +1015,28 @@ export class PokerPanel {
 
     private setStatus(msg: string, color: string): void {
         this.statusText.setText(msg).setColor(color);
+    }
+
+    private refreshHandHistory(): void {
+        this.historyContainer.removeAll(true);
+        if (this.handHistory.length === 0) return;
+
+        const title = this.scene.add.text(0, 0, 'HAND HISTORY', {
+            fontFamily: 'monospace', fontSize: '9px', color: '#445566', fontStyle: 'bold',
+        }).setOrigin(0.5, 0);
+        this.historyContainer.add(title);
+
+        // Show most-recent first
+        this.handHistory.slice().reverse().forEach((entry, i) => {
+            const y = 14 + i * 13;
+            const sign = entry.delta >= 0 ? '+' : '';
+            const color = entry.delta > 0 ? '#2ecc71' : entry.delta < 0 ? '#e74c3c' : '#888888';
+            const txt = this.scene.add.text(0, y,
+                `#${entry.hand}  ${entry.result}  ${sign}${entry.delta}◈`, {
+                    fontFamily: 'monospace', fontSize: '9px', color,
+                }).setOrigin(0.5, 0);
+            this.historyContainer.add(txt);
+        });
     }
 
     // ── Hand Rankings Popup ───────────────────────────────────────────────────

@@ -111,17 +111,43 @@ All 9 steps from the original plan have been implemented:
 
 ---
 
-## 6. Phase 2 TODO (Multiplayer, Persistence, Authority)
+## 6. Phase 2 — Gameplay Depth (✅ Complete)
 
+All planned gameplay-depth items have been implemented:
+
+- [x] **Blackjack solo mode** — `BlackjackEngine.ts` + `BlackjackPanel.ts`; split pairs, insurance, dealer reveal animation
+- [x] **Plinko minigame** — `PlinkoPanel.ts`; Low/Medium/High risk levels, animated peg board, RISK_MULTIPLIERS
+- [x] **Roulette minigame** — `RouletteEngine.ts` + `RoulettePanel.ts`; European single-zero, straight/red-black/odd-even/dozen bets, animated wheel
+- [x] **Poker AI personalities** — TIGHT / BLUFFER / AGGRESSIVE opponents with per-seat assignments
+- [x] **Poker hand history panel** — last 5 hands tracked (hand #, Won/Lost/Even, ±delta◈)
+- [x] **Bet sizing slider** — drag slider between MIN-raise and ALL-IN in poker action area
+- [x] **Player chip stack graphic** — stacked gold chip graphic rendered in each occupied seat card
+- [x] **Community card flip animation** — staggered `scaleX` tween as flop/turn/river cards land
+- [x] **Fix BB pre-flop option** — `bbHasOption` flag in `PokerRoundManager`; pre-flop turn order corrected
+- [x] **Blackjack server room** — `BlackjackTableRoom.ts` fully handles BET/HIT/STAND/DOUBLE; `BlackjackEngine.ts` on server
+- [x] **UX polish** — tutorial overlay, feature pills, `? Help` hand-rankings popup, `★ YOUR TURN ★` pulsing banner
+
+---
+
+## 7. Phase 3 TODO (Social & Animation Polish)
+
+Carried from Phase 2 (deferred visual depth items):
+- [ ] **Pot distribution animation** — chips fly/slide toward winner seat after showdown
+- [ ] **Slot machine vertical-scroll reel animation** — reels spin with momentum before stopping
+- [ ] **Spectator mode** — observe a poker table without taking a seat
+
+New social & multiplayer features:
 - [ ] **Dev environment setup guide** — docker-compose for Postgres + Colyseus with one command
 - [ ] **Session persistence** — connect lobby chip balance to Prisma via ChipEconomyService
 - [ ] **Server-authoritative slot machine** — move spin logic to a SlotMachineRoom on the server; client is display-only
 - [ ] **Actual `SlotsScene` portal** in multiplayer lobby (replace the Blackjack placeholder)
-- [ ] **Blackjack gameplay** — complete BlackjackTableRoom + client scene
 - [ ] **Avatar outfit selector** — use `outfitId` field that's already in the schema
 - [ ] **Depth-sorted walking** — MovementController currently allows clicking through UI objects
 - [ ] **Sprite sheet swap** — PlayerAvatar is designed for this; asset pipeline TBD
 - [ ] **Next.js + game auth handoff** — share JWT between web shell and game client
 - [ ] **Tournament UI** — live tournament bracket visible in BarRoomScene
 - [ ] **VIP room** — defined in RoomType enum, room not implemented
-- [x] **Fix BB pre-flop option** in `PokerRoundManager.isBettingRoundComplete()` — BB now always gets one action pre-flop via `bbHasOption` flag; pre-flop turn ordering fixed to sort by seat index
+- [ ] **Friend system** — send/accept requests, online status indicator
+- [ ] **Public player profiles** — stats, recent games, cosmetics showcase
+- [ ] **Radial emote menu** — hold E to open quick-reaction wheel
+- [ ] **Player titles** — earned through achievements

@@ -68,26 +68,35 @@ Single-player is now the primary entry point with a complete new-user experience
 
 ---
 
-## Phase 2 — Gameplay Depth 🔜
+## Phase 2 — Gameplay Depth ✅ Complete
 
 > Make the casino floor feel alive and complete.
 
-- [ ] Blackjack game logic (hit, stand, double-down, split)
-- [ ] Bet sizing slider for poker (drag to set custom raise amount)
-- [ ] Pot distribution animation (chips fly to winner seat)
-- [ ] Player chip stack displayed on poker table felt
-- [ ] Spectator mode — watch a poker table without joining
-- [ ] Community card reveal animation (flip + brief glow)
-- [ ] Action replay / hand history (last 5 hands, review cards played)
-- [ ] Slot machine reel spin animation (spinning reels before landing)
-- [ ] Server-authoritative slot machine (move RNG to server)
+- [x] Blackjack game logic (hit, stand, double-down, split, insurance) — `BlackjackEngine.ts` + `BlackjackPanel.ts`
+- [x] Bet sizing slider for poker (drag to set custom raise amount) — slider widget in action area
+- [x] Player chip stack displayed on poker table felt — stacked chip graphic in each seat card
+- [x] Community card reveal animation (flip + brief glow) — staggered `scaleX` tween on deal
+- [x] Action replay / hand history (last 5 hands, review cards played) — sidebar history panel
+- [x] Plinko minigame — Low/Medium/High risk, animated peg board (`PlinkoPanel.ts`)
+- [x] Roulette minigame — European single-zero, 5 bet types, animated wheel (`RouletteEngine.ts` + `RoulettePanel.ts`)
+- [x] Poker AI personalities — TIGHT / BLUFFER / AGGRESSIVE presets per opponent
+- [ ] Pot distribution animation (chips fly to winner seat) — deferred to Phase 3
+- [ ] Spectator mode — watch a poker table without joining — deferred to Phase 3
+- [ ] Slot machine reel vertical-scroll animation — deferred to Phase 3
+- [ ] Server-authoritative slot machine (move RNG to server) — deferred to Phase 7
 
 ---
 
-## Phase 3 — Social Systems 🔜
+## Phase 3 — Social & Animation Polish 🔜
 
-> Make the casino feel alive with people.
+> Carry forward deferred Phase 2 visual depth items and make the casino feel alive with people.
 
+### Carried from Phase 2
+- [ ] Pot distribution animation — chips fly/slide toward the winner's seat after showdown
+- [ ] Slot machine vertical-scroll reel animation — reels spin with momentum before stopping
+- [ ] Spectator mode — observe a poker table without occupying a seat
+
+### New Social Systems
 - [ ] Friend system (send/accept requests, online status indicator)
 - [ ] Private direct messages
 - [ ] Public player profiles (stats, recent games, cosmetics showcase)
