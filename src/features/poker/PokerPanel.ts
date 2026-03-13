@@ -123,7 +123,7 @@ export class PokerPanel {
     // Hand history (last 5 hands)
     private handHistory: Array<{ hand: number; result: string; delta: number }> = [];
     private historyContainer!: Phaser.GameObjects.Container;
-    private handStartChips: number = 0;
+    private handStartChips: number = -1;
     private rankingsPopup: Phaser.GameObjects.Container | undefined = undefined;
 
     // Session tracking
@@ -528,7 +528,7 @@ export class PokerPanel {
 
         // Track chips at the start of this hand for hand-history delta calculation
         const playerEntry = activePlayers.find(p => p.seatId === this.playerSeatId);
-        this.handStartChips = playerEntry ? playerEntry.chips : 0;
+        this.handStartChips = playerEntry ? playerEntry.chips : -1;
 
         const prevHandNum   = this.game?.handNumber ?? 0;
         const prevDealerIdx = this.game?.dealerIdx ?? 0;
@@ -769,7 +769,10 @@ export class PokerPanel {
             });
             raiseBtn.on('pointerover',  () => raiseBtn.setFillStyle(0x3a2a1a));
             raiseBtn.on('pointerout',   () => raiseBtn.setFillStyle(0x2a1a0a));
-            raiseBtn.on('pointerdown',  () => { raiseBtn.setFillStyle(0x1a0a00); this.playerAction('raise', this.customRaiseAmount); });
+            raiseBtn.on('pointerdown', () => {
+                raiseBtn.setFillStyle(0x1a0a00);
+                this.playerAction('raise', this.customRaiseAmount);
+            });
 
             updateSlider(-thumbRange / 2); // initialise at raiseMin
 
@@ -836,7 +839,7 @@ export class PokerPanel {
 
         // Record hand history
         const gpHistory = this.game.players.find(p => p.seatId === this.playerSeatId);
-        if (gpHistory !== undefined && this.handStartChips >= 0) {
+        if (gpHistory !== undefined && this.handStartChips !== -1) {
             const delta = gpHistory.chips - this.handStartChips;
             this.handHistory.push({
                 hand: this.handsPlayed,
