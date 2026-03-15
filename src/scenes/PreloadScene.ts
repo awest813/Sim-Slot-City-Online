@@ -3,7 +3,7 @@ import {
     GAME_WIDTH, GAME_HEIGHT,
     COL_UI_BG2, COL_UI_BG3, COL_UI_BORDER, COL_TRIM, COL_TRIM_DIM,
     COL_BTN_PRIMARY, COL_BTN_PRIMARY_H,
-    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BLACKJACK_ACCENT, COL_BAR_ACCENT,
+    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BLACKJACK_ACCENT, COL_BAR_ACCENT, COL_BINGO_ACCENT,
     FONT, ANIM_MED, ANIM_SLOW,
 } from '../game/constants';
 import { GameState } from '../core/state/GameState';
@@ -202,6 +202,7 @@ export class PreloadScene extends Phaser.Scene {
             { icon: '♠',  label: 'POKER',      color: COL_POKER_ACCENT },
             { icon: '🃏', label: 'BLACKJACK',  color: COL_BLACKJACK_ACCENT },
             { icon: '🍹', label: 'BAR',        color: COL_BAR_ACCENT },
+            { icon: '🎱', label: 'BINGO',      color: COL_BINGO_ACCENT },
         ];
 
         const pillW = 120;

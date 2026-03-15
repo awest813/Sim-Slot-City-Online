@@ -5,10 +5,10 @@ import {
     COL_BG, COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
     COL_TRIM, COL_TRIM_DIM,
     COL_TABLE,
-    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT,
+    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD,
-    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO,
+    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO,
     FONT, ANIM_SLOW,
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
@@ -23,12 +23,13 @@ import { PokerPanel } from '../poker/PokerPanel';
 import { BlackjackPanel } from '../blackjack/BlackjackPanel';
 import { RoulettePanel } from '../roulette/RoulettePanel';
 import { PlinkoPanel } from '../plinko/PlinkoPanel';
+import { BingoPanel } from '../bingo/BingoPanel';
 
 export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!:      AvatarController;
     private aiWalkers:    AIWalker[] = [];
     private interaction!: InteractionSystem;
-    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' | 'plinko' = 'none';
+    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' | 'plinko' | 'bingo' = 'none';
     private graphics!:    Phaser.GameObjects.Graphics;
 
     constructor() { super({ key: 'CasinoLobbyScene' }); }
@@ -230,6 +231,11 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillRect(ZONE_PLINKO.x - 8, ZONE_PLINKO.y - 8, ZONE_PLINKO.w + 16, ZONE_PLINKO.h + 16);
         g.fillStyle(0x071a14, 0.6);
         g.fillRect(ZONE_PLINKO.x, ZONE_PLINKO.y, ZONE_PLINKO.w, ZONE_PLINKO.h);
+        // Bingo
+        g.fillStyle(0x041820, 0.3);
+        g.fillRect(ZONE_BINGO.x - 8, ZONE_BINGO.y - 8, ZONE_BINGO.w + 16, ZONE_BINGO.h + 16);
+        g.fillStyle(0x041820, 0.6);
+        g.fillRect(ZONE_BINGO.x, ZONE_BINGO.y, ZONE_BINGO.w, ZONE_BINGO.h);
 
         // Spotlight radial layer on each zone center
         g.fillStyle(COL_SLOTS_ACCENT, 0.04);
@@ -244,6 +250,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillCircle(ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2, Math.max(ZONE_ROULETTE.w, ZONE_ROULETTE.h) * 0.7);
         g.fillStyle(COL_PLINKO_ACCENT, 0.04);
         g.fillCircle(ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + ZONE_PLINKO.h / 2, Math.max(ZONE_PLINKO.w, ZONE_PLINKO.h) * 0.7);
+        g.fillStyle(COL_BINGO_ACCENT, 0.04);
+        g.fillCircle(ZONE_BINGO.x + ZONE_BINGO.w / 2, ZONE_BINGO.y + ZONE_BINGO.h / 2, Math.max(ZONE_BINGO.w, ZONE_BINGO.h) * 0.7);
 
         // === Zone accent borders — 3-layer neon glow ===
         const zones: Array<[typeof ZONE_SLOTS, number]> = [
@@ -253,6 +261,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             [ZONE_BLACKJACK,  COL_BLACKJACK_ACCENT],
             [ZONE_ROULETTE,   COL_ROULETTE_ACCENT],
             [ZONE_PLINKO,     COL_PLINKO_ACCENT],
+            [ZONE_BINGO,      COL_BINGO_ACCENT],
         ];
         for (const [z, col] of zones) {
             // Outer glow
@@ -315,6 +324,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.drawPlinkoBoard(
             ZONE_PLINKO.x + ZONE_PLINKO.w / 2,
             ZONE_PLINKO.y + ZONE_PLINKO.h / 2,
+        );
+
+        // Bingo board
+        this.drawBingoBoard(
+            ZONE_BINGO.x + ZONE_BINGO.w / 2,
+            ZONE_BINGO.y + ZONE_BINGO.h / 2,
         );
 
         // Chandeliers
@@ -773,6 +788,56 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g2.fillCircle(cx, cy - bh / 2 + 6, 5);
     }
 
+    private drawBingoBoard(cx: number, cy: number): void {
+        const g2  = this.add.graphics().setDepth(DEPTH_PROPS);
+        const bw  = 130;
+        const bh  = 70;
+
+        // Shadow
+        g2.fillStyle(0x000000, 0.3);
+        g2.fillRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 4, bw, bh, 5);
+        // Board background
+        g2.fillStyle(0x030c14, 1);
+        g2.fillRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
+        // Cyan border
+        g2.lineStyle(2, COL_BINGO_ACCENT, 0.85);
+        g2.strokeRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
+        // Inner inset
+        g2.lineStyle(1, COL_BINGO_ACCENT, 0.2);
+        g2.strokeRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 3, bw - 6, bh - 6, 3);
+
+        // Mini 5×5 grid (decorative)
+        const cellW = (bw - 16) / 5;
+        const cellH = (bh - 24) / 5;
+        const gridX = cx - bw / 2 + 8;
+        const gridY = cy - bh / 2 + 16;
+
+        for (let r = 0; r < 5; r++) {
+            for (let c = 0; c < 5; c++) {
+                const rx = gridX + c * cellW;
+                const ry = gridY + r * cellH;
+                // FREE center + aesthetic checker — purely decorative for the lobby prop
+                const isMarked = (r === 2 && c === 2) || (r + c) % 3 === 0;
+                g2.fillStyle(isMarked ? 0x004060 : 0x020a12, isMarked ? 0.7 : 0.9);
+                g2.fillRect(rx, ry, cellW - 1, cellH - 1);
+                g2.lineStyle(0.5, COL_BINGO_ACCENT, isMarked ? 0.5 : 0.2);
+                g2.strokeRect(rx, ry, cellW - 1, cellH - 1);
+            }
+        }
+
+        // B I N G O header
+        const headers = ['B', 'I', 'N', 'G', 'O'];
+        const headerColors = ['#4080ff', '#ff4080', '#40c040', '#ffa020', '#c040ff'];
+        for (let c = 0; c < 5; c++) {
+            this.add.text(
+                gridX + c * cellW + cellW / 2,
+                cy - bh / 2 + 9,
+                headers[c],
+                { fontFamily: FONT, fontSize: '7px', color: headerColors[c], fontStyle: 'bold' },
+            ).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
+        }
+    }
+
     private drawPillar(x: number, y: number): void {
         const g2 = this.add.graphics().setDepth(DEPTH_PROPS + 1);
 
@@ -913,6 +978,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             [ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,   ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2,   0x9b50c0, 110],
             [ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,     ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2,     0xcc3333, 100],
             [ZONE_PLINKO.x + ZONE_PLINKO.w / 2,         ZONE_PLINKO.y + ZONE_PLINKO.h / 2,         0x20d4a0, 100],
+            [ZONE_BINGO.x  + ZONE_BINGO.w  / 2,         ZONE_BINGO.y  + ZONE_BINGO.h  / 2,         0x00c8ff, 100],
         ];
 
         const ambientGfx = this.add.graphics().setDepth(DEPTH_FLOOR + 2);
@@ -935,6 +1001,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.buildZoneSign(ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + 14, '🃏 BLACKJACK', COL_BLACKJACK_ACCENT, d);
         this.buildZoneSign(ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + 14, '🎡 ROULETTE', COL_ROULETTE_ACCENT, d);
         this.buildZoneSign(ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + 14, '🎯 PLINKO', COL_PLINKO_ACCENT, d);
+        this.buildZoneSign(ZONE_BINGO.x + ZONE_BINGO.w / 2, ZONE_BINGO.y + 14, '🎱 BINGO', COL_BINGO_ACCENT, d);
     }
 
     private buildZoneSign(x: number, y: number, text: string, accentColor: number, depth: number): void {
@@ -1109,6 +1176,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
                 y: ZONE_PLINKO.y + ZONE_PLINKO.h / 2 - 35,
                 w: 120, h: 70,
             },
+            // Bingo board
+            {
+                x: ZONE_BINGO.x + ZONE_BINGO.w / 2 - 65,
+                y: ZONE_BINGO.y + ZONE_BINGO.h / 2 - 35,
+                w: 130, h: 70,
+            },
         ];
     }
 
@@ -1124,6 +1197,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         else if (this.inZone(x, y, ZONE_BLACKJACK))  zone = 'blackjack';
         else if (this.inZone(x, y, ZONE_ROULETTE))   zone = 'roulette';
         else if (this.inZone(x, y, ZONE_PLINKO))     zone = 'plinko';
+        else if (this.inZone(x, y, ZONE_BINGO))      zone = 'bingo';
         else if (this.inZone(x, y, ZONE_ENTRANCE))   zone = 'entrance';
 
         if (GameState.get().zone !== zone) {
@@ -1181,6 +1255,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
             label: 'Play Plinko',
             onInteract: () => this.openPlinko(),
         });
+        this.interaction.register({
+            id: 'bingo',
+            x: ZONE_BINGO.x + ZONE_BINGO.w / 2,
+            y: ZONE_BINGO.y + ZONE_BINGO.h / 2,
+            radius: 100,
+            label: 'Play Bingo',
+            onInteract: () => this.openBingo(),
+        });
     }
 
     // ── Panel Openers ─────────────────────────────────────────────────────────
@@ -1225,6 +1307,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.activePanel = 'plinko';
         GameState.setInteraction('plinko');
         new PlinkoPanel(this, () => this.closePanel());
+    }
+
+    private openBingo(): void {
+        if (this.activePanel !== 'none') return;
+        this.activePanel = 'bingo';
+        GameState.setInteraction('bingo');
+        new BingoPanel(this, () => this.closePanel());
     }
 
     private closePanel(): void {

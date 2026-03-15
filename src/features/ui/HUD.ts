@@ -15,6 +15,7 @@ const ZONE_ACCENT: Record<Zone, { fill: number; border: number; text: string }> 
     blackjack: { fill: 0x0a1520, border: 0x3a6a8a, text: '#60b0d0' },
     roulette:  { fill: 0x1a0808, border: 0x8a2a2a, text: '#e06060' },
     plinko:    { fill: 0x081a10, border: 0x2a7a4a, text: '#50cc80' },
+    bingo:     { fill: 0x041014, border: 0x107090, text: '#00c8ff' },
     floor:     { fill: 0x101018, border: 0x445577, text: '#8090aa' },
 };
 import { SoundManager } from '../../core/systems/SoundManager';
@@ -27,6 +28,7 @@ const ZONE_LABELS: Record<Zone, string> = {
     blackjack: '🃏 Blackjack',
     roulette:  '🎡 Roulette',
     plinko:    '🎯 Plinko',
+    bingo:     '🎱 Bingo Hall',
     floor:     '🏛 Casino Floor',
 };
 
