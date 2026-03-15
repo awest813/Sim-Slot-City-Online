@@ -13,7 +13,7 @@ import {
     BingoState, WinType,
     BET_OPTIONS, BALL_LIMIT, PAYOUTS,
     ballLetter, COLUMN_HEADERS,
-    createGame, callBall, chipDelta,
+    createGame, callBall,
 } from './BingoEngine';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -116,12 +116,6 @@ export class BingoPanel {
             duration: ANIM_MED, ease: 'Back.Out',
         });
 
-        // Keyboard
-        this.escKey   = this.scene.input.keyboard!.addKey('ESC');
-        this.spaceKey = this.scene.input.keyboard!.addKey('SPACE');
-        this.escKey.on('down',   () => this.close());
-        this.spaceKey.on('down', () => { if (this.gameState?.phase === 'playing') this.doCallBall(); });
-
         // Build UI sections
         this.buildHeader();
         this.buildCloseButton();
@@ -135,6 +129,12 @@ export class BingoPanel {
 
         // Start first game
         this.startNewGame();
+
+        // Keyboard — registered after startNewGame so gameState is always defined
+        this.escKey   = this.scene.input.keyboard!.addKey('ESC');
+        this.spaceKey = this.scene.input.keyboard!.addKey('SPACE');
+        this.escKey.on('down',   () => this.close());
+        this.spaceKey.on('down', () => { if (this.gameState.phase === 'playing') this.doCallBall(); });
 
         this.refreshChipsDisplay();
     }
@@ -490,17 +490,23 @@ export class BingoPanel {
 
     private startNewGame(): void {
         this.stopAutoPlay();
-        const bet = Math.min(this.currentBet, GameState.get().chips);
-        if (bet < this.currentBet) {
-            // not enough chips — find affordable bet
+
+        // Find an affordable bet
+        if (GameState.get().chips < this.currentBet) {
             const affordable = [...BET_OPTIONS].reverse().find(b => b <= GameState.get().chips);
             if (!affordable) {
                 this.statusText.setText('Not enough chips!').setColor('#e74c3c');
+                // Create a placeholder state so gameState is always defined
+                this.gameState = createGame(BET_OPTIONS[0]);
+                this.gameState = { ...this.gameState, phase: 'bust' };
                 return;
             }
             this.currentBet = affordable;
             this.refreshBetButtons();
         }
+
+        // Deduct the bet upfront (same pattern as SlotsPanel / BlackjackPanel)
+        GameState.addChips(-this.currentBet);
 
         this.gameState = createGame(this.currentBet);
         this.refreshCard();
@@ -509,6 +515,7 @@ export class BingoPanel {
         this.refreshBallsLeft();
         this.refreshStatus('SPACE / CALL to draw a ball');
         this.refreshCallButton(false);
+        this.newBtnLabel.setColor('#204a30');
         this.refreshChipsDisplay();
     }
 
@@ -535,14 +542,13 @@ export class BingoPanel {
     }
 
     private handleGameEnd(): void {
-        const delta = chipDelta(this.gameState);
-        GameState.addChips(delta);
-
         this.totalGames++;
         this.totalWagered += this.gameState.bet;
 
         if (this.gameState.phase === 'won') {
+            // Bet was already deducted at game start; pay out full multiplied amount
             const winnings = this.gameState.bet * PAYOUTS[this.gameState.winType as WinType];
+            GameState.addChips(winnings);
             this.totalWon += winnings;
 
             if (this.gameState.winType === 'blackout') {
@@ -555,6 +561,7 @@ export class BingoPanel {
                 this.highlightWinCells();
             }
         } else {
+            // Bust — bet already deducted, nothing to add back
             this.refreshStatus(`😞 Bust! No line in ${BALL_LIMIT} balls. Lost ${this.gameState.bet} chips.`);
             this.statusText.setColor('#e74c3c');
         }
@@ -782,7 +789,7 @@ export class BingoPanel {
             gfx.clear();
             gfx.fillStyle(fill, 1);
             // recalculate same bx
-            const bx = CARD_LEFT + 36 + BET_OPTIONS.indexOf(amount as typeof BET_OPTIONS[number]) * 46;
+            const bx = CARD_LEFT + 36 + (BET_OPTIONS as readonly number[]).indexOf(amount) * 46;
             const y  = CARD_TOP - 2;
             gfx.fillRoundedRect(bx - 20, y - 11, 40, 22, 4);
             gfx.lineStyle(sel ? 1.5 : 1, sc, sel ? 1 : 0.6);

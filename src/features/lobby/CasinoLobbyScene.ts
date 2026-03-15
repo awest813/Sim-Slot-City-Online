@@ -816,6 +816,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             for (let c = 0; c < 5; c++) {
                 const rx = gridX + c * cellW;
                 const ry = gridY + r * cellH;
+                // FREE center + aesthetic checker — purely decorative for the lobby prop
                 const isMarked = (r === 2 && c === 2) || (r + c) % 3 === 0;
                 g2.fillStyle(isMarked ? 0x004060 : 0x020a12, isMarked ? 0.7 : 0.9);
                 g2.fillRect(rx, ry, cellW - 1, cellH - 1);
