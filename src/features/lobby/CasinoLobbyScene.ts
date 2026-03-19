@@ -17,6 +17,7 @@ import { AIWalker, AI_NAMES, AI_COLORS } from '../../core/systems/AIWalker';
 import { InteractionSystem } from '../../core/systems/InteractionSystem';
 import { SoundManager } from '../../core/systems/SoundManager';
 import { HUD } from '../ui/HUD';
+import { Minimap } from '../ui/Minimap';
 import { SlotsPanel } from '../slots/SlotsPanel';
 import { BarPanel, resetBarSession } from '../bar/BarPanel';
 import { PokerPanel } from '../poker/PokerPanel';
@@ -29,8 +30,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!:      AvatarController;
     private aiWalkers:    AIWalker[] = [];
     private interaction!: InteractionSystem;
+    private minimap!:     Minimap;
     private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' | 'plinko' | 'bingo' = 'none';
     private graphics!:    Phaser.GameObjects.Graphics;
+    // Context hint bar
+    private hintBg!:      Phaser.GameObjects.Rectangle;
+    private hintText!:    Phaser.GameObjects.Text;
 
     constructor() { super({ key: 'CasinoLobbyScene' }); }
 
@@ -74,6 +79,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // HUD
         new HUD(this);
 
+        // Minimap
+        this.minimap = new Minimap(this);
+
+        // Context-sensitive hint bar (bottom edge)
+        this.buildHintBar();
+
         // Initialise sound engine on the first pointer-down (browser autoplay policy
         // requires a user gesture before creating / resuming an AudioContext).
         this.input.once('pointerdown', () => SoundManager.init());
@@ -106,6 +117,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         this.interaction.update(this.avatar.x, this.avatar.y);
         this.updateZone();
+
+        // Update minimap with current avatar world-space position
+        this.minimap.update(this.avatar.x, this.avatar.y);
     }
 
     // ── World Building ────────────────────────────────────────────────────────
@@ -1202,6 +1216,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         if (GameState.get().zone !== zone) {
             GameState.setZone(zone);
+            this.updateHintForZone(zone);
         }
     }
 
@@ -1319,6 +1334,39 @@ export class CasinoLobbyScene extends Phaser.Scene {
     private closePanel(): void {
         this.activePanel = 'none';
         GameState.clearInteraction();
+        this.updateHintForZone(GameState.get().zone);
+    }
+
+    // ── Context-sensitive hint bar ────────────────────────────────────────────
+
+    private buildHintBar(): void {
+        const cx = GAME_WIDTH / 2;
+        this.hintBg = this.add.rectangle(cx, GAME_HEIGHT - 13, GAME_WIDTH - 16, 18, 0x000000, 0.72)
+            .setScrollFactor(0).setDepth(DEPTH_HUD + 1).setAlpha(0);
+
+        this.hintText = this.add.text(cx, GAME_HEIGHT - 13, '', {
+            fontFamily: FONT, fontSize: '9px', color: '#3a5a4a',
+        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
+
+        this.updateHintForZone('floor');
+    }
+
+    private updateHintForZone(zone: Zone): void {
+        const HINTS: Record<Zone, string> = {
+            floor:     'WASD / ↑↓←→ move  ·  approach a zone and press  E  to interact  ·  ESC close',
+            entrance:  'WASD / ↑↓←→ move  ·  walk north to explore the casino',
+            slots:     'Walk up and press  E  to play  ·  SPACE spin  ·  ESC close',
+            poker:     'Walk up and press  E  to join  ·  F=Fold  C=Call  R=Raise  ·  ESC close',
+            bar:       'Walk up and press  E  to order  ·  ESC close',
+            blackjack: 'Walk up and press  E  to play  ·  H=Hit  S=Stand  ·  ESC close',
+            roulette:  'Walk up and press  E  to play  ·  SPACE spin  ·  ESC close',
+            plinko:    'Walk up and press  E  to play  ·  SPACE drop  ·  ESC close',
+            bingo:     'Walk up and press  E  to play  ·  ESC close',
+        };
+
+        if (this.hintText) {
+            this.hintText.setText(HINTS[zone] ?? HINTS['floor']);
+        }
     }
 
     // ── Welcome Banner ────────────────────────────────────────────────────────
@@ -1353,9 +1401,9 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         const steps: Array<{ icon: string; title: string; desc: string }> = [
             { icon: '①', title: 'Move around',       desc: 'WASD or Arrow keys to walk your avatar through the casino' },
-            { icon: '②', title: 'Approach a zone',   desc: 'Walk near Slots, Poker Table, Bar, or Blackjack' },
+            { icon: '②', title: 'Approach a zone',   desc: 'Walk near Slots, Poker Table, Bar, Blackjack, Roulette, Plinko or Bingo' },
             { icon: '③', title: 'Press E to interact', desc: 'Approach any zone and press E when the prompt appears' },
-            { icon: '④', title: 'Play & earn chips',  desc: 'Start with 1,000 ◈  ·  Free reload if you go broke' },
+            { icon: '④', title: 'Play & earn chips',  desc: 'Start with 1,000 ◈  ·  Free reload if you go broke  ·  Minimap: bottom-right' },
         ];
 
         const tutObjs: Phaser.GameObjects.GameObject[] = [tutBgGfx, tutTitle];
@@ -1395,9 +1443,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
                 ease: 'Sine.easeIn',
                 onComplete: () => {
                     tutObjs.forEach(o => o.destroy());
-                    if (hint.active) {
-                        this.tweens.add({ targets: [hintBg, hint], alpha: 1, duration: 500 });
-                    }
+                    // Fade in the context hint bar
+                    this.tweens.add({ targets: [this.hintBg, this.hintText], alpha: 1, duration: 500 });
                 },
             });
         };
@@ -1410,14 +1457,5 @@ export class CasinoLobbyScene extends Phaser.Scene {
         tutBgGfx.once('pointerdown', closeTutorial);
         this.input.keyboard!.once('keydown', closeTutorial);
         this.time.delayedCall(12000, closeTutorial);
-
-        // ── Persistent hint bar (bottom edge) ─────────────────────────────
-        const hintBg = this.add.rectangle(cx, GAME_HEIGHT - 13, 640, 18, 0x000000, 0.7)
-            .setScrollFactor(0).setDepth(DEPTH_HUD + 1).setAlpha(0);
-
-        const hint = this.add.text(cx, GAME_HEIGHT - 13,
-            'WASD/↑↓←→ move  ·  E interact  ·  Slots: SPACE spin  ·  Poker: F=Fold C=Call R=Raise  ·  BJ: H=Hit S=Stand  ·  Roulette: SPACE spin  ·  Plinko: SPACE drop  ·  ESC close', {
-            fontFamily: FONT, fontSize: '9px', color: '#3a5a4a',
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
     }
 }

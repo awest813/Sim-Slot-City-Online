@@ -4,6 +4,7 @@ import {
     COL_UI_BG2, COL_UI_BG3, COL_UI_BORDER, COL_TRIM, COL_TRIM_DIM,
     COL_BTN_PRIMARY, COL_BTN_PRIMARY_H,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BLACKJACK_ACCENT, COL_BAR_ACCENT, COL_BINGO_ACCENT,
+    COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT,
     FONT, ANIM_MED, ANIM_SLOW,
 } from '../game/constants';
 import { GameState } from '../core/state/GameState';
@@ -198,16 +199,19 @@ export class PreloadScene extends Phaser.Scene {
 
         // ── Feature pills ─────────────────────────────────────────────────
         const features: Array<{ icon: string; label: string; color: number }> = [
-            { icon: '🎰', label: 'SLOTS',      color: COL_SLOTS_ACCENT },
-            { icon: '♠',  label: 'POKER',      color: COL_POKER_ACCENT },
-            { icon: '🃏', label: 'BLACKJACK',  color: COL_BLACKJACK_ACCENT },
-            { icon: '🍹', label: 'BAR',        color: COL_BAR_ACCENT },
-            { icon: '🎱', label: 'BINGO',      color: COL_BINGO_ACCENT },
+            { icon: '🎰', label: 'SLOTS',     color: COL_SLOTS_ACCENT },
+            { icon: '♠',  label: 'POKER',     color: COL_POKER_ACCENT },
+            { icon: '🃏', label: 'BLACKJACK', color: COL_BLACKJACK_ACCENT },
+            { icon: '🎡', label: 'ROULETTE',  color: COL_ROULETTE_ACCENT },
+            { icon: '🎯', label: 'PLINKO',    color: COL_PLINKO_ACCENT },
+            { icon: '🍹', label: 'BAR',       color: COL_BAR_ACCENT },
+            { icon: '🎱', label: 'BINGO',     color: COL_BINGO_ACCENT },
         ];
 
-        const pillW = 120;
-        const pillH = 48;
-        const pillGap = 16;
+        // Compact pill size to fit all 7 across the screen width
+        const pillW = 96;
+        const pillH = 46;
+        const pillGap = 10;
         const pillTotalW = features.length * pillW + (features.length - 1) * pillGap;
         const pillStartX = cx - pillTotalW / 2;
         const pillY = cy - 16;
@@ -238,12 +242,12 @@ export class PreloadScene extends Phaser.Scene {
             pillGfx.fillStyle(0xffffff, 0.05);
             pillGfx.fillTriangle(px, pillY, px + 6, pillY, px, pillY + 6);
 
-            this.add.text(px + pillW / 2 + 2, pillY + 10, f.icon, {
-                fontFamily: FONT, fontSize: '16px',
+            this.add.text(px + pillW / 2 + 2, pillY + 9, f.icon, {
+                fontFamily: FONT, fontSize: '15px',
             }).setOrigin(0.5, 0);
 
-            this.add.text(px + pillW / 2 + 2, pillY + 28, f.label, {
-                fontFamily: FONT, fontSize: '9px', color: '#888888', fontStyle: 'bold',
+            this.add.text(px + pillW / 2 + 2, pillY + 27, f.label, {
+                fontFamily: FONT, fontSize: '8px', color: '#888888', fontStyle: 'bold',
             }).setOrigin(0.5, 0);
         });
 

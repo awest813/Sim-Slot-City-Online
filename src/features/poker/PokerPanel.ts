@@ -21,6 +21,7 @@ import {
     PERSONALITY_AGGRESSIVE,
 } from './PokerAI';
 import { SoundManager } from '../../core/systems/SoundManager';
+import { ToastManager } from '../ui/ToastManager';
 
 // ── Seat configuration ────────────────────────────────────────────────────────
 
@@ -926,6 +927,16 @@ export class PokerPanel {
             });
             if (this.handHistory.length > 5) this.handHistory.shift();
             this.refreshHandHistory();
+
+            // Toast for hand outcome
+            if (delta > 0) {
+                const isPlayerWinner = this.game.lastWinnerSeatIds.includes(this.playerSeatId!);
+                if (isPlayerWinner) {
+                    ToastManager.show(this.scene, `Pot won! +${delta} ◈`, 'win');
+                }
+            } else if (delta < 0) {
+                ToastManager.show(this.scene, `${delta} ◈`, 'loss');
+            }
         }
 
         const t = this.scene.time.delayedCall(3000, () => {

@@ -15,6 +15,7 @@ import {
     ballLetter, COLUMN_HEADERS,
     createGame, callBall,
 } from './BingoEngine';
+import { ToastManager } from '../ui/ToastManager';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 const PW = 620;
@@ -555,15 +556,18 @@ export class BingoPanel {
                 this.refreshStatus(`🎉 BLACKOUT! Won ${winnings} chips (${PAYOUTS.blackout}×)!`);
                 this.statusText.setColor('#ffd040');
                 this.highlightWinCells();
+                ToastManager.show(this.scene, `BINGO BLACKOUT! +${winnings} ◈`, 'jackpot');
             } else {
                 this.refreshStatus(`✅ BINGO! Won ${winnings} chips (${PAYOUTS.line}×)!`);
                 this.statusText.setColor('#2ecc71');
                 this.highlightWinCells();
+                ToastManager.show(this.scene, `BINGO! +${winnings} ◈`, 'win');
             }
         } else {
             // Bust — bet already deducted, nothing to add back
             this.refreshStatus(`😞 Bust! No line in ${BALL_LIMIT} balls. Lost ${this.gameState.bet} chips.`);
             this.statusText.setColor('#e74c3c');
+            ToastManager.show(this.scene, `-${this.gameState.bet} ◈`, 'loss');
         }
 
         this.refreshChipsDisplay();

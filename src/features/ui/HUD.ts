@@ -57,6 +57,10 @@ export class HUD {
     private muteLabel!: Phaser.GameObjects.Text;
     private muteHit!: Phaser.GameObjects.Rectangle;
 
+    // Session P&L tracker
+    private sessionStartChips = -1;
+    private plText!: Phaser.GameObjects.Text;
+
     private unsub!: () => void;
     private prevChips = -1;
     private chipFlashTimer: Phaser.Time.TimerEvent | null = null;
@@ -95,6 +99,14 @@ export class HUD {
             .setScrollFactor(0)
             .setDepth(DEPTH_HUD + 1)
             .setOrigin(0, 0.5);
+
+        // Session P&L — small text to the right of the chip counter
+        this.plText = this.scene.add.text(barX + barW - 8, barY + 33, '', {
+            fontFamily: FONT, fontSize: '10px', color: '#556677',
+        })
+            .setScrollFactor(0)
+            .setDepth(DEPTH_HUD + 1)
+            .setOrigin(1, 0.5);
 
         // ── Zone badge (top-right) ─────────────────────────────────────────
         const zoneW = 168;
@@ -192,6 +204,7 @@ export class HUD {
         this.unsub = GameState.subscribe(s => this.refresh(s));
         const initial = GameState.get();
         this.prevChips = initial.chips;
+        this.sessionStartChips = initial.chips;
         this.refresh(initial);
     }
 
@@ -305,6 +318,18 @@ export class HUD {
         this.chipsText.setText(`◈ ${s.chips.toLocaleString()} chips`);
         this.zoneText.setText(ZONE_LABELS[s.zone] ?? s.zone);
 
+        // Session P&L display
+        if (this.sessionStartChips >= 0) {
+            const pl = s.chips - this.sessionStartChips;
+            if (pl === 0) {
+                this.plText.setText('');
+            } else if (pl > 0) {
+                this.plText.setText(`+${pl.toLocaleString()}`).setColor('#2ecc71');
+            } else {
+                this.plText.setText(`${pl.toLocaleString()}`).setColor('#e74c3c');
+            }
+        }
+
         // Redraw zone badge when zone changes (accent color update)
         if (s.zone !== this.prevZone) {
             this.drawZoneBadge(s.zone);
@@ -346,6 +371,7 @@ export class HUD {
         this.playerGfx.destroy();
         this.nameText.destroy();
         this.chipsText.destroy();
+        this.plText.destroy();
         this.zoneGfx.destroy();
         this.zoneText.destroy();
         this.freeChipsGfx.destroy();

@@ -17,6 +17,7 @@ import {
     handValue, isBlackjack, cardLabel, isRed, chipDelta,
     Card,
 } from './BlackjackEngine';
+import { ToastManager } from '../ui/ToastManager';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
@@ -466,6 +467,17 @@ export class BlackjackPanel {
             this.showChipDelta(dText, net > 0 ? '#2ecc71' : '#e74c3c');
         }
         if (delta > 0) GameState.addChips(delta);
+
+        // Toast notification for significant outcomes
+        const isBlackjackWin = this.bjState.result === 'blackjack';
+        if (isBlackjackWin) {
+            ToastManager.show(this.scene, `BLACKJACK! +${net} ◈`, 'jackpot');
+        } else if (net > 0) {
+            ToastManager.show(this.scene, `+${net} ◈`, 'win');
+        } else if (net < 0) {
+            ToastManager.show(this.scene, `${net} ◈`, 'loss');
+        }
+
         this.betDeducted  = false;
         this.splitDeducted = false;
         this.showResultUI();
