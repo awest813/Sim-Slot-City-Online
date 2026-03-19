@@ -43,11 +43,12 @@ const ZONES: Array<{
 ];
 
 export class Minimap {
-    private scene:     Phaser.Scene;
-    private bgGfx!:    Phaser.GameObjects.Graphics;   // static frame + zone fills
-    private dotGfx!:   Phaser.GameObjects.Graphics;   // player dot (updates each frame)
-    private labelGfx!: Phaser.GameObjects.Graphics;   // label background chips
-    private isVisible  = true;
+    private scene:       Phaser.Scene;
+    private bgGfx!:      Phaser.GameObjects.Graphics;   // static frame + zone fills
+    private dotGfx!:     Phaser.GameObjects.Graphics;   // player dot (updates each frame)
+    private labelGfx!:   Phaser.GameObjects.Graphics;   // label background chips
+    private isVisible    = true;
+    private labelsBuilt  = false;   // guard: zone label text objects created only once
 
     /** The scene must provide getPlayerPos() or pass avatar coords via update(). */
     constructor(scene: Phaser.Scene) {
@@ -112,17 +113,20 @@ export class Minimap {
 
         // ── Zone label text (using scene.add.text below the static gfx) ─────
         // (Labels are drawn once via separate text objects)
-        if ((this as any)._zoneLabels) return;
-        (this as any)._zoneLabels = true;
+        if (this.labelsBuilt) return;
+        this.labelsBuilt = true;
 
         for (const zd of ZONES) {
             const lx = SX(zd.zone.x + zd.zone.w / 2);
             const ly = SY(zd.zone.y + zd.zone.h / 2);
 
+            // Convert numeric colour to CSS hex string for Phaser text style
+            const hexStr = `#${zd.color.toString(16).padStart(6, '0')}`;
+
             this.scene.add.text(lx, ly, zd.label, {
                 fontFamily: FONT,
                 fontSize: '6px',
-                color: Phaser.Display.Color.IntegerToColor(zd.color).rgba,
+                color: hexStr,
             })
                 .setOrigin(0.5)
                 .setScrollFactor(0)

@@ -1401,7 +1401,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         const steps: Array<{ icon: string; title: string; desc: string }> = [
             { icon: '①', title: 'Move around',       desc: 'WASD or Arrow keys to walk your avatar through the casino' },
-            { icon: '②', title: 'Approach a zone',   desc: 'Walk near Slots, Poker Table, Bar, Blackjack, Roulette, Plinko or Bingo' },
+            { icon: '②', title: 'Approach a zone',   desc: 'Walk near Slots, Poker Table, Bar, Blackjack, Roulette, Plinko, or Bingo' },
             { icon: '③', title: 'Press E to interact', desc: 'Approach any zone and press E when the prompt appears' },
             { icon: '④', title: 'Play & earn chips',  desc: 'Start with 1,000 ◈  ·  Free reload if you go broke  ·  Minimap: bottom-right' },
         ];
