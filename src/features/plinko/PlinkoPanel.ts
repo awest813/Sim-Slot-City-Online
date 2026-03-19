@@ -9,6 +9,7 @@ import {
     COL_PLINKO_ACCENT,
     FONT, PANEL_RADIUS, ANIM_MED,
 } from '../../game/constants';
+import { ToastManager } from '../ui/ToastManager';
 
 // ── Plinko board configuration ────────────────────────────────────────────────
 const BOARD_ROWS    = 8;    // number of peg rows
@@ -695,6 +696,15 @@ export class PlinkoPanel {
                     : `${mult}× — House wins`;
         this.showResult(msg, colStr);
         this.updateStatsDisplay();
+
+        // Toast notification
+        if (mult >= 10) {
+            ToastManager.show(this.scene, `PLINKO JACKPOT! ${mult}× = +${payout} ◈`, 'jackpot');
+        } else if (net > 0) {
+            ToastManager.show(this.scene, `${mult}×  +${net} ◈`, 'win');
+        } else if (net < 0) {
+            ToastManager.show(this.scene, `${net} ◈`, 'loss');
+        }
 
         // Flash camera on jackpot
         if (mult >= 10) {

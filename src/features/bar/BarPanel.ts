@@ -4,6 +4,7 @@ import { GameState } from '../../core/state/GameState';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, COL_TRIM,
 } from '../../game/constants';
+import { ToastManager } from '../ui/ToastManager';
 
 // ── Session-level tracking for once-per-session items ─────────────────────────
 // Persists across bar visits within a single gameplay session so that
@@ -404,6 +405,7 @@ export class BarPanel {
         // Apply bonus chips if any
         if (drink.bonusChips) {
             GameState.addChips(drink.bonusChips);
+            ToastManager.show(this.scene, `${drink.name}: +${drink.bonusChips} ◈`, 'win');
         }
 
         if (drink.oncePerSession) {

@@ -10,6 +10,7 @@ import {
     FONT, PANEL_RADIUS, ANIM_MED,
 } from '../../game/constants';
 import { SoundManager } from '../../core/systems/SoundManager';
+import { ToastManager } from '../ui/ToastManager';
 
 const SYMBOLS  = ['🍒', '🍋', '🍊', '🍇', '⭐', '💎', '7️⃣'];
 const WEIGHTS  = [30, 25, 20, 12, 7, 4, 2];  // weighted rarity (lower = rarer)
@@ -827,6 +828,7 @@ export class SlotsPanel {
                     onComplete: () => { this.drawPayLine(false); this.payLineGfx.setAlpha(1); },
                 });
                 SoundManager.playJackpot();
+                ToastManager.show(this.scene, `JACKPOT!  +${payout} ◈`, 'jackpot');
             } else {
                 this.scene.tweens.add({
                     targets: finalSymTexts, scaleX: 1.14, scaleY: 1.14,
@@ -834,6 +836,7 @@ export class SlotsPanel {
                 });
                 this.scene.time.delayedCall(600, () => this.drawPayLine(false));
                 SoundManager.playWin(payout);
+                ToastManager.show(this.scene, `+${payout} ◈`, 'win');
             }
         } else {
             this.winStreak = 0;
@@ -936,6 +939,7 @@ export class SlotsPanel {
             this.updateBetDisplay();
             this.updateStatsDisplay();
             this.showResult('🎁 500 free chips added!', '#6acc30');
+            ToastManager.show(this.scene, '🎁 Free reload: +500 ◈', 'info');
             this.freeChipsContainer?.destroy();
             this.freeChipsContainer = null;
         });

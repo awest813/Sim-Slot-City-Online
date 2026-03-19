@@ -15,6 +15,7 @@ import {
     spinResult, evalAllBets, getTotalBetAmount,
     getNumberColor, getWheelIndex, betWins,
 } from './RouletteEngine';
+import { ToastManager } from '../ui/ToastManager';
 
 // ── Colours ───────────────────────────────────────────────────────────────────
 const COL_RED    = 0xcc2222;
@@ -821,6 +822,7 @@ export class RoulettePanel {
             this.totalWon += totalReturn;
             this.showMsg(`${result} — WIN! +${net}◈`, '#2ecc71');
             this.showChipDelta(`+${net}◈`, '#2ecc71');
+            ToastManager.show(this.scene, `${result}! +${net} ◈`, 'win');
         } else if (net === 0) {
             // push (e.g., bets on both red and black cancel out)
             this.showMsg(`${result} — Push`, '#c9a84c');
@@ -828,9 +830,11 @@ export class RoulettePanel {
             // Partial return: some bets won, overall net loss
             this.showMsg(`${result} — Net loss  (${totalReturn}◈ returned)`, '#e74c3c');
             this.showChipDelta(`-${wagered - totalReturn}◈`, '#e74c3c');
+            ToastManager.show(this.scene, `-${wagered - totalReturn} ◈`, 'loss');
         } else {
             this.showMsg(`${result} — No win  -${wagered}◈`, '#e74c3c');
             this.showChipDelta(`-${wagered}◈`, '#e74c3c');
+            ToastManager.show(this.scene, `-${wagered} ◈`, 'loss');
         }
 
         this.refreshChipsDisplay();
