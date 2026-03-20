@@ -27,6 +27,8 @@ export class AvatarController {
     facing: FacingDir = 'down';
     isMoving: boolean = false;
 
+    private trailTimer = 0;
+
     constructor(scene: Phaser.Scene, startX: number, startY: number, displayName: string) {
         this.scene = scene;
         this.x = startX;
@@ -128,6 +130,15 @@ export class AvatarController {
             const resolved = this.resolveBlockers(this.x + vx, this.y + vy);
             this.x = resolved.x;
             this.y = resolved.y;
+
+            // Footstep trail
+            this.trailTimer += delta;
+            if (this.trailTimer >= 90) {
+                this.trailTimer = 0;
+                this.emitTrailParticle();
+            }
+        } else {
+            this.trailTimer = 0;
         }
 
         this.syncSprite();
@@ -165,5 +176,21 @@ export class AvatarController {
         this.head.destroy();
         this.dot.destroy();
         this.nameTag.destroy();
+    }
+
+    private emitTrailParticle(): void {
+        const g = this.scene.add.graphics();
+        g.setDepth(DEPTH_SHADOW - 1);
+        g.fillStyle(COL_TRIM, 0.5);
+        g.fillCircle(this.x, this.y + AVATAR_SIZE * 0.5, 2.5);
+        this.scene.tweens.add({
+            targets:  g,
+            alpha:    0,
+            scaleX:   0.2,
+            scaleY:   0.2,
+            duration: 400,
+            ease:     'Sine.easeOut',
+            onComplete: () => { g.destroy(); },
+        });
     }
 }

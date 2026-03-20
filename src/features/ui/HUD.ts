@@ -334,6 +334,15 @@ export class HUD {
         if (s.zone !== this.prevZone) {
             this.drawZoneBadge(s.zone);
             this.prevZone = s.zone;
+            // Scale-pop the zone text to signal the zone change
+            this.zoneText.setScale(0.78);
+            this.scene.tweens.add({
+                targets:  this.zoneText,
+                scaleX:   1,
+                scaleY:   1,
+                duration: 320,
+                ease:     'Back.Out',
+            });
         }
 
         // Chip flash on change
