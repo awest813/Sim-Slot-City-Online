@@ -17,6 +17,8 @@ export class InteractionSystem {
     private promptText!:   Phaser.GameObjects.Text;
     private keyBadgeBg!:   Phaser.GameObjects.Graphics;
     private keyBadgeText!: Phaser.GameObjects.Text;
+    private pulseRingGfx!: Phaser.GameObjects.Graphics;
+    private pulseTween:    Phaser.Tweens.Tween | null = null;
     private activeHotspot: Hotspot | null = null;
     private eKey!:         Phaser.Input.Keyboard.Key;
 
@@ -36,6 +38,12 @@ export class InteractionSystem {
     private buildPromptUI(): void {
         const cx = this.scene.scale.width / 2;
         const py = this.PROMPT_Y;
+
+        // Pulse ring — expands outward behind the prompt pill
+        this.pulseRingGfx = this.scene.add.graphics()
+            .setScrollFactor(0)
+            .setDepth(DEPTH_OVERLAY - 1)
+            .setVisible(false);
 
         // Background Graphics (drawn dynamically to fit label width)
         this.promptGfx = this.scene.add.graphics()
@@ -182,9 +190,44 @@ export class InteractionSystem {
             duration: 220,
             ease: 'Back.Out',
         });
+
+        // Pulsing ring — expands and fades behind the pill
+        this.startPulseRing(pillX, pillY, pillW, h);
+    }
+
+    private startPulseRing(pillX: number, pillY: number, pillW: number, h: number): void {
+        const g = this.pulseRingGfx;
+        g.clear();
+        g.lineStyle(2, COL_TRIM, 0.75);
+        g.strokeRoundedRect(pillX - 3, pillY - 3, pillW + 6, h + 6, h / 2 + 3);
+        g.setVisible(true);
+        g.setAlpha(0.75);
+        g.setScale(1);
+
+        if (this.pulseTween) {
+            this.pulseTween.stop();
+            this.pulseTween = null;
+        }
+        this.pulseTween = this.scene.tweens.add({
+            targets:  g,
+            alpha:    { from: 0.65, to: 0 },
+            scaleX:   { from: 1.0,  to: 1.10 },
+            scaleY:   { from: 1.0,  to: 1.25 },
+            duration: 850,
+            ease:     'Sine.easeOut',
+            repeat:   -1,
+            repeatDelay: 100,
+        });
     }
 
     private hidePrompt(): void {
+        // Stop pulse ring
+        if (this.pulseTween) {
+            this.pulseTween.stop();
+            this.pulseTween = null;
+        }
+        this.pulseRingGfx.setVisible(false);
+
         this.scene.tweens.killTweensOf([this.promptGfx, this.keyBadgeBg, this.keyBadgeText, this.promptText]);
         this.scene.tweens.add({
             targets:  [this.promptGfx, this.keyBadgeBg, this.keyBadgeText, this.promptText],
@@ -201,7 +244,12 @@ export class InteractionSystem {
     }
 
     destroy(): void {
+        if (this.pulseTween) {
+            this.pulseTween.stop();
+            this.pulseTween = null;
+        }
         this.eKey.destroy();
+        this.pulseRingGfx.destroy();
         this.promptGfx.destroy();
         this.keyBadgeBg.destroy();
         this.keyBadgeText.destroy();

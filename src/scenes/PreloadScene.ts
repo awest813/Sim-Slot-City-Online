@@ -398,8 +398,42 @@ export class PreloadScene extends Phaser.Scene {
 
         this.inputActive = true;
 
+        // Ambient sparkle particles drifting upward
+        this.spawnAmbientParticles();
+
         // Entrance animation — fade scene in
         this.cameras.main.fadeIn(ANIM_SLOW, 0, 0, 0);
+    }
+
+    private spawnAmbientParticles(): void {
+        const PARTICLE_COUNT = 18;
+        const colors = [COL_TRIM, 0xffe0a0, 0xc0d8ff, 0x80ffb0, 0xffc0e0];
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+            const x      = Phaser.Math.Between(30, GAME_WIDTH - 30);
+            const startY = Phaser.Math.Between(60, GAME_HEIGHT - 30);
+            const size   = Phaser.Math.FloatBetween(1.2, 3.0);
+            const alpha0 = Phaser.Math.FloatBetween(0.12, 0.40);
+            const delay  = Phaser.Math.Between(0, 4000);
+            const dur    = Phaser.Math.Between(3200, 6500);
+            const col    = colors[Math.floor(Math.random() * colors.length)];
+
+            const g = this.add.graphics();
+            g.fillStyle(col, alpha0);
+            g.fillCircle(0, 0, size);
+            g.setPosition(x, startY);
+            g.setAlpha(0);
+
+            this.tweens.add({
+                targets:     g,
+                y:           startY - Phaser.Math.Between(70, 160),
+                alpha:       { from: 0, to: alpha0, yoyo: true },
+                duration:    dur,
+                delay,
+                ease:        'Sine.easeInOut',
+                repeat:      -1,
+                repeatDelay: Phaser.Math.Between(300, 1800),
+            });
+        }
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

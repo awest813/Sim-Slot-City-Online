@@ -7,7 +7,7 @@ import {
     COL_TABLE,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
-    DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD,
+    DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD, DEPTH_OVERLAY,
     ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO,
     FONT, ANIM_SLOW,
 } from '../../game/constants';
@@ -36,6 +36,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
     // Context hint bar
     private hintBg!:      Phaser.GameObjects.Rectangle;
     private hintText!:    Phaser.GameObjects.Text;
+    private zoneFlashRect: Phaser.GameObjects.Rectangle | null = null;
 
     constructor() { super({ key: 'CasinoLobbyScene' }); }
 
@@ -1217,6 +1218,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         if (GameState.get().zone !== zone) {
             GameState.setZone(zone);
             this.updateHintForZone(zone);
+            this.flashZoneTransition(zone);
         }
     }
 
@@ -1225,6 +1227,42 @@ export class CasinoLobbyScene extends Phaser.Scene {
         zone: { x: number; y: number; w: number; h: number },
     ): boolean {
         return x >= zone.x && x <= zone.x + zone.w && y >= zone.y && y <= zone.y + zone.h;
+    }
+
+    private flashZoneTransition(zone: Zone): void {
+        const ZONE_FLASH_COLORS: Record<Zone, number> = {
+            slots:     COL_SLOTS_ACCENT,
+            poker:     COL_POKER_ACCENT,
+            bar:       COL_BAR_ACCENT,
+            blackjack: COL_BLACKJACK_ACCENT,
+            roulette:  COL_ROULETTE_ACCENT,
+            plinko:    COL_PLINKO_ACCENT,
+            bingo:     COL_BINGO_ACCENT,
+            entrance:  COL_TRIM,
+            floor:     0x112233,
+        };
+        const col = ZONE_FLASH_COLORS[zone] ?? 0x112233;
+
+        if (this.zoneFlashRect) {
+            this.tweens.killTweensOf(this.zoneFlashRect);
+            this.zoneFlashRect.destroy();
+            this.zoneFlashRect = null;
+        }
+
+        this.zoneFlashRect = this.add.rectangle(
+            GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, col, 0.13,
+        ).setScrollFactor(0).setDepth(DEPTH_OVERLAY + 20);
+
+        this.tweens.add({
+            targets:   this.zoneFlashRect,
+            fillAlpha: 0,
+            duration:  640,
+            ease:      'Sine.easeOut',
+            onComplete: () => {
+                this.zoneFlashRect?.destroy();
+                this.zoneFlashRect = null;
+            },
+        });
     }
 
     // ── Interaction Hotspots ──────────────────────────────────────────────────

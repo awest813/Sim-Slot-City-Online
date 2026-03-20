@@ -164,6 +164,13 @@ export class Minimap {
         const g = this.dotGfx;
         g.clear();
 
+        // Pulsing outer ring — expands and fades over a 1.4 s cycle
+        const t = (Date.now() % 1400) / 1400;   // 0 → 1 each 1.4 s
+        const pulseR  = 4 + t * 7;              // 4 → 11 px
+        const pulseA  = 0.45 * (1 - t);         // fades to 0
+        g.fillStyle(0xffffff, pulseA);
+        g.fillCircle(px, py, pulseR);
+
         // Soft halo
         g.fillStyle(0xffffff, 0.12);
         g.fillCircle(px, py, 5);
