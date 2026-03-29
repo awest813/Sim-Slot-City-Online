@@ -4,7 +4,7 @@ import {
     COL_UI_BG2, COL_UI_BG3, COL_UI_BORDER, COL_TRIM, COL_TRIM_DIM,
     COL_BTN_PRIMARY, COL_BTN_PRIMARY_H,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BLACKJACK_ACCENT, COL_BAR_ACCENT, COL_BINGO_ACCENT,
-    COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT,
+    COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_HORSES_ACCENT,
     FONT, ANIM_MED, ANIM_SLOW,
 } from '../game/constants';
 import { GameState } from '../core/state/GameState';
@@ -206,6 +206,7 @@ export class PreloadScene extends Phaser.Scene {
             { icon: '🎯', label: 'PLINKO',    color: COL_PLINKO_ACCENT },
             { icon: '🍹', label: 'BAR',       color: COL_BAR_ACCENT },
             { icon: '🎱', label: 'BINGO',     color: COL_BINGO_ACCENT },
+            { icon: '🏇', label: 'HORSES',    color: COL_HORSES_ACCENT },
         ];
 
         // Compact pill size to fit all 7 across the screen width

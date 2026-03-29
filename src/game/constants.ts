@@ -39,6 +39,7 @@ export const COL_BLACKJACK_ACCENT = 0x9b50c0;   // Purple (blackjack)
 export const COL_ROULETTE_ACCENT  = 0xcc3333;   // Red (roulette)
 export const COL_PLINKO_ACCENT    = 0x20d4a0;   // Teal (plinko)
 export const COL_BINGO_ACCENT     = 0x00c8ff;   // Cyan (bingo)
+export const COL_HORSES_ACCENT    = 0xe8b020;   // Gold-amber (horse race)
 
 // ── Palette — UI ──────────────────────────────────────────────────────────────
 export const COL_UI_BG        = 0x080f1c;   // Panel background (deep navy)
@@ -123,3 +124,4 @@ export const ZONE_BLACKJACK  = { x: 330, y: 250, w: 300, h: 200 };
 export const ZONE_ROULETTE   = { x:  30, y: 450, w: 270, h: 130 };
 export const ZONE_PLINKO     = { x: 650, y: 450, w: 280, h: 130 };
 export const ZONE_BINGO      = { x: 320, y: 452, w: 310, h: 118 };
+export const ZONE_HORSES     = { x: 650, y: 590, w: 280, h:  98 };
