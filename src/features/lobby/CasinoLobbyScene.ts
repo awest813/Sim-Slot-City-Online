@@ -5,10 +5,10 @@ import {
     COL_BG, COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
     COL_TRIM, COL_TRIM_DIM,
     COL_TABLE,
-    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT,
+    COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT, COL_HORSES_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD, DEPTH_OVERLAY,
-    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO,
+    ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO, ZONE_HORSES,
     FONT, ANIM_SLOW,
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
@@ -25,13 +25,14 @@ import { BlackjackPanel } from '../blackjack/BlackjackPanel';
 import { RoulettePanel } from '../roulette/RoulettePanel';
 import { PlinkoPanel } from '../plinko/PlinkoPanel';
 import { BingoPanel } from '../bingo/BingoPanel';
+import { HorseRacePanel } from '../horserace/HorseRacePanel';
 
 export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!:      AvatarController;
     private aiWalkers:    AIWalker[] = [];
     private interaction!: InteractionSystem;
     private minimap!:     Minimap;
-    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' | 'plinko' | 'bingo' = 'none';
+    private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' | 'plinko' | 'bingo' | 'horses' = 'none';
     private graphics!:    Phaser.GameObjects.Graphics;
     // Context hint bar
     private hintBg!:      Phaser.GameObjects.Rectangle;
@@ -251,6 +252,11 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillRect(ZONE_BINGO.x - 8, ZONE_BINGO.y - 8, ZONE_BINGO.w + 16, ZONE_BINGO.h + 16);
         g.fillStyle(0x041820, 0.6);
         g.fillRect(ZONE_BINGO.x, ZONE_BINGO.y, ZONE_BINGO.w, ZONE_BINGO.h);
+        // Horses
+        g.fillStyle(0x1c1400, 0.3);
+        g.fillRect(ZONE_HORSES.x - 8, ZONE_HORSES.y - 8, ZONE_HORSES.w + 16, ZONE_HORSES.h + 16);
+        g.fillStyle(0x1c1400, 0.6);
+        g.fillRect(ZONE_HORSES.x, ZONE_HORSES.y, ZONE_HORSES.w, ZONE_HORSES.h);
 
         // Spotlight radial layer on each zone center
         g.fillStyle(COL_SLOTS_ACCENT, 0.04);
@@ -267,6 +273,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillCircle(ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + ZONE_PLINKO.h / 2, Math.max(ZONE_PLINKO.w, ZONE_PLINKO.h) * 0.7);
         g.fillStyle(COL_BINGO_ACCENT, 0.04);
         g.fillCircle(ZONE_BINGO.x + ZONE_BINGO.w / 2, ZONE_BINGO.y + ZONE_BINGO.h / 2, Math.max(ZONE_BINGO.w, ZONE_BINGO.h) * 0.7);
+        g.fillStyle(COL_HORSES_ACCENT, 0.04);
+        g.fillCircle(ZONE_HORSES.x + ZONE_HORSES.w / 2, ZONE_HORSES.y + ZONE_HORSES.h / 2, Math.max(ZONE_HORSES.w, ZONE_HORSES.h) * 0.7);
 
         // === Zone accent borders — 3-layer neon glow ===
         const zones: Array<[typeof ZONE_SLOTS, number]> = [
@@ -277,6 +285,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             [ZONE_ROULETTE,   COL_ROULETTE_ACCENT],
             [ZONE_PLINKO,     COL_PLINKO_ACCENT],
             [ZONE_BINGO,      COL_BINGO_ACCENT],
+            [ZONE_HORSES,     COL_HORSES_ACCENT],
         ];
         for (const [z, col] of zones) {
             // Outer glow
@@ -345,6 +354,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.drawBingoBoard(
             ZONE_BINGO.x + ZONE_BINGO.w / 2,
             ZONE_BINGO.y + ZONE_BINGO.h / 2,
+        );
+
+        // Horse race tote board
+        this.drawHorseToteBoard(
+            ZONE_HORSES.x + ZONE_HORSES.w / 2,
+            ZONE_HORSES.y + ZONE_HORSES.h / 2,
         );
 
         // Chandeliers
@@ -853,6 +868,55 @@ export class CasinoLobbyScene extends Phaser.Scene {
         }
     }
 
+    private drawHorseToteBoard(cx: number, cy: number): void {
+        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
+        const bw = 150;
+        const bh = 72;
+
+        // Shadow
+        g2.fillStyle(0x000000, 0.3);
+        g2.fillRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 4, bw, bh, 5);
+        // Board background
+        g2.fillStyle(0x100c00, 1);
+        g2.fillRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
+        // Amber border
+        g2.lineStyle(2, COL_HORSES_ACCENT, 0.85);
+        g2.strokeRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
+        g2.lineStyle(1, COL_HORSES_ACCENT, 0.18);
+        g2.strokeRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 3, bw - 6, bh - 6, 3);
+
+        // Decorative odds rows (6 horses)
+        const rowH  = (bh - 20) / 6;
+        const rowX  = cx - bw / 2 + 8;
+        const rowY0 = cy - bh / 2 + 18;
+        const oddsLabels = ['2×', '3×', '4×', '6×', '10×', '20×'];
+        for (let r = 0; r < 6; r++) {
+            const ry = rowY0 + r * rowH;
+            g2.fillStyle(r % 2 === 0 ? 0x181000 : 0x120e00, 1);
+            g2.fillRect(rowX, ry, bw - 16, rowH - 1);
+            // Bar fill — purely decorative
+            const barFrac = [0.72, 0.58, 0.44, 0.32, 0.18, 0.10][r];
+            g2.fillStyle(COL_HORSES_ACCENT, 0.3 + barFrac * 0.2);
+            g2.fillRect(rowX, ry, (bw - 16) * barFrac, rowH - 1);
+            // Odds text placed later via this.add.text below
+        }
+
+        // Header text
+        this.add.text(cx, cy - bh / 2 + 9, '🏇 ODDS BOARD', {
+            fontFamily: FONT, fontSize: '7px',
+            color: Phaser.Display.Color.IntegerToColor(COL_HORSES_ACCENT).rgba,
+            fontStyle: 'bold',
+        }).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
+
+        // Odds labels
+        for (let r = 0; r < 6; r++) {
+            const ry = rowY0 + r * rowH + rowH / 2;
+            this.add.text(rowX + bw - 24, ry, oddsLabels[r], {
+                fontFamily: FONT, fontSize: '7px', color: '#c9a84c',
+            }).setOrigin(1, 0.5).setDepth(DEPTH_PROPS + 1);
+        }
+    }
+
     private drawPillar(x: number, y: number): void {
         const g2 = this.add.graphics().setDepth(DEPTH_PROPS + 1);
 
@@ -994,6 +1058,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             [ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,     ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2,     0xcc3333, 100],
             [ZONE_PLINKO.x + ZONE_PLINKO.w / 2,         ZONE_PLINKO.y + ZONE_PLINKO.h / 2,         0x20d4a0, 100],
             [ZONE_BINGO.x  + ZONE_BINGO.w  / 2,         ZONE_BINGO.y  + ZONE_BINGO.h  / 2,         0x00c8ff, 100],
+            [ZONE_HORSES.x + ZONE_HORSES.w / 2,         ZONE_HORSES.y + ZONE_HORSES.h / 2,         0xe8b020, 90],
         ];
 
         const ambientGfx = this.add.graphics().setDepth(DEPTH_FLOOR + 2);
@@ -1017,6 +1082,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.buildZoneSign(ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + 14, '🎡 ROULETTE', COL_ROULETTE_ACCENT, d);
         this.buildZoneSign(ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + 14, '🎯 PLINKO', COL_PLINKO_ACCENT, d);
         this.buildZoneSign(ZONE_BINGO.x + ZONE_BINGO.w / 2, ZONE_BINGO.y + 14, '🎱 BINGO', COL_BINGO_ACCENT, d);
+        this.buildZoneSign(ZONE_HORSES.x + ZONE_HORSES.w / 2, ZONE_HORSES.y + 14, '🏇 HORSE RACING', COL_HORSES_ACCENT, d);
     }
 
     private buildZoneSign(x: number, y: number, text: string, accentColor: number, depth: number): void {
@@ -1213,6 +1279,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         else if (this.inZone(x, y, ZONE_ROULETTE))   zone = 'roulette';
         else if (this.inZone(x, y, ZONE_PLINKO))     zone = 'plinko';
         else if (this.inZone(x, y, ZONE_BINGO))      zone = 'bingo';
+        else if (this.inZone(x, y, ZONE_HORSES))     zone = 'horses';
         else if (this.inZone(x, y, ZONE_ENTRANCE))   zone = 'entrance';
 
         if (GameState.get().zone !== zone) {
@@ -1238,6 +1305,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             roulette:  COL_ROULETTE_ACCENT,
             plinko:    COL_PLINKO_ACCENT,
             bingo:     COL_BINGO_ACCENT,
+            horses:    COL_HORSES_ACCENT,
             entrance:  COL_TRIM,
             floor:     0x112233,
         };
@@ -1316,6 +1384,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
             label: 'Play Bingo',
             onInteract: () => this.openBingo(),
         });
+        this.interaction.register({
+            id: 'horses',
+            x: ZONE_HORSES.x + ZONE_HORSES.w / 2,
+            y: ZONE_HORSES.y + ZONE_HORSES.h / 2,
+            radius: 100,
+            label: 'Bet on Horses',
+            onInteract: () => this.openHorseRace(),
+        });
     }
 
     // ── Panel Openers ─────────────────────────────────────────────────────────
@@ -1369,6 +1445,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
         new BingoPanel(this, () => this.closePanel());
     }
 
+    private openHorseRace(): void {
+        if (this.activePanel !== 'none') return;
+        this.activePanel = 'horses';
+        GameState.setInteraction('horses');
+        new HorseRacePanel(this, () => this.closePanel());
+    }
+
     private closePanel(): void {
         this.activePanel = 'none';
         GameState.clearInteraction();
@@ -1400,6 +1483,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             roulette:  'Walk up and press  E  to play  ·  SPACE spin  ·  ESC close',
             plinko:    'Walk up and press  E  to play  ·  SPACE drop  ·  ESC close',
             bingo:     'Walk up and press  E  to play  ·  ESC close',
+            horses:    'Walk up and press  E  to bet  ·  Pick horse, set bet, press RACE  ·  ESC close',
         };
 
         if (this.hintText) {
@@ -1439,7 +1523,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         const steps: Array<{ icon: string; title: string; desc: string }> = [
             { icon: '①', title: 'Move around',       desc: 'WASD or Arrow keys to walk your avatar through the casino' },
-            { icon: '②', title: 'Approach a zone',   desc: 'Walk near Slots, Poker Table, Bar, Blackjack, Roulette, Plinko, or Bingo' },
+            { icon: '②', title: 'Approach a zone',   desc: 'Walk near Slots, Poker Table, Bar, Blackjack, Roulette, Plinko, Bingo, or Horse Racing' },
             { icon: '③', title: 'Press E to interact', desc: 'Approach any zone and press E when the prompt appears' },
             { icon: '④', title: 'Play & earn chips',  desc: 'Start with 1,000 ◈  ·  Free reload if you go broke  ·  Minimap: bottom-right' },
         ];
