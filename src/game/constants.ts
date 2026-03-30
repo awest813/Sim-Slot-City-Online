@@ -30,6 +30,11 @@ export const COL_ALL_IN      = 0xcc44cc;   // magenta badge for all-in players a
 export const COL_WHITE       = 0xf0e6d3;
 export const COL_GRAY        = 0x889090;
 export const COL_GRAY_DIM    = 0x445050;
+export const COL_SKY_TOP     = 0x050914;
+export const COL_SKY_MID     = 0x0d1730;
+export const COL_SKY_GLOW    = 0x1d1330;
+export const COL_RUNNER      = 0x230816;
+export const COL_RUNNER_TRIM = 0xff4fa8;
 
 // ── Palette — Zone Accent Colors ──────────────────────────────────────────────
 export const COL_SLOTS_ACCENT     = 0xf5a020;   // Amber (slots)

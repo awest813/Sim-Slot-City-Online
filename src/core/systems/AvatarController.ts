@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import {
     AVATAR_SPEED, AVATAR_SIZE, WORLD_W, WORLD_H,
     COL_TRIM, COL_UI_BG2, DEPTH_AVATAR_BASE, DEPTH_SHADOW,
+    COL_NEON_BLUE, COL_NEON_PINK,
 } from '../../game/constants';
 
 interface Blocker {
@@ -12,8 +13,11 @@ export type FacingDir = 'down' | 'up' | 'left' | 'right';
 
 export class AvatarController {
     private scene: Phaser.Scene;
+    private aura!: Phaser.GameObjects.Ellipse;
+    private shoulders!: Phaser.GameObjects.Ellipse;
     private body!: Phaser.GameObjects.Arc;
     private head!: Phaser.GameObjects.Arc;
+    private hair!: Phaser.GameObjects.Arc;
     private dot!: Phaser.GameObjects.Arc;    // facing indicator
     private shadow!: Phaser.GameObjects.Ellipse;
     private nameTag!: Phaser.GameObjects.Text;
@@ -50,8 +54,15 @@ export class AvatarController {
         this.shadow = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE - 2, AVATAR_SIZE * 2, AVATAR_SIZE * 0.8, 0x000000, 0.35)
             .setDepth(DEPTH_SHADOW);
 
+        this.aura = this.scene.add.ellipse(this.x, this.y - 2, AVATAR_SIZE * 2.8, AVATAR_SIZE * 3.3, COL_NEON_BLUE, 0.14)
+            .setDepth(DEPTH_AVATAR_BASE - 1);
+
+        this.shoulders = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE * 0.15, AVATAR_SIZE * 1.85, AVATAR_SIZE * 1.35, 0x151a34)
+            .setDepth(DEPTH_AVATAR_BASE);
+        this.shoulders.setStrokeStyle(1.5, COL_NEON_PINK, 0.18);
+
         // Body (torso)
-        this.body = this.scene.add.arc(this.x, this.y, AVATAR_SIZE, 0, 360, false, COL_UI_BG2)
+        this.body = this.scene.add.arc(this.x, this.y - 1, AVATAR_SIZE * 0.84, 0, 360, false, COL_UI_BG2)
             .setDepth(DEPTH_AVATAR_BASE);
         this.body.setStrokeStyle(2, COL_TRIM, 1);
 
@@ -60,16 +71,21 @@ export class AvatarController {
             .setDepth(DEPTH_AVATAR_BASE + 1);
         this.head.setStrokeStyle(1.5, 0xb08060, 1);
 
+        this.hair = this.scene.add.arc(this.x, this.y - AVATAR_SIZE * 0.95, AVATAR_SIZE * 0.42, 180, 360, false, 0x2a1a14)
+            .setDepth(DEPTH_AVATAR_BASE + 2);
+        this.hair.setStrokeStyle(1, 0x483024, 0.75);
+
         // Facing dot
         this.dot = this.scene.add.arc(this.x, this.y + AVATAR_SIZE * 0.6, 3, 0, 360, false, COL_TRIM)
-            .setDepth(DEPTH_AVATAR_BASE + 2);
+            .setDepth(DEPTH_AVATAR_BASE + 3);
 
         // Name tag
         this.nameTag = this.scene.add.text(this.x, this.y - AVATAR_SIZE * 2.2, displayName, {
             fontFamily: 'monospace',
             fontSize: '10px',
             color: '#c9a84c',
-        }).setOrigin(0.5, 1).setDepth(DEPTH_AVATAR_BASE + 3);
+        }).setOrigin(0.5, 1).setDepth(DEPTH_AVATAR_BASE + 4);
+        this.nameTag.setShadow(0, 1, '#000000', 3, false, true);
     }
 
     addBlocker(b: Blocker): void {
@@ -148,15 +164,21 @@ export class AvatarController {
         const r = AVATAR_SIZE;
 
         this.shadow.setPosition(this.x, this.y + r - 2);
-        this.body.setPosition(this.x, this.y);
+        this.aura.setPosition(this.x, this.y - 2).setAlpha(this.isMoving ? 0.22 : 0.14);
+        this.shoulders.setPosition(this.x, this.y + r * 0.12);
+        this.body.setPosition(this.x, this.y - 1);
         this.head.setPosition(this.x, this.y - r * 0.8);
+        this.hair.setPosition(this.x, this.y - r * 0.95);
         this.nameTag.setPosition(this.x, this.y - r * 2.4);
 
         // Depth sort: higher y = higher depth
         const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
+        this.aura.setDepth(depth - 2);
+        this.shoulders.setDepth(depth);
         this.body.setDepth(depth);
         this.head.setDepth(depth + 1);
-        this.nameTag.setDepth(depth + 3);
+        this.hair.setDepth(depth + 2);
+        this.nameTag.setDepth(depth + 4);
         this.shadow.setDepth(depth - 5);
 
         // Facing indicator offset
@@ -167,13 +189,16 @@ export class AvatarController {
             right: [ r * 0.6, 0],
         };
         const [ox, oy] = offsets[this.facing];
-        this.dot.setPosition(this.x + ox, this.y + oy).setDepth(depth + 2);
+        this.dot.setPosition(this.x + ox, this.y + oy).setDepth(depth + 3);
     }
 
     destroy(): void {
         this.shadow.destroy();
+        this.aura.destroy();
+        this.shoulders.destroy();
         this.body.destroy();
         this.head.destroy();
+        this.hair.destroy();
         this.dot.destroy();
         this.nameTag.destroy();
     }

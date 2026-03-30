@@ -56,6 +56,14 @@ export class PreloadScene extends Phaser.Scene {
         bgGfx.fillStyle(0xc9a84c, 0.02);  // warm gold tint at very centre
         bgGfx.fillCircle(cx, cy, 18);
 
+        // Sweeping spotlights behind the marquee
+        bgGfx.fillStyle(0x40b0ff, 0.05);
+        bgGfx.fillTriangle(cx - 210, GAME_HEIGHT, cx - 36, cy - 170, cx - 88, cy - 170);
+        bgGfx.fillStyle(0xff40a0, 0.04);
+        bgGfx.fillTriangle(cx + 210, GAME_HEIGHT, cx + 36, cy - 170, cx + 88, cy - 170);
+        bgGfx.fillStyle(0xffd040, 0.035);
+        bgGfx.fillTriangle(cx, GAME_HEIGHT, cx - 28, cy - 190, cx + 28, cy - 190);
+
         // Diagonal diamond-grid carpet pattern
         bgGfx.lineStyle(0.5, COL_TRIM_DIM, 0.07);
         const gs = 60;
@@ -63,6 +71,24 @@ export class PreloadScene extends Phaser.Scene {
             bgGfx.lineBetween(x - gs / 2, 0, x + gs / 2, GAME_HEIGHT);
             bgGfx.lineBetween(x + gs / 2, 0, x - gs / 2, GAME_HEIGHT);
         }
+
+        // Neon skyline silhouette
+        const skylineBase = GAME_HEIGHT - 110;
+        const skylineBars = [
+            [26, 72], [64, 118], [112, 86], [150, 146], [204, 98], [252, 126], [304, 92],
+            [360, 166], [420, 104], [474, 136], [536, 96], [588, 152], [650, 112], [706, 134],
+            [764, 90], [816, 146], [874, 80],
+        ];
+        bgGfx.fillStyle(0x08101e, 0.95);
+        for (const [sx, h] of skylineBars) {
+            bgGfx.fillRect(sx, skylineBase - h, 28, h);
+            bgGfx.fillStyle(0xc9a84c, 0.08);
+            bgGfx.fillRect(sx + 8, skylineBase - h + 12, 4, h - 22);
+            bgGfx.fillRect(sx + 16, skylineBase - h + 24, 4, h - 34);
+            bgGfx.fillStyle(0x08101e, 0.95);
+        }
+        bgGfx.fillStyle(0x0b1324, 1);
+        bgGfx.fillRect(0, skylineBase, GAME_WIDTH, GAME_HEIGHT - skylineBase);
 
         // Outer frames — nested gold rectangles
         bgGfx.lineStyle(1, COL_UI_BORDER, 0.25);
@@ -144,9 +170,19 @@ export class PreloadScene extends Phaser.Scene {
             const y2 = logoY  + Math.sin(angle) * 50;
             glowGfx.lineBetween(cx, logoY, x2, y2);
         }
+        glowGfx.lineStyle(1, 0x40b0ff, 0.18);
+        glowGfx.strokeCircle(cx, logoY, 52);
+        glowGfx.lineStyle(1, 0xff40a0, 0.14);
+        glowGfx.strokeCircle(cx, logoY, 58);
 
         this.add.text(cx, logoY, '🎰', {
             fontFamily: 'monospace', fontSize: '48px',
+        }).setOrigin(0.5);
+        this.add.text(cx - 48, logoY + 8, '♠', {
+            fontFamily: FONT, fontSize: '18px', color: '#40b0ff', fontStyle: 'bold',
+        }).setOrigin(0.5);
+        this.add.text(cx + 48, logoY + 8, '♦', {
+            fontFamily: FONT, fontSize: '18px', color: '#ff4fa8', fontStyle: 'bold',
         }).setOrigin(0.5);
 
         // ── Title — 4-layer neon effect ────────────────────────────────────

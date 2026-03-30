@@ -2,11 +2,12 @@
 import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, WORLD_W, WORLD_H,
-    COL_BG, COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
+    COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
     COL_TRIM, COL_TRIM_DIM,
     COL_TABLE,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT, COL_HORSES_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
+    COL_SKY_TOP, COL_SKY_MID, COL_SKY_GLOW, COL_RUNNER, COL_RUNNER_TRIM, COL_NEON_BLUE, COL_NEON_PINK,
     DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD, DEPTH_OVERLAY,
     ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO, ZONE_HORSES,
     FONT, ANIM_SLOW,
@@ -130,13 +131,20 @@ export class CasinoLobbyScene extends Phaser.Scene {
         const g = this.graphics;
 
         // === Background ===
-        g.fillStyle(COL_BG, 1);
+        g.fillStyle(COL_SKY_TOP, 1);
         g.fillRect(0, 0, WORLD_W, WORLD_H);
+        g.fillStyle(COL_SKY_MID, 0.45);
+        g.fillRect(0, 0, WORLD_W, WORLD_H * 0.45);
+        g.fillStyle(COL_SKY_GLOW, 0.32);
+        g.fillCircle(WORLD_W / 2, WORLD_H * 0.16, 240);
+        g.fillStyle(0x16122e, 0.18);
+        g.fillTriangle(90, WORLD_H, WORLD_W / 2 - 72, 34, WORLD_W / 2 + 12, 34);
+        g.fillTriangle(WORLD_W - 90, WORLD_H, WORLD_W / 2 + 72, 34, WORLD_W / 2 - 12, 34);
 
         // Subtle radial gradient from center
-        g.fillStyle(0x080e20, 0.4);
+        g.fillStyle(0x080e20, 0.35);
         g.fillCircle(WORLD_W / 2, WORLD_H / 2, 600);
-        g.fillStyle(0x0a1428, 0.25);
+        g.fillStyle(0x0a1428, 0.2);
         g.fillCircle(WORLD_W / 2, WORLD_H / 2, 400);
 
         // === Walls ===
@@ -194,6 +202,26 @@ export class CasinoLobbyScene extends Phaser.Scene {
                 g.lineBetween(tx + 2, ty + 2, tx + tileSize - 3, ty + 2);
                 g.lineBetween(tx + 2, ty + 2, tx + 2, ty + tileSize - 3);
             }
+        }
+
+        // Central velvet runner
+        const runnerX = WORLD_W / 2 - 118;
+        const runnerY = 178;
+        const runnerW = 236;
+        const runnerH = WORLD_H - runnerY - 86;
+        g.fillStyle(COL_RUNNER, 0.88);
+        g.fillRoundedRect(runnerX, runnerY, runnerW, runnerH, 18);
+        g.lineStyle(3, COL_RUNNER_TRIM, 0.35);
+        g.strokeRoundedRect(runnerX + 4, runnerY + 4, runnerW - 8, runnerH - 8, 16);
+        g.lineStyle(1, COL_TRIM, 0.35);
+        g.strokeRoundedRect(runnerX + 14, runnerY + 14, runnerW - 28, runnerH - 28, 10);
+        for (let yy = runnerY + 34; yy < runnerY + runnerH - 22; yy += 56) {
+            g.lineStyle(1, COL_NEON_BLUE, 0.1);
+            g.lineBetween(WORLD_W / 2 - 54, yy, WORLD_W / 2, yy - 10);
+            g.lineStyle(1, COL_NEON_PINK, 0.1);
+            g.lineBetween(WORLD_W / 2, yy - 10, WORLD_W / 2 + 54, yy);
+            g.fillStyle(COL_TRIM, 0.18);
+            g.fillCircle(WORLD_W / 2, yy - 10, 3);
         }
 
         // Diamond diagonal overlay — subtle
@@ -289,14 +317,28 @@ export class CasinoLobbyScene extends Phaser.Scene {
         ];
         for (const [z, col] of zones) {
             // Outer glow
-            g.lineStyle(4, col, 0.15);
-            g.strokeRect(z.x - 2, z.y - 2, z.w + 4, z.h + 4);
+            g.lineStyle(10, col, 0.035);
+            g.strokeRoundedRect(z.x - 5, z.y - 5, z.w + 10, z.h + 10, 10);
             // Mid glow
-            g.lineStyle(2, col, 0.4);
-            g.strokeRect(z.x, z.y, z.w, z.h);
+            g.lineStyle(2, col, 0.22);
+            g.strokeRoundedRect(z.x + 3, z.y + 3, z.w - 6, z.h - 6, 8);
             // Inner accent
-            g.lineStyle(0.5, col, 0.25);
-            g.strokeRect(z.x + 2, z.y + 2, z.w - 4, z.h - 4);
+            g.lineStyle(1, COL_TRIM, 0.22);
+            g.strokeRoundedRect(z.x + 11, z.y + 11, z.w - 22, z.h - 22, 5);
+
+            const bracket = 18;
+            const brackets: Array<[number, number, number, number]> = [
+                [z.x + 10, z.y + 10, z.x + 10 + bracket, z.y + 10],
+                [z.x + 10, z.y + 10, z.x + 10, z.y + 10 + bracket],
+                [z.x + z.w - 10, z.y + 10, z.x + z.w - 10 - bracket, z.y + 10],
+                [z.x + z.w - 10, z.y + 10, z.x + z.w - 10, z.y + 10 + bracket],
+                [z.x + 10, z.y + z.h - 10, z.x + 10 + bracket, z.y + z.h - 10],
+                [z.x + 10, z.y + z.h - 10, z.x + 10, z.y + z.h - 10 - bracket],
+                [z.x + z.w - 10, z.y + z.h - 10, z.x + z.w - 10 - bracket, z.y + z.h - 10],
+                [z.x + z.w - 10, z.y + z.h - 10, z.x + z.w - 10, z.y + z.h - 10 - bracket],
+            ];
+            g.lineStyle(2, col, 0.4);
+            for (const [x1, y1, x2, y2] of brackets) g.lineBetween(x1, y1, x2, y2);
         }
 
         // === Entrance path ===
@@ -1063,13 +1105,19 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
         const ambientGfx = this.add.graphics().setDepth(DEPTH_FLOOR + 2);
         for (const [lx, ly, col, radius] of lightPools) {
-            ambientGfx.fillStyle(col, 0.025);
-            ambientGfx.fillCircle(lx, ly, radius);
             ambientGfx.fillStyle(col, 0.035);
-            ambientGfx.fillCircle(lx, ly, radius * 0.55);
+            ambientGfx.fillCircle(lx, ly, radius);
             ambientGfx.fillStyle(col, 0.05);
+            ambientGfx.fillCircle(lx, ly, radius * 0.55);
+            ambientGfx.fillStyle(col, 0.075);
             ambientGfx.fillCircle(lx, ly, radius * 0.28);
         }
+
+        const shaftGfx = this.add.graphics().setDepth(DEPTH_FLOOR + 1);
+        shaftGfx.fillStyle(0xffd040, 0.03);
+        shaftGfx.fillTriangle(WORLD_W / 2 - 46, 104, WORLD_W / 2 + 46, 104, WORLD_W / 2, 258);
+        shaftGfx.fillTriangle(154, 216, 246, 216, 200, 320);
+        shaftGfx.fillTriangle(714, 216, 806, 216, 760, 320);
     }
 
     private buildLabels(): void {
@@ -1099,8 +1147,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
         const bgGfx = this.add.graphics().setDepth(depth - 1);
 
         // Extra outer neon glow (4th ring)
-        bgGfx.lineStyle(8, accentColor, 0.04);
-        bgGfx.strokeRoundedRect(x - sw / 2 - 5, y - sh / 2 - 5, sw + 10, sh + 10, 8);
+        bgGfx.lineStyle(10, accentColor, 0.04);
+        bgGfx.strokeRoundedRect(x - sw / 2 - 7, y - sh / 2 - 7, sw + 14, sh + 14, 10);
         // Outer neon glow
         bgGfx.lineStyle(6, accentColor, 0.08);
         bgGfx.strokeRoundedRect(x - sw / 2 - 3, y - sh / 2 - 3, sw + 6, sh + 6, 7);
@@ -1115,10 +1163,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
         bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2 + sh * 0.3, sw, sh * 0.4, 0);
         bgGfx.fillStyle(accentColor, 0.06);
         bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
+        bgGfx.fillStyle(0xffffff, 0.04);
+        bgGfx.fillRoundedRect(x - sw / 2 + 4, y - sh / 2 + 3, sw - 8, 7, { tl: 4, tr: 4, bl: 0, br: 0 });
 
         // Neon border
         bgGfx.lineStyle(1.5, accentColor, 0.8);
         bgGfx.strokeRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
+        bgGfx.lineStyle(1, COL_TRIM, 0.18);
+        bgGfx.strokeRoundedRect(x - sw / 2 + 3, y - sh / 2 + 3, sw - 6, sh - 6, 4);
 
         // Left accent bar
         bgGfx.fillStyle(accentColor, 0.8);
