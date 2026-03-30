@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GameState, PlayerState, Zone } from '../../core/state/GameState';
 import {
+    GAME_WIDTH,
     DEPTH_HUD, COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     COL_TRIM_DIM,
     FONT,
@@ -113,7 +114,7 @@ export class HUD {
         // ── Zone badge (top-right) ─────────────────────────────────────────
         const zoneW = 168;
         const zoneH = 28;
-        const zoneX = 960 - zoneW - 8;
+        const zoneX = GAME_WIDTH - zoneW - 8;
         const zoneY = 8;
 
         this.zoneGfx = this.scene.add.graphics()
@@ -190,6 +191,7 @@ export class HUD {
             this.muteGfx.strokeRoundedRect(muteX, muteY, muteSize, muteSize, 5);
         };
         drawMuteBtn(false);
+        this.muteLabel.setText(SoundManager.isMuted() ? '🔇' : '🔊');
 
         this.muteHit.on('pointerover',  () => drawMuteBtn(true));
         this.muteHit.on('pointerout',   () => drawMuteBtn(false));
@@ -264,7 +266,7 @@ export class HUD {
     private drawZoneBadge(zone: Zone): void {
         const zoneW = 168;
         const zoneH = 28;
-        const zoneX = 960 - zoneW - 8;
+        const zoneX = GAME_WIDTH - zoneW - 8;
         const zoneY = 8;
         const acc = ZONE_ACCENT[zone] ?? ZONE_ACCENT['floor'];
         const g = this.zoneGfx;
@@ -307,7 +309,11 @@ export class HUD {
         this.freeChipsVisible = visible;
         this.freeChipsGfx.setVisible(visible);
         this.freeChipsLabel.setVisible(visible);
-        this.freeChipsHit.setInteractive(visible ? { useHandCursor: true } : undefined as any);
+        if (visible) {
+            this.freeChipsHit.setInteractive({ useHandCursor: true });
+        } else {
+            this.freeChipsHit.disableInteractive();
+        }
         this.freeChipsHit.setVisible(visible);
         if (visible) this.drawFreeChipsBtn(false);
         else this.freeChipsGfx.clear();
