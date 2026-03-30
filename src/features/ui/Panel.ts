@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_TRIM,
-    FONT, ANIM_MED, PANEL_RADIUS,
+    FONT, ANIM_MED, PANEL_RADIUS, COL_NEON_BLUE, COL_NEON_PINK,
 } from '../../game/constants';
 
 export interface ButtonConfig {
@@ -94,12 +94,25 @@ export class Panel {
         // Main background
         g.fillStyle(COL_UI_BG, 1);
         g.fillRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
+        g.fillStyle(COL_NEON_BLUE, 0.05);
+        g.fillCircle(cx - this.w * 0.2, cy - this.h * 0.15, this.w * 0.28);
+        g.fillStyle(COL_NEON_PINK, 0.05);
+        g.fillCircle(cx + this.w * 0.22, cy + this.h * 0.12, this.w * 0.24);
 
         // Center highlight simulation
-        g.fillStyle(0x0d1830, 0.5);
-        g.fillCircle(cx, cy - 30, this.w * 0.4);
-        g.fillStyle(COL_UI_BG, 0.7);
+        g.fillStyle(0x0d1830, 0.6);
+        g.fillCircle(cx, cy - 30, this.w * 0.42);
+        g.fillStyle(COL_UI_BG, 0.78);
         g.fillRoundedRect(px + 4, py + 4, this.w - 8, this.h - 8, PANEL_RADIUS - 2);
+
+        // Vertical panel bands for a glass-casino feel
+        g.fillStyle(0xffffff, 0.025);
+        g.fillRoundedRect(px + 24, py + 18, 22, this.h - 36, 8);
+        g.fillRoundedRect(px + this.w - 46, py + 18, 22, this.h - 36, 8);
+        g.fillStyle(COL_NEON_BLUE, 0.06);
+        g.fillRoundedRect(px + 30, py + 26, 8, this.h - 52, 6);
+        g.fillStyle(COL_NEON_PINK, 0.05);
+        g.fillRoundedRect(px + this.w - 38, py + 26, 8, this.h - 52, 6);
 
         // Top header band
         g.fillStyle(COL_UI_BG2, 1);
@@ -113,6 +126,12 @@ export class Panel {
             px + this.w - PANEL_RADIUS - 72, py + 1,
             px + this.w - PANEL_RADIUS - 2,  py + 1,
             px + this.w - PANEL_RADIUS - 2,  py + 46,
+        );
+        g.fillStyle(0xffffff, 0.03);
+        g.fillTriangle(
+            px + PANEL_RADIUS + 2, py + 1,
+            px + PANEL_RADIUS + 56, py + 1,
+            px + PANEL_RADIUS + 2, py + 36,
         );
 
         // Gold border — main
@@ -173,6 +192,12 @@ export class Panel {
         for (const [dx, dy] of dotPositions) {
             g.fillRect(dx - dotR, dy - dotR, dotR * 2, dotR * 2);
         }
+
+        // Bottom deco rails
+        g.lineStyle(2, COL_NEON_BLUE, 0.12);
+        g.lineBetween(px + 24, py + this.h - 20, px + this.w / 2 - 44, py + this.h - 20);
+        g.lineStyle(2, COL_NEON_PINK, 0.12);
+        g.lineBetween(px + this.w / 2 + 44, py + this.h - 20, px + this.w - 24, py + this.h - 20);
     }
 
     addTitle(text: string): void {
