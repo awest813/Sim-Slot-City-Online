@@ -5,9 +5,29 @@
 
 type AudioCtx = AudioContext;
 
+const MUTE_STORAGE_KEY = 'slot-city-audio-muted';
+
+function readStoredMuted(): boolean {
+    try {
+        return typeof localStorage !== 'undefined' && localStorage.getItem(MUTE_STORAGE_KEY) === '1';
+    } catch {
+        return false;
+    }
+}
+
+function persistMuted(muted: boolean): void {
+    try {
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(MUTE_STORAGE_KEY, muted ? '1' : '0');
+        }
+    } catch {
+        /* private mode / quota */
+    }
+}
+
 let _ctx: AudioCtx | null = null;
 let _masterGain: GainNode | null = null;
-let _muted = false;
+let _muted = readStoredMuted();
 
 /** Return (and lazily create) the AudioContext, resuming it if suspended. */
 function getCtx(): AudioCtx | null {
@@ -15,7 +35,7 @@ function getCtx(): AudioCtx | null {
         try {
             _ctx = new AudioContext();
             _masterGain = _ctx.createGain();
-            _masterGain.gain.value = 0.38;
+            _masterGain.gain.value = _muted ? 0 : 0.38;
             _masterGain.connect(_ctx.destination);
         } catch {
             return null;
@@ -114,6 +134,7 @@ export const SoundManager = {
 
     setMuted(muted: boolean): void {
         _muted = muted;
+        persistMuted(muted);
         const m = getMaster();
         const c = getCtx();
         if (m && c) {

@@ -245,7 +245,7 @@ export class PreloadScene extends Phaser.Scene {
             { icon: '🏇', label: 'HORSES',    color: COL_HORSES_ACCENT },
         ];
 
-        // Compact pill size to fit all 7 across the screen width
+        // Compact pill size to fit all feature pills across the screen width
         const pillW = 96;
         const pillH = 46;
         const pillGap = 10;

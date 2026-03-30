@@ -258,8 +258,12 @@ export class Panel {
 
         drawBtn(baseFill);
 
-        const hitRect = this.scene.add.rectangle(0, by, bw, bh, 0x000000, 0)
-            .setInteractive(cfg.disabled ? undefined as any : { useHandCursor: true });
+        const hitRect = this.scene.add.rectangle(0, by, bw, bh, 0x000000, 0);
+        if (cfg.disabled) {
+            hitRect.disableInteractive();
+        } else {
+            hitRect.setInteractive({ useHandCursor: true });
+        }
 
         const label = this.scene.add.text(0, by, cfg.label, {
             fontFamily: FONT, fontSize: '12px',

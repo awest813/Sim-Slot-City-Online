@@ -7,9 +7,9 @@ import {
     GAME_WIDTH, GAME_HEIGHT, WORLD_W, WORLD_H,
     DEPTH_HUD, FONT,
     ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK,
-    ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO, ZONE_ENTRANCE,
+    ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO, ZONE_HORSES, ZONE_ENTRANCE,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT,
-    COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT,
+    COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT, COL_HORSES_ACCENT,
     COL_UI_BG, COL_UI_BORDER, COL_TRIM,
 } from '../../game/constants';
 
@@ -39,6 +39,7 @@ const ZONES: Array<{
     { zone: ZONE_ROULETTE,   color: COL_ROULETTE_ACCENT,    label: 'Rlt' },
     { zone: ZONE_PLINKO,     color: COL_PLINKO_ACCENT,      label: 'Plnk' },
     { zone: ZONE_BINGO,      color: COL_BINGO_ACCENT,       label: 'Bingo' },
+    { zone: ZONE_HORSES,     color: COL_HORSES_ACCENT,      label: 'Hrs' },
     { zone: ZONE_ENTRANCE,   color: 0xc9a84c,               label: '↑' },
 ];
 
