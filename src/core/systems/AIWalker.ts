@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import {
     AVATAR_SPEED, AVATAR_SIZE, WORLD_W, WORLD_H,
     COL_TRIM, DEPTH_AVATAR_BASE, DEPTH_SHADOW,
-    COL_NEON_BLUE,
 } from '../../game/constants';
 
 interface Blocker {
@@ -248,10 +247,7 @@ export class AIWalker {
             right: [ r * 0.6, 0],
         };
         const [ox, oy] = offsets[this.facing];
-        this.dot
-            .setPosition(this.x + ox, this.y + oy)
-            .setFillStyle(this.facing === 'up' ? COL_NEON_BLUE : COL_TRIM)
-            .setDepth(depth + 2);
+        this.dot.setPosition(this.x + ox, this.y + oy).setDepth(depth + 2);
     }
 
     destroy(): void {
