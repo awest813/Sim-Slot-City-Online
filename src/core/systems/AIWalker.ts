@@ -10,6 +10,8 @@ interface Blocker {
 
 type FacingDir = 'down' | 'up' | 'left' | 'right';
 
+const AI_BODY_SCALE = 0.82;
+
 // Walkable waypoints spread around the casino floor (avoiding furniture)
 const WAYPOINTS: [number, number][] = [
     [480, 630], // entrance center
@@ -100,7 +102,7 @@ export class AIWalker {
         this.shoulders.setStrokeStyle(1, this.bodyColor, 0.45);
 
         this.body = this.scene.add
-            .arc(this.x, this.y - 1, r * 0.82, 0, 360, false, this.bodyColor)
+            .arc(this.x, this.y - 1, r * AI_BODY_SCALE, 0, 360, false, this.bodyColor)
             .setDepth(DEPTH_AVATAR_BASE);
         this.body.setStrokeStyle(2, COL_TRIM, 0.7);
 

@@ -11,10 +11,12 @@ interface Blocker {
 
 export type FacingDir = 'down' | 'up' | 'left' | 'right';
 
+const PLAYER_BODY_SCALE = 0.84;
+
 export class AvatarController {
     private scene: Phaser.Scene;
     private aura!: Phaser.GameObjects.Ellipse;
-    private floorGlow!: Phaser.GameObjects.Ellipse;
+    private pinkFloorGlow!: Phaser.GameObjects.Ellipse;
     private leftArm!: Phaser.GameObjects.Ellipse;
     private rightArm!: Phaser.GameObjects.Ellipse;
     private leftLeg!: Phaser.GameObjects.Ellipse;
@@ -61,7 +63,7 @@ export class AvatarController {
         this.shadow = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE - 2, AVATAR_SIZE * 2, AVATAR_SIZE * 0.8, 0x000000, 0.35)
             .setDepth(DEPTH_SHADOW);
 
-        this.floorGlow = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE * 0.55, AVATAR_SIZE * 2.4, AVATAR_SIZE * 0.7, COL_NEON_PINK, 0.12)
+        this.pinkFloorGlow = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE * 0.55, AVATAR_SIZE * 2.4, AVATAR_SIZE * 0.7, COL_NEON_PINK, 0.12)
             .setDepth(DEPTH_AVATAR_BASE - 3)
             .setBlendMode(Phaser.BlendModes.ADD);
 
@@ -86,7 +88,7 @@ export class AvatarController {
         this.shoulders.setStrokeStyle(1.5, COL_NEON_PINK, 0.18);
 
         // Body (torso)
-        this.body = this.scene.add.arc(this.x, this.y - 1, AVATAR_SIZE * 0.84, 0, 360, false, COL_UI_BG2)
+        this.body = this.scene.add.arc(this.x, this.y - 1, AVATAR_SIZE * PLAYER_BODY_SCALE, 0, 360, false, COL_UI_BG2)
             .setDepth(DEPTH_AVATAR_BASE);
         this.body.setStrokeStyle(2, COL_TRIM, 1);
 
@@ -195,7 +197,7 @@ export class AvatarController {
         const r = AVATAR_SIZE;
 
         this.shadow.setPosition(this.x, this.y + r - 2);
-        this.floorGlow.setPosition(this.x, this.y + r * 0.55).setAlpha(this.isMoving ? 0.2 : 0.12);
+        this.pinkFloorGlow.setPosition(this.x, this.y + r * 0.55).setAlpha(this.isMoving ? 0.2 : 0.12);
         this.aura.setPosition(this.x, this.y - 2).setAlpha(this.isMoving ? 0.22 : 0.14);
         this.leftLeg.setPosition(this.x - r * 0.36, this.y + r * 0.92);
         this.rightLeg.setPosition(this.x + r * 0.36, this.y + r * 0.92);
@@ -211,7 +213,7 @@ export class AvatarController {
 
         // Depth sort: higher y = higher depth
         const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
-        this.floorGlow.setDepth(depth - 6);
+        this.pinkFloorGlow.setDepth(depth - 6);
         this.aura.setDepth(depth - 2);
         this.leftLeg.setDepth(depth - 1);
         this.rightLeg.setDepth(depth - 1);
@@ -239,7 +241,7 @@ export class AvatarController {
 
     destroy(): void {
         this.shadow.destroy();
-        this.floorGlow.destroy();
+        this.pinkFloorGlow.destroy();
         this.aura.destroy();
         this.leftLeg.destroy();
         this.rightLeg.destroy();
