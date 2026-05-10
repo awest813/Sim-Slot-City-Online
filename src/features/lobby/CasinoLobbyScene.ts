@@ -1203,24 +1203,28 @@ export class CasinoLobbyScene extends Phaser.Scene {
             });
         }
 
-        const runnerLights: Phaser.GameObjects.GameObject[] = [];
         for (let i = 0; i < 9; i++) {
-            runnerLights.push(
-                this.add.circle(WORLD_W / 2 - 76 + (i % 2) * 152, 218 + i * 38, 3, i % 2 === 0 ? COL_NEON_BLUE : COL_NEON_PINK, 0.45)
-                    .setDepth(DEPTH_FLOOR + 4)
-                    .setBlendMode(Phaser.BlendModes.ADD),
-            );
+            const runnerLight = this.add.circle(
+                WORLD_W / 2 - 76 + (i % 2) * 152,
+                218 + i * 38,
+                3,
+                i % 2 === 0 ? COL_NEON_BLUE : COL_NEON_PINK,
+                0.45,
+            )
+                .setDepth(DEPTH_FLOOR + 4)
+                .setBlendMode(Phaser.BlendModes.ADD);
+
+            this.tweens.add({
+                targets: runnerLight,
+                alpha: { from: 0.2, to: 0.85 },
+                scale: { from: 0.8, to: 1.4 },
+                duration: 720,
+                ease: 'Sine.easeInOut',
+                yoyo: true,
+                repeat: -1,
+                delay: i * 90,
+            });
         }
-        this.tweens.add({
-            targets: runnerLights,
-            alpha: { from: 0.2, to: 0.85 },
-            scale: { from: 0.8, to: 1.4 },
-            duration: 720,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1,
-            delay: this.tweens.stagger(90),
-        });
     }
 
     private buildLabels(): void {
