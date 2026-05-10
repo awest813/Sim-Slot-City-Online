@@ -10,6 +10,8 @@ interface Blocker {
 
 type FacingDir = 'down' | 'up' | 'left' | 'right';
 
+const AI_BODY_SCALE = 0.82;
+
 // Walkable waypoints spread around the casino floor (avoiding furniture)
 const WAYPOINTS: [number, number][] = [
     [480, 630], // entrance center
@@ -34,8 +36,13 @@ export const AI_COLORS = [0x4488cc, 0xcc5544, 0x44cc88, 0xcc8844, 0x9955cc, 0x44
 
 export class AIWalker {
     private scene:    Phaser.Scene;
+    private aura!:    Phaser.GameObjects.Ellipse;
+    private shoulders!: Phaser.GameObjects.Ellipse;
+    private leftLeg!: Phaser.GameObjects.Ellipse;
+    private rightLeg!: Phaser.GameObjects.Ellipse;
     private body!:    Phaser.GameObjects.Arc;
     private head!:    Phaser.GameObjects.Arc;
+    private hair!:    Phaser.GameObjects.Arc;
     private dot!:     Phaser.GameObjects.Arc;
     private shadow!:  Phaser.GameObjects.Ellipse;
     private nameTag!: Phaser.GameObjects.Text;
@@ -76,8 +83,26 @@ export class AIWalker {
             .ellipse(this.x, this.y + r - 2, r * 2, r * 0.8, 0x000000, 0.30)
             .setDepth(DEPTH_SHADOW);
 
+        this.aura = this.scene.add
+            .ellipse(this.x, this.y - 2, r * 2.3, r * 2.75, this.bodyColor, 0.08)
+            .setDepth(DEPTH_AVATAR_BASE - 2)
+            .setBlendMode(Phaser.BlendModes.ADD);
+
+        this.leftLeg = this.scene.add
+            .ellipse(this.x - r * 0.33, this.y + r * 0.82, r * 0.42, r * 0.82, 0x080a12)
+            .setDepth(DEPTH_AVATAR_BASE - 1);
+
+        this.rightLeg = this.scene.add
+            .ellipse(this.x + r * 0.33, this.y + r * 0.82, r * 0.42, r * 0.82, 0x080a12)
+            .setDepth(DEPTH_AVATAR_BASE - 1);
+
+        this.shoulders = this.scene.add
+            .ellipse(this.x, this.y + r * 0.12, r * 1.65, r * 1.12, 0x12172a)
+            .setDepth(DEPTH_AVATAR_BASE);
+        this.shoulders.setStrokeStyle(1, this.bodyColor, 0.45);
+
         this.body = this.scene.add
-            .arc(this.x, this.y, r, 0, 360, false, this.bodyColor)
+            .arc(this.x, this.y - 1, r * AI_BODY_SCALE, 0, 360, false, this.bodyColor)
             .setDepth(DEPTH_AVATAR_BASE);
         this.body.setStrokeStyle(2, COL_TRIM, 0.7);
 
@@ -85,6 +110,10 @@ export class AIWalker {
             .arc(this.x, this.y - r * 0.8, r * 0.55, 0, 360, false, 0xd4a984)
             .setDepth(DEPTH_AVATAR_BASE + 1);
         this.head.setStrokeStyle(1.5, 0xb08060, 1);
+
+        this.hair = this.scene.add
+            .arc(this.x, this.y - r * 0.95, r * 0.4, 180, 360, false, 0x22130e)
+            .setDepth(DEPTH_AVATAR_BASE + 2);
 
         this.dot = this.scene.add
             .arc(this.x, this.y + r * 0.6, 3, 0, 360, false, COL_TRIM)
@@ -193,13 +222,23 @@ export class AIWalker {
         const r = AVATAR_SIZE;
 
         this.shadow.setPosition(this.x, this.y + r - 2);
-        this.body.setPosition(this.x, this.y);
+        this.aura.setPosition(this.x, this.y - 2);
+        this.leftLeg.setPosition(this.x - r * 0.33, this.y + r * 0.82);
+        this.rightLeg.setPosition(this.x + r * 0.33, this.y + r * 0.82);
+        this.shoulders.setPosition(this.x, this.y + r * 0.12);
+        this.body.setPosition(this.x, this.y - 1);
         this.head.setPosition(this.x, this.y - r * 0.8);
+        this.hair.setPosition(this.x, this.y - r * 0.95);
         this.nameTag.setPosition(this.x, this.y - r * 2.4);
 
         const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
+        this.aura.setDepth(depth - 2);
+        this.leftLeg.setDepth(depth - 1);
+        this.rightLeg.setDepth(depth - 1);
+        this.shoulders.setDepth(depth);
         this.body.setDepth(depth);
         this.head.setDepth(depth + 1);
+        this.hair.setDepth(depth + 2);
         this.nameTag.setDepth(depth + 3);
         this.shadow.setDepth(depth - 5);
 
@@ -215,8 +254,13 @@ export class AIWalker {
 
     destroy(): void {
         this.shadow.destroy();
+        this.aura.destroy();
+        this.leftLeg.destroy();
+        this.rightLeg.destroy();
+        this.shoulders.destroy();
         this.body.destroy();
         this.head.destroy();
+        this.hair.destroy();
         this.dot.destroy();
         this.nameTag.destroy();
     }

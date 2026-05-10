@@ -58,6 +58,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         this.buildWorld();
         this.buildProps();
         this.buildAmbientLighting();
+        this.buildAnimatedAtmosphere();
         this.buildLabels();
         this.buildEntranceFx();
 
@@ -141,6 +142,26 @@ export class CasinoLobbyScene extends Phaser.Scene {
         g.fillTriangle(90, WORLD_H, WORLD_W / 2 - 72, 34, WORLD_W / 2 + 12, 34);
         g.fillTriangle(WORLD_W - 90, WORLD_H, WORLD_W / 2 + 72, 34, WORLD_W / 2 - 12, 34);
 
+        // Neon skyline silhouettes behind the casino.
+        const towerXs = [56, 132, 214, 704, 796, 884];
+        for (let i = 0; i < towerXs.length; i++) {
+            const tw = 34 + (i % 3) * 10;
+            const th = 84 + (i % 4) * 20;
+            const tx = towerXs[i] - tw / 2;
+            const ty = 42;
+            g.fillStyle(0x070a18, 0.82);
+            g.fillRect(tx, ty, tw, th);
+            g.lineStyle(1, i % 2 === 0 ? COL_NEON_BLUE : COL_NEON_PINK, 0.18);
+            g.strokeRect(tx, ty, tw, th);
+            for (let wy = ty + 10; wy < ty + th - 8; wy += 14) {
+                for (let wx = tx + 7; wx < tx + tw - 5; wx += 11) {
+                    const lit = (Math.floor(wx + wy) + i) % 3 !== 0;
+                    g.fillStyle(lit ? 0xffd040 : 0x152030, lit ? 0.35 : 0.28);
+                    g.fillRect(wx, wy, 4, 5);
+                }
+            }
+        }
+
         // Subtle radial gradient from center
         g.fillStyle(0x080e20, 0.35);
         g.fillCircle(WORLD_W / 2, WORLD_H / 2, 600);
@@ -186,6 +207,13 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // === Casino carpet ===
         g.fillStyle(COL_FLOOR, 1);
         g.fillRect(24, 32, WORLD_W - 48, WORLD_H - 56);
+
+        // Soft vignette edge burn for more depth.
+        g.fillStyle(0x000000, 0.16);
+        g.fillRect(24, 32, WORLD_W - 48, 30);
+        g.fillRect(24, WORLD_H - 72, WORLD_W - 48, 48);
+        g.fillRect(24, 32, 36, WORLD_H - 56);
+        g.fillRect(WORLD_W - 60, 32, 36, WORLD_H - 56);
 
         // === Marble tile checkerboard ===
         const tileSize    = 48;
@@ -1118,6 +1146,85 @@ export class CasinoLobbyScene extends Phaser.Scene {
         shaftGfx.fillTriangle(WORLD_W / 2 - 46, 104, WORLD_W / 2 + 46, 104, WORLD_W / 2, 258);
         shaftGfx.fillTriangle(154, 216, 246, 216, 200, 320);
         shaftGfx.fillTriangle(714, 216, 806, 216, 760, 320);
+    }
+
+    private buildAnimatedAtmosphere(): void {
+        const zoneGlows: Array<[number, number, number, number]> = [
+            [ZONE_SLOTS.x + ZONE_SLOTS.w / 2, ZONE_SLOTS.y + ZONE_SLOTS.h / 2, COL_SLOTS_ACCENT, 190],
+            [ZONE_POKER.x + ZONE_POKER.w / 2, ZONE_POKER.y + ZONE_POKER.h / 2, COL_POKER_ACCENT, 210],
+            [ZONE_BAR.x + ZONE_BAR.w / 2, ZONE_BAR.y + ZONE_BAR.h / 2, COL_BAR_ACCENT, 170],
+            [ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2, COL_BLACKJACK_ACCENT, 150],
+            [ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2, COL_ROULETTE_ACCENT, 130],
+            [ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + ZONE_PLINKO.h / 2, COL_PLINKO_ACCENT, 135],
+        ];
+
+        for (const [x, y, color, radius] of zoneGlows) {
+            const glow = this.add.ellipse(x, y, radius, radius * 0.55, color, 0.055)
+                .setDepth(DEPTH_FLOOR + 3)
+                .setBlendMode(Phaser.BlendModes.ADD);
+
+            this.tweens.add({
+                targets: glow,
+                alpha: { from: 0.28, to: 0.72 },
+                scaleX: { from: 0.96, to: 1.06 },
+                scaleY: { from: 0.96, to: 1.08 },
+                duration: 1600 + (x % 5) * 240,
+                ease: 'Sine.easeInOut',
+                yoyo: true,
+                repeat: -1,
+            });
+        }
+
+        const sparklePositions: Array<[number, number, number]> = [
+            [152, 92, COL_SLOTS_ACCENT], [216, 328, COL_SLOTS_ACCENT],
+            [702, 104, COL_POKER_ACCENT], [890, 314, COL_POKER_ACCENT],
+            [342, 74, COL_BAR_ACCENT], [612, 82, COL_BAR_ACCENT],
+            [430, 368, COL_BLACKJACK_ACCENT], [546, 418, COL_BLACKJACK_ACCENT],
+            [166, 512, COL_ROULETTE_ACCENT], [808, 506, COL_PLINKO_ACCENT],
+            [466, 500, COL_BINGO_ACCENT], [788, 638, COL_HORSES_ACCENT],
+        ];
+
+        for (let i = 0; i < sparklePositions.length; i++) {
+            const [x, y, color] = sparklePositions[i];
+            const sparkle = this.add.star(x, y, 4, 2, 7, color, 0.55)
+                .setDepth(DEPTH_PROPS + 8)
+                .setBlendMode(Phaser.BlendModes.ADD);
+
+            this.tweens.add({
+                targets: sparkle,
+                alpha: { from: 0.15, to: 0.9 },
+                angle: 360,
+                scale: { from: 0.75, to: 1.35 },
+                duration: 900 + i * 110,
+                delay: i * 90,
+                ease: 'Sine.easeInOut',
+                yoyo: true,
+                repeat: -1,
+            });
+        }
+
+        for (let i = 0; i < 9; i++) {
+            const runnerLight = this.add.circle(
+                WORLD_W / 2 - 76 + (i % 2) * 152,
+                218 + i * 38,
+                3,
+                i % 2 === 0 ? COL_NEON_BLUE : COL_NEON_PINK,
+                0.45,
+            )
+                .setDepth(DEPTH_FLOOR + 4)
+                .setBlendMode(Phaser.BlendModes.ADD);
+
+            this.tweens.add({
+                targets: runnerLight,
+                alpha: { from: 0.2, to: 0.85 },
+                scale: { from: 0.8, to: 1.4 },
+                duration: 720,
+                ease: 'Sine.easeInOut',
+                yoyo: true,
+                repeat: -1,
+                delay: i * 90,
+            });
+        }
     }
 
     private buildLabels(): void {
