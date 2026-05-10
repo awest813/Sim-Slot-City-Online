@@ -14,10 +14,17 @@ export type FacingDir = 'down' | 'up' | 'left' | 'right';
 export class AvatarController {
     private scene: Phaser.Scene;
     private aura!: Phaser.GameObjects.Ellipse;
+    private floorGlow!: Phaser.GameObjects.Ellipse;
+    private leftArm!: Phaser.GameObjects.Ellipse;
+    private rightArm!: Phaser.GameObjects.Ellipse;
+    private leftLeg!: Phaser.GameObjects.Ellipse;
+    private rightLeg!: Phaser.GameObjects.Ellipse;
     private shoulders!: Phaser.GameObjects.Ellipse;
     private body!: Phaser.GameObjects.Arc;
+    private lapel!: Phaser.GameObjects.Triangle;
     private head!: Phaser.GameObjects.Arc;
     private hair!: Phaser.GameObjects.Arc;
+    private faceGlow!: Phaser.GameObjects.Arc;
     private dot!: Phaser.GameObjects.Arc;    // facing indicator
     private shadow!: Phaser.GameObjects.Ellipse;
     private nameTag!: Phaser.GameObjects.Text;
@@ -54,8 +61,25 @@ export class AvatarController {
         this.shadow = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE - 2, AVATAR_SIZE * 2, AVATAR_SIZE * 0.8, 0x000000, 0.35)
             .setDepth(DEPTH_SHADOW);
 
+        this.floorGlow = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE * 0.55, AVATAR_SIZE * 2.4, AVATAR_SIZE * 0.7, COL_NEON_PINK, 0.12)
+            .setDepth(DEPTH_AVATAR_BASE - 3)
+            .setBlendMode(Phaser.BlendModes.ADD);
+
         this.aura = this.scene.add.ellipse(this.x, this.y - 2, AVATAR_SIZE * 2.8, AVATAR_SIZE * 3.3, COL_NEON_BLUE, 0.14)
+            .setDepth(DEPTH_AVATAR_BASE - 1)
+            .setBlendMode(Phaser.BlendModes.ADD);
+
+        this.leftLeg = this.scene.add.ellipse(this.x - AVATAR_SIZE * 0.36, this.y + AVATAR_SIZE * 0.92, AVATAR_SIZE * 0.45, AVATAR_SIZE * 0.9, 0x0a0c18)
             .setDepth(DEPTH_AVATAR_BASE - 1);
+        this.rightLeg = this.scene.add.ellipse(this.x + AVATAR_SIZE * 0.36, this.y + AVATAR_SIZE * 0.92, AVATAR_SIZE * 0.45, AVATAR_SIZE * 0.9, 0x0a0c18)
+            .setDepth(DEPTH_AVATAR_BASE - 1);
+
+        this.leftArm = this.scene.add.ellipse(this.x - AVATAR_SIZE * 0.9, this.y + AVATAR_SIZE * 0.08, AVATAR_SIZE * 0.42, AVATAR_SIZE * 1.25, 0x10142b)
+            .setDepth(DEPTH_AVATAR_BASE);
+        this.rightArm = this.scene.add.ellipse(this.x + AVATAR_SIZE * 0.9, this.y + AVATAR_SIZE * 0.08, AVATAR_SIZE * 0.42, AVATAR_SIZE * 1.25, 0x10142b)
+            .setDepth(DEPTH_AVATAR_BASE);
+        this.leftArm.setStrokeStyle(1, COL_NEON_BLUE, 0.28);
+        this.rightArm.setStrokeStyle(1, COL_NEON_PINK, 0.28);
 
         this.shoulders = this.scene.add.ellipse(this.x, this.y + AVATAR_SIZE * 0.15, AVATAR_SIZE * 1.85, AVATAR_SIZE * 1.35, 0x151a34)
             .setDepth(DEPTH_AVATAR_BASE);
@@ -66,10 +90,17 @@ export class AvatarController {
             .setDepth(DEPTH_AVATAR_BASE);
         this.body.setStrokeStyle(2, COL_TRIM, 1);
 
+        this.lapel = this.scene.add.triangle(this.x, this.y - 1, 0, -AVATAR_SIZE * 0.55, -AVATAR_SIZE * 0.42, AVATAR_SIZE * 0.34, AVATAR_SIZE * 0.42, AVATAR_SIZE * 0.34, 0x1d2c46, 0.95)
+            .setDepth(DEPTH_AVATAR_BASE + 1);
+        this.lapel.setStrokeStyle(1, COL_NEON_BLUE, 0.3);
+
         // Head
         this.head = this.scene.add.arc(this.x, this.y - AVATAR_SIZE * 0.8, AVATAR_SIZE * 0.55, 0, 360, false, 0xd4a984)
             .setDepth(DEPTH_AVATAR_BASE + 1);
         this.head.setStrokeStyle(1.5, 0xb08060, 1);
+
+        this.faceGlow = this.scene.add.arc(this.x - AVATAR_SIZE * 0.15, this.y - AVATAR_SIZE * 0.95, AVATAR_SIZE * 0.18, 0, 360, false, 0xffe0b0, 0.42)
+            .setDepth(DEPTH_AVATAR_BASE + 2);
 
         this.hair = this.scene.add.arc(this.x, this.y - AVATAR_SIZE * 0.95, AVATAR_SIZE * 0.42, 180, 360, false, 0x2a1a14)
             .setDepth(DEPTH_AVATAR_BASE + 2);
@@ -164,19 +195,33 @@ export class AvatarController {
         const r = AVATAR_SIZE;
 
         this.shadow.setPosition(this.x, this.y + r - 2);
+        this.floorGlow.setPosition(this.x, this.y + r * 0.55).setAlpha(this.isMoving ? 0.2 : 0.12);
         this.aura.setPosition(this.x, this.y - 2).setAlpha(this.isMoving ? 0.22 : 0.14);
+        this.leftLeg.setPosition(this.x - r * 0.36, this.y + r * 0.92);
+        this.rightLeg.setPosition(this.x + r * 0.36, this.y + r * 0.92);
+        this.leftArm.setPosition(this.x - r * 0.9, this.y + r * 0.08);
+        this.rightArm.setPosition(this.x + r * 0.9, this.y + r * 0.08);
         this.shoulders.setPosition(this.x, this.y + r * 0.12);
         this.body.setPosition(this.x, this.y - 1);
+        this.lapel.setPosition(this.x, this.y - 1);
         this.head.setPosition(this.x, this.y - r * 0.8);
+        this.faceGlow.setPosition(this.x - r * 0.15, this.y - r * 0.95);
         this.hair.setPosition(this.x, this.y - r * 0.95);
         this.nameTag.setPosition(this.x, this.y - r * 2.4);
 
         // Depth sort: higher y = higher depth
         const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
+        this.floorGlow.setDepth(depth - 6);
         this.aura.setDepth(depth - 2);
+        this.leftLeg.setDepth(depth - 1);
+        this.rightLeg.setDepth(depth - 1);
+        this.leftArm.setDepth(depth);
+        this.rightArm.setDepth(depth);
         this.shoulders.setDepth(depth);
         this.body.setDepth(depth);
+        this.lapel.setDepth(depth + 1);
         this.head.setDepth(depth + 1);
+        this.faceGlow.setDepth(depth + 2);
         this.hair.setDepth(depth + 2);
         this.nameTag.setDepth(depth + 4);
         this.shadow.setDepth(depth - 5);
@@ -194,10 +239,17 @@ export class AvatarController {
 
     destroy(): void {
         this.shadow.destroy();
+        this.floorGlow.destroy();
         this.aura.destroy();
+        this.leftLeg.destroy();
+        this.rightLeg.destroy();
+        this.leftArm.destroy();
+        this.rightArm.destroy();
         this.shoulders.destroy();
         this.body.destroy();
+        this.lapel.destroy();
         this.head.destroy();
+        this.faceGlow.destroy();
         this.hair.destroy();
         this.dot.destroy();
         this.nameTag.destroy();
