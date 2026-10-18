@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { GameState, PlayerState, Zone } from '../../core/state/GameState';
 import {
     GAME_WIDTH,
-    DEPTH_HUD, COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
+    DOCK_H, DOCK_Y,
+    DEPTH_HUD, COL_UI_BG2, COL_UI_BORDER,
     COL_TRIM_DIM,
     FONT,
 } from '../../game/constants';
@@ -46,6 +47,15 @@ const ZONE_LABELS: Record<Zone, string> = {
 };
 
 const FREE_CHIPS_AMOUNT = 500;
+const PLAYER_BAR_W = 276;
+const ZONE_W = 168;
+const ZONE_H = 28;
+const ZONE_X = GAME_WIDTH - 200 - ZONE_W;
+const ZONE_Y = DOCK_Y + 18;
+
+function portraitTexture(avatarKey: string | undefined): string {
+    return `portrait_${avatarKey || 'avatar_player'}`;
+}
 
 export class HUD {
     private scene: Phaser.Scene;
@@ -54,6 +64,8 @@ export class HUD {
     private playerGfx!: Phaser.GameObjects.Graphics;
     private nameText!: Phaser.GameObjects.Text;
     private chipsText!: Phaser.GameObjects.Text;
+    private portrait!: Phaser.GameObjects.Image;
+    private portraitKey = '';
 
     // Zone badge (top-right)
     private zoneGfx!: Phaser.GameObjects.Graphics;
@@ -100,10 +112,10 @@ export class HUD {
 
     private build(): void {
         // ── Player info bar (top-left) ─────────────────────────────────────
-        const barW = 220;
-        const barH = 48;
+        const barW = GAME_WIDTH;
+        const barH = DOCK_H;
         const barX = 0;
-        const barY = 0;
+        const barY = DOCK_Y;
 
         this.playerGfx = this.scene.add.graphics()
             .setScrollFactor(0)
@@ -118,7 +130,15 @@ export class HUD {
         this.drawPlayerBar(false);
 
         // Player star icon + name
-        this.nameText = this.scene.add.text(barX + 14, barY + 13, '', {
+        const portraitKey = portraitTexture(GameState.get().avatarTextureKey);
+        this.portrait = this.scene.add.image(16, DOCK_Y + 9, portraitKey)
+            .setOrigin(0, 0)
+            .setDisplaySize(40, 46)
+            .setScrollFactor(0)
+            .setDepth(DEPTH_HUD + 2);
+        this.portraitKey = portraitKey;
+
+        this.nameText = this.scene.add.text(barX + 70, barY + 20, '', {
             fontFamily: FONT, fontSize: '10px', color: '#c9a84c', fontStyle: 'bold',
         })
             .setScrollFactor(0)
@@ -126,7 +146,7 @@ export class HUD {
             .setOrigin(0, 0.5);
 
         // Chip counter — larger text with drop shadow
-        this.chipsText = this.scene.add.text(barX + 42, barY + 33, '', {
+        this.chipsText = this.scene.add.text(barX + 96, barY + 44, '', {
             fontFamily: FONT, fontSize: '14px', color: '#2ecc71', fontStyle: 'bold',
             shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 3, fill: true },
         })
@@ -135,18 +155,18 @@ export class HUD {
             .setOrigin(0, 0.5);
 
         // Session P&L — small text to the right of the chip counter
-        this.plText = this.scene.add.text(barX + barW - 8, barY + 33, '', {
+        this.plText = this.scene.add.text(barX + 230, barY + 44, '', {
             fontFamily: FONT, fontSize: '10px', color: '#556677',
         })
             .setScrollFactor(0)
             .setDepth(DEPTH_HUD + 1)
-            .setOrigin(1, 0.5);
+            .setOrigin(0, 0.5);
 
-        // ── Zone badge (top-right) ─────────────────────────────────────────
-        const zoneW = 168;
-        const zoneH = 28;
-        const zoneX = GAME_WIDTH - zoneW - 8;
-        const zoneY = 8;
+        // ── Zone badge, sitting in the control dock ────────────────────────
+        const zoneW = ZONE_W;
+        const zoneH = ZONE_H;
+        const zoneX = ZONE_X;
+        const zoneY = ZONE_Y;
 
         this.zoneGfx = this.scene.add.graphics()
             .setScrollFactor(0)
@@ -161,17 +181,17 @@ export class HUD {
         // Zone badge bg — redrawn per zone in drawZoneBadge()
         this.drawZoneBadge('floor');
 
-        this.zoneText = this.scene.add.text(zoneX + zoneW / 2, zoneY + zoneH / 2, '', {
-            fontFamily: FONT, fontSize: '10px', color: '#7a8a9a',
+        this.zoneText = this.scene.add.text(zoneX + zoneW / 2 + 8, zoneY + zoneH / 2, '', {
+            fontFamily: FONT, fontSize: '10px', color: '#e7fff6',
         })
             .setScrollFactor(0)
             .setDepth(DEPTH_HUD + 1)
             .setOrigin(0.5);
 
         // ── Free Chips button (shown below player bar when broke) ──────────
-        const fbX = barX;
-        const fbY = barY + barH + 4;
-        const fbW = barW;
+        const fbX = 8;
+        const fbY = DOCK_Y - 30;
+        const fbW = PLAYER_BAR_W;
         const fbH = 26;
 
         this.freeChipsGfx = this.scene.add.graphics()
@@ -199,9 +219,9 @@ export class HUD {
         this.setFreeChipsVisible(false);
 
         // ── Daily Bonus button ──────────
-        const dbX = barX;
-        const dbY = barY + barH + 34; // Below free chips
-        const dbW = barW;
+        const dbX = 8;
+        const dbY = DOCK_Y - 60;
+        const dbW = PLAYER_BAR_W;
         const dbH = 26;
 
         this.dailyBonusGfx = this.scene.add.graphics()
@@ -233,8 +253,8 @@ export class HUD {
 
         // ── Sound mute toggle (top-left, to the right of player bar) ──────
         const muteSize = 28;
-        const muteX = 228;
-        const muteY = 8;
+        const muteX = GAME_WIDTH - 188;
+        const muteY = DOCK_Y + 18;
 
         this.muteGfx = this.scene.add.graphics()
             .setScrollFactor(0)
@@ -255,10 +275,10 @@ export class HUD {
 
         const drawMuteBtn = (hover: boolean): void => {
             this.muteGfx.clear();
-            this.muteGfx.fillStyle(hover ? 0x2a2a3a : 0x141420, 0.88);
-            this.muteGfx.fillRoundedRect(muteX, muteY, muteSize, muteSize, 5);
-            this.muteGfx.lineStyle(1, 0x445566, 0.55);
-            this.muteGfx.strokeRoundedRect(muteX, muteY, muteSize, muteSize, 5);
+            this.muteGfx.fillStyle(hover ? 0x1faf98 : 0x14786c, 0.95);
+            this.muteGfx.fillRoundedRect(muteX, muteY, muteSize, muteSize, 8);
+            this.muteGfx.lineStyle(1.5, 0xd8ffe8, 0.8);
+            this.muteGfx.strokeRoundedRect(muteX, muteY, muteSize, muteSize, 8);
         };
         drawMuteBtn(false);
         this.muteLabel.setText(SoundManager.isMuted() ? '🔇' : '🔊');
@@ -276,8 +296,8 @@ export class HUD {
 
         // ── Stats/Menu button (top-left, next to mute button) ──────────────
         const statsSize = 28;
-        const statsX = 262;
-        const statsY = 8;
+        const statsX = GAME_WIDTH - 152;
+        const statsY = DOCK_Y + 18;
 
         this.statsBtnGfx = this.scene.add.graphics()
             .setScrollFactor(0)
@@ -298,10 +318,10 @@ export class HUD {
 
         const drawStatsBtn = (hover: boolean): void => {
             this.statsBtnGfx.clear();
-            this.statsBtnGfx.fillStyle(hover ? 0x2a2a3a : 0x141420, 0.88);
-            this.statsBtnGfx.fillRoundedRect(statsX, statsY, statsSize, statsSize, 5);
-            this.statsBtnGfx.lineStyle(1, 0x445566, 0.55);
-            this.statsBtnGfx.strokeRoundedRect(statsX, statsY, statsSize, statsSize, 5);
+            this.statsBtnGfx.fillStyle(hover ? 0x1faf98 : 0x14786c, 0.95);
+            this.statsBtnGfx.fillRoundedRect(statsX, statsY, statsSize, statsSize, 8);
+            this.statsBtnGfx.lineStyle(1.5, 0xd8ffe8, 0.8);
+            this.statsBtnGfx.strokeRoundedRect(statsX, statsY, statsSize, statsSize, 8);
         };
         drawStatsBtn(false);
 
@@ -336,37 +356,35 @@ export class HUD {
 
     private drawPlayerBar(chipFlash: boolean, flashGain = false): void {
         const g = this.playerGfx;
-        const barW = 220;
-        const barH = 48;
+        const y = DOCK_Y;
+        const h = DOCK_H;
+        const w = GAME_WIDTH;
         g.clear();
 
-        // Outer glow halo at low opacity
-        g.lineStyle(6, COL_UI_BORDER, 0.08);
-        g.strokeRoundedRect(-2, -2, barW + 4, barH + 4, { tl: 0, tr: 0, bl: 8, br: 8 });
+        g.fillStyle(0x06362f, 0.4);
+        g.fillRect(0, y - 3, w, 3);
+        g.fillStyle(0x178f7c, 1);
+        g.fillRect(0, y, w, h);
+        g.fillStyle(0xd8ffe8, 0.7);
+        g.fillRect(0, y, w, 3);
+        g.fillStyle(0x0c5c50, 1);
+        g.fillRect(0, y + h - 4, w, 4);
 
-        // Drop shadow
-        g.fillStyle(0x000000, 0.4);
-        g.fillRoundedRect(2, 2, barW, barH, { tl: 0, tr: 0, bl: 6, br: 6 });
+        g.fillStyle(0x0e3f38, 0.55);
+        g.fillRoundedRect(8, y + 6, 300, h - 12, 14);
 
-        // Main bg
-        g.fillStyle(COL_UI_BG, 0.92);
-        g.fillRoundedRect(0, 0, barW, barH, { tl: 0, tr: 0, bl: 6, br: 6 });
+        g.fillStyle(0xfff6e8, 1);
+        g.fillRoundedRect(14, y + 8, 44, 48, 10);
+        g.lineStyle(1.5, 0x08332e, 0.55);
+        g.strokeRoundedRect(14, y + 8, 44, 48, 10);
 
-        // Inner darker section for chips
-        g.fillStyle(COL_UI_BG2, 0.7);
-        g.fillRoundedRect(8, barH / 2 + 4, barW - 16, barH / 2 - 8, 3);
+        g.fillStyle(COL_UI_BG2, chipFlash ? 0.95 : 0.7);
+        g.fillRoundedRect(68, y + 30, 220, 24, 8);
+        g.lineStyle(1.5, chipFlash ? (flashGain ? 0x2ecc71 : 0xe74c3c) : COL_TRIM_DIM, chipFlash ? 0.9 : 0.45);
+        g.strokeRoundedRect(68, y + 30, 220, 24, 8);
 
-        // Border
-        g.lineStyle(1, COL_UI_BORDER, chipFlash ? 0.9 : 0.55);
-        g.strokeRoundedRect(0, 0, barW, barH, { tl: 0, tr: 0, bl: 6, br: 6 });
-
-        // Gold accent line at bottom
-        g.lineStyle(1.5, chipFlash ? (flashGain ? COL_TRIM_DIM : 0xe74c3c) : COL_TRIM_DIM, chipFlash ? 0.8 : 0.35);
-        g.lineBetween(0, barH - 1, barW, barH - 1);
-
-        // ── Detailed chip icon (gold circle + cross-hatch lines) ──────────
-        const iconX = 26;
-        const iconY = barH / 2 + 6;
+        const iconX = 82;
+        const iconY = y + 42;
         const iconR = 8;
         // Outer ring
         g.fillStyle(0xc9a84c, 0.9);
@@ -386,45 +404,52 @@ export class HUD {
     }
 
     private drawZoneBadge(zone: Zone): void {
-        const zoneW = 168;
-        const zoneH = 28;
-        const zoneX = GAME_WIDTH - zoneW - 8;
-        const zoneY = 8;
+        const zoneW = ZONE_W;
+        const zoneH = ZONE_H;
+        const zoneX = ZONE_X;
+        const zoneY = ZONE_Y;
         const acc = ZONE_ACCENT[zone] ?? ZONE_ACCENT['floor'];
         const g = this.zoneGfx;
         g.clear();
-        // Outer halo glow
-        g.lineStyle(6, acc.border, 0.12);
-        g.strokeRoundedRect(zoneX - 2, zoneY - 2, zoneW + 4, zoneH + 4, 16);
-        // Background fill with zone accent
-        g.fillStyle(acc.fill, 0.92);
+        g.fillStyle(0x06362f, 0.35);
+        g.fillRoundedRect(zoneX + 2, zoneY + 2, zoneW, zoneH, 14);
+        g.fillStyle(0x14675c, 0.96);
         g.fillRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
-        // Border
-        g.lineStyle(1, acc.border, 0.7);
+        g.lineStyle(1.5, COL_UI_BORDER, 0.9);
         g.strokeRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
-        // Inner border tint
-        g.lineStyle(0.5, acc.border, 0.3);
-        g.strokeRoundedRect(zoneX + 2, zoneY + 2, zoneW - 4, zoneH - 4, 12);
-        // Update text color to match accent
-        if (this.zoneText) this.zoneText.setColor(acc.text);
+        g.fillStyle(acc.border, 1);
+        g.fillCircle(zoneX + 14, zoneY + zoneH / 2, 5);
+        g.lineStyle(1, 0xffffff, 0.55);
+        g.strokeCircle(zoneX + 14, zoneY + zoneH / 2, 5);
+        if (this.zoneText) {
+            this.zoneText.setColor('#e7fff6');
+            this.zoneText.setX(zoneX + zoneW / 2 + 8);
+        }
+    }
+
+    private drawActionBtn(
+        g: Phaser.GameObjects.Graphics,
+        x: number, y: number, w: number, h: number,
+        hover: boolean,
+    ): void {
+        g.fillStyle(0x06362f, 0.35);
+        g.fillRoundedRect(x + 2, y + 2, w, h, 8);
+        g.fillStyle(hover ? 0x1faf98 : 0x14786c, 0.96);
+        g.fillRoundedRect(x, y, w, h, 8);
+        g.lineStyle(1.5, 0xd8ffe8, 0.9);
+        g.strokeRoundedRect(x, y, w, h, 8);
     }
 
     private drawFreeChipsBtn(hover: boolean): void {
-        const barW = 220;
-        const barH = 48;
-        const fbX = 0;
-        const fbY = barH + 4;
-        const fbW = barW;
+        const fbX = 8;
+        const fbY = DOCK_Y - 30;
+        const fbW = PLAYER_BAR_W;
         const fbH = 26;
         const g = this.freeChipsGfx;
         g.clear();
 
         if (!this.freeChipsVisible) return;
-
-        g.fillStyle(hover ? 0x1e3812 : 0x141e0c, 0.92);
-        g.fillRoundedRect(fbX, fbY, fbW, fbH, { tl: 0, tr: 0, bl: 5, br: 5 });
-        g.lineStyle(1, hover ? 0x4a9a1a : 0x304a10, 0.9);
-        g.strokeRoundedRect(fbX, fbY, fbW, fbH, { tl: 0, tr: 0, bl: 5, br: 5 });
+        this.drawActionBtn(g, fbX, fbY, fbW, fbH, hover);
     }
 
     private setFreeChipsVisible(visible: boolean): void {
@@ -442,21 +467,15 @@ export class HUD {
     }
 
     private drawDailyBonusBtn(hover: boolean): void {
-        const barW = 220;
-        const barH = 48;
-        const dbX = 0;
-        const dbY = barH + 34;
-        const dbW = barW;
+        const dbX = 8;
+        const dbY = DOCK_Y - 60;
+        const dbW = PLAYER_BAR_W;
         const dbH = 26;
         const g = this.dailyBonusGfx;
         g.clear();
 
         if (!this.dailyBonusVisible) return;
-
-        g.fillStyle(hover ? 0x3d300b : 0x241d08, 0.92);
-        g.fillRoundedRect(dbX, dbY, dbW, dbH, { tl: 0, tr: 0, bl: 5, br: 5 });
-        g.lineStyle(1, hover ? 0xcca610 : 0x826907, 0.9);
-        g.strokeRoundedRect(dbX, dbY, dbW, dbH, { tl: 0, tr: 0, bl: 5, br: 5 });
+        this.drawActionBtn(g, dbX, dbY, dbW, dbH, hover);
     }
 
     private setDailyBonusVisible(visible: boolean): void {
@@ -477,7 +496,12 @@ export class HUD {
 
     private refresh(s: PlayerState): void {
         this.nameText.setText(`★ ${s.displayName}  [${getPlayerTitle(s.chips)}]`);
-        this.chipsText.setText(`◈ ${s.chips.toLocaleString()} chips`);
+        this.chipsText.setText(s.chips.toLocaleString());
+        const nextPortrait = portraitTexture(s.avatarTextureKey);
+        if (nextPortrait !== this.portraitKey && this.scene.textures.exists(nextPortrait)) {
+            this.portrait.setTexture(nextPortrait);
+            this.portraitKey = nextPortrait;
+        }
         this.zoneText.setText(ZONE_LABELS[s.zone] ?? s.zone);
 
         // Session P&L display
@@ -568,6 +592,7 @@ export class HUD {
             this.chipFlashTimer = null;
         }
         this.playerGfx.destroy();
+        this.portrait.destroy();
         this.nameText.destroy();
         this.chipsText.destroy();
         this.plText.destroy();

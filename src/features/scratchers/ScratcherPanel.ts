@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { GameState } from '../../core/state/GameState';
-import { GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, FONT, COL_TRIM } from '../../game/constants';
+import { GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, FONT } from '../../game/constants';
 import { SoundManager } from '../../core/systems/SoundManager';
 import { ToastManager } from '../ui/ToastManager';
+import { paintLifeSimShell } from '../ui/shell';
 import { PAYOUTS } from '../slots/SlotsEngine';
 
 export class ScratcherPanel {
@@ -46,17 +47,14 @@ export class ScratcherPanel {
 
         // BG
         const bg = this.scene.add.graphics();
-        bg.fillGradientStyle(0x2a1535, 0x2a1535, 0x10051a, 0x10051a, 1, 1, 1, 1);
-        bg.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 12);
-        bg.lineStyle(3, COL_TRIM, 1);
-        bg.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 12);
+        paintLifeSimShell(bg, -pw / 2, -ph / 2, pw, ph);
         
         const title = this.scene.add.text(0, -ph / 2 + 30, '🎟️ SHOWGIRL SCRATCHERS', {
-            fontFamily: FONT, fontSize: '20px', color: '#ff66b2', fontStyle: 'bold',
+            fontFamily: FONT, fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
 
         this.statusText = this.scene.add.text(0, -ph / 2 + 64, 'Match 3 to win! Buy a card to start.', {
-            fontFamily: FONT, fontSize: '13px', color: '#aaaaaa'
+            fontFamily: FONT, fontSize: '13px', color: '#d7f3ea'
         }).setOrigin(0.5);
 
         this.container.add([bg, title, this.statusText]);
@@ -135,14 +133,14 @@ export class ScratcherPanel {
         this.buyBtn.on('pointerdown', () => this.buyCard());
 
         // Close Button
-        const closeBtn = this.scene.add.rectangle(0, ph / 2 - 30, 120, 28, 0x3a1e1e, 1)
-            .setStrokeStyle(1, 0x8a3a3a, 1)
+        const closeBtn = this.scene.add.rectangle(0, ph / 2 - 30, 120, 28, 0xe7fff4, 1)
+            .setStrokeStyle(2, 0x0e3f38, 1)
             .setInteractive({ useHandCursor: true });
-        const closeLabel = this.scene.add.text(0, ph / 2 - 30, 'Leave [ESC]', {
-            fontFamily: FONT, fontSize: '11px', color: '#e05050'
+        const closeLabel = this.scene.add.text(0, ph / 2 - 30, 'Leave', {
+            fontFamily: FONT, fontSize: '12px', color: '#0e3f38', fontStyle: 'bold'
         }).setOrigin(0.5);
-        closeBtn.on('pointerover', () => closeBtn.setFillStyle(0x5a2a2a));
-        closeBtn.on('pointerout', () => closeBtn.setFillStyle(0x3a1e1e));
+        closeBtn.on('pointerover', () => closeBtn.setFillStyle(0xffffff));
+        closeBtn.on('pointerout', () => closeBtn.setFillStyle(0xe7fff4));
         closeBtn.on('pointerdown', () => this.close());
 
         this.container.add([this.buyBtn, this.buyLabel, closeBtn, closeLabel]);

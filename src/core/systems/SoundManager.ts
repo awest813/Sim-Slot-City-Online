@@ -1,11 +1,13 @@
-// ── Casino Sound Engine — Web Audio API synthesis ─────────────────────────────
-// All sounds are generated programmatically (no external audio files required).
-// The AudioContext is unlocked on first user interaction to satisfy browser
-// autoplay policies.  SoundManager is a module-level singleton.
+// ── Lot sound engine — Web Audio synthesis, no sample files ──────────────────
+// Original mallet, music-box, and wood timbres in major keys. Nothing here is
+// transcribed from a life-sim soundtrack. SoundManager is a module singleton.
+// The AudioContext unlocks on the first user gesture.
 
 type AudioCtx = AudioContext;
 
 const MUTE_STORAGE_KEY = 'slot-city-audio-muted';
+const MASTER_VOL = 0.38;
+const LOOP_SEC = 8;
 
 function readStoredMuted(): boolean {
     try {
@@ -27,15 +29,15 @@ function persistMuted(muted: boolean): void {
 
 let _ctx: AudioCtx | null = null;
 let _masterGain: GainNode | null = null;
+let _noiseBuf: AudioBuffer | null = null;
 let _muted = readStoredMuted();
 
-/** Return (and lazily create) the AudioContext, resuming it if suspended. */
 function getCtx(): AudioCtx | null {
     if (!_ctx) {
         try {
             _ctx = new AudioContext();
             _masterGain = _ctx.createGain();
-            _masterGain.gain.value = _muted ? 0 : 0.38;
+            _masterGain.gain.value = _muted ? 0 : MASTER_VOL;
             _masterGain.connect(_ctx.destination);
         } catch {
             return null;
@@ -47,346 +49,412 @@ function getCtx(): AudioCtx | null {
     return _ctx;
 }
 
-function getMaster(): GainNode | null {
+function master(): GainNode | null {
     getCtx();
     return _masterGain;
 }
 
-// ── Primitive helpers ─────────────────────────────────────────────────────────
-
-/** Play a single oscillator with an ADSR-ish envelope. */
-function tone(
-    frequency: number,
-    type: OscillatorType,
-    attack: number,
-    sustain: number,
-    release: number,
-    vol = 0.28,
-    dest?: AudioNode,
-): void {
-    const c = getCtx();
-    if (!c || _muted) return;
-    const now = c.currentTime;
-    const g = c.createGain();
-    g.gain.setValueAtTime(0, now);
-    g.gain.linearRampToValueAtTime(vol, now + attack);
-    g.gain.setValueAtTime(vol, now + attack + sustain);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + attack + sustain + release);
-    const o = c.createOscillator();
-    o.type = type;
-    o.frequency.setValueAtTime(frequency, now);
-    o.connect(g);
-    g.connect(dest ?? getMaster() ?? c.destination);
-    o.start(now);
-    o.stop(now + attack + sustain + release + 0.05);
+function noiseBuffer(c: AudioCtx): AudioBuffer {
+    if (!_noiseBuf || _noiseBuf.sampleRate !== c.sampleRate) {
+        const buf = c.createBuffer(1, c.sampleRate, c.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+        _noiseBuf = buf;
+    }
+    return _noiseBuf;
 }
 
-/** Play a band-pass-filtered noise burst. */
-function noiseBurst(
-    duration: number,
-    vol = 0.14,
-    freq = 1000,
-    q = 1.5,
-    delaySeconds = 0,
+interface LiveNote {
+    osc: OscillatorNode;
+    gain: GainNode;
+    end: number;
+}
+
+let _live: LiveNote[] = [];
+let _ambientOn = false;
+let _bedIndex = 0;
+let _loopTimer: ReturnType<typeof setTimeout> | null = null;
+let _generation = 0;
+let _stepFlip = false;
+
+function remember(osc: OscillatorNode, gain: GainNode, end: number, keep: boolean): void {
+    if (!keep) return;
+    const now = osc.context.currentTime;
+    _live = _live.filter(n => n.end > now);
+    _live.push({ osc, gain, end });
+}
+
+/** Fast mallet: sine fundamental plus a short inharmonic wood partial. */
+function mallet(when: number, freq: number, decay: number, vol: number, keep = false): void {
+    const c = getCtx();
+    const dest = master();
+    if (!c || !dest) return;
+    const partials = [
+        { ratio: 1, amp: 1, fall: decay },
+        { ratio: 2.78, amp: 0.22, fall: decay * 0.32 },
+        { ratio: 5.2, amp: 0.06, fall: decay * 0.16 },
+    ];
+    for (const p of partials) {
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq * p.ratio, when);
+        const peak = Math.max(0.0002, vol * p.amp);
+        const fall = Math.max(0.04, p.fall);
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.exponentialRampToValueAtTime(peak, when + 0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + fall);
+        osc.connect(g);
+        g.connect(dest);
+        osc.start(when);
+        osc.stop(when + fall + 0.04);
+        remember(osc, g, when + fall, keep);
+    }
+}
+
+/** Music-box tine: two slightly detuned sines, slower bloom than a mallet. */
+function tine(when: number, freq: number, decay: number, vol: number, keep = false): void {
+    const c = getCtx();
+    const dest = master();
+    if (!c || !dest) return;
+    const fall = Math.max(0.12, decay);
+    for (const detune of [-6, 5]) {
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, when);
+        osc.detune.setValueAtTime(detune, when);
+        const peak = Math.max(0.0002, vol * 0.55);
+        g.gain.setValueAtTime(0.0001, when);
+        g.gain.exponentialRampToValueAtTime(peak, when + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, when + fall);
+        osc.connect(g);
+        g.connect(dest);
+        osc.start(when);
+        osc.stop(when + fall + 0.04);
+        remember(osc, g, when + fall, keep);
+    }
+}
+
+function filteredNoise(
+    when: number,
+    dur: number,
+    vol: number,
+    type: BiquadFilterType,
+    freq: number,
+    q: number,
+    freqEnd?: number,
 ): void {
     const c = getCtx();
-    if (!c || _muted) return;
-    const bufLen = Math.ceil(c.sampleRate * (duration + 0.05));
-    const buf = c.createBuffer(1, bufLen, c.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+    const dest = master();
+    if (!c || !dest || _muted) return;
     const src = c.createBufferSource();
-    src.buffer = buf;
+    src.buffer = noiseBuffer(c);
     const filter = c.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = freq;
-    filter.Q.value = q;
+    filter.type = type;
+    filter.Q.setValueAtTime(q, when);
+    filter.frequency.setValueAtTime(freq, when);
+    if (freqEnd !== undefined) {
+        filter.frequency.exponentialRampToValueAtTime(Math.max(40, freqEnd), when + dur);
+    }
     const g = c.createGain();
-    const start = c.currentTime + delaySeconds;
-    g.gain.setValueAtTime(vol, start);
-    g.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    g.gain.setValueAtTime(Math.max(0.0002, vol), when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
     src.connect(filter);
     filter.connect(g);
-    g.connect(getMaster() ?? c.destination);
-    src.start(start);
-    src.stop(start + duration + 0.05);
+    g.connect(dest);
+    src.start(when);
+    src.stop(when + dur + 0.02);
 }
 
-// ── Ambient state ─────────────────────────────────────────────────────────────
+/** Hollow wood block: pitched sine click plus a short band-passed knock. */
+function wood(when: number, freq: number, vol: number): void {
+    const c = getCtx();
+    const dest = master();
+    if (!c || !dest || _muted) return;
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, when);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq * 0.62), when + 0.045);
+    g.gain.setValueAtTime(Math.max(0.0002, vol), when);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + 0.06);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(when);
+    osc.stop(when + 0.08);
+    filteredNoise(when, 0.035, vol * 0.55, 'bandpass', 1800, 7);
+}
 
-let _ambientOscs: OscillatorNode[] = [];
-let _ambientGains: GainNode[] = [];
-let _ambientPlaying = false;
-let _ambientTickTimer: ReturnType<typeof setTimeout> | null = null;
+/** Ceramic token: two soft high partials, no noise splash. */
+function ceramic(when: number, vol: number): void {
+    mallet(when, 1480, 0.11, vol * 0.34);
+    mallet(when + 0.004, 2210, 0.07, vol * 0.2);
+}
 
-// ── Public API ─────────────────────────────────────────────────────────────────
+interface BedNote { t: number; f: number; d: number; v: number; }
+
+interface Bed {
+    name: string;
+    melody: BedNote[];
+    bass: BedNote[];
+}
+
+// Original pentatonic phrases. Each loop sits in one major key so a bed
+// change doesn't clash with the one fading out.
+const BEDS: Bed[] = [
+    {
+        name: 'Neighborhood',
+        melody: [
+            { t: 0.00, f: 523.25, d: 0.85, v: 0.055 },
+            { t: 0.55, f: 659.25, d: 0.6,  v: 0.04 },
+            { t: 1.20, f: 783.99, d: 0.75, v: 0.046 },
+            { t: 2.15, f: 659.25, d: 1.0,  v: 0.038 },
+            { t: 3.40, f: 880.00, d: 0.65, v: 0.048 },
+            { t: 4.20, f: 783.99, d: 0.7,  v: 0.036 },
+            { t: 5.10, f: 659.25, d: 0.55, v: 0.034 },
+            { t: 5.85, f: 523.25, d: 1.3,  v: 0.05 },
+            { t: 7.25, f: 392.00, d: 0.55, v: 0.028 },
+        ],
+        bass: [
+            { t: 0, f: 130.81, d: 1.7, v: 0.04 },
+            { t: 2, f: 196.00, d: 1.7, v: 0.032 },
+            { t: 4, f: 174.61, d: 1.7, v: 0.03 },
+            { t: 6, f: 196.00, d: 1.6, v: 0.028 },
+        ],
+    },
+    {
+        name: 'Front Porch',
+        melody: [
+            { t: 0.00, f: 698.46, d: 0.7,  v: 0.05 },
+            { t: 0.70, f: 880.00, d: 0.55, v: 0.04 },
+            { t: 1.35, f: 523.25, d: 0.8,  v: 0.038 },
+            { t: 2.30, f: 440.00, d: 0.7,  v: 0.032 },
+            { t: 3.15, f: 523.25, d: 0.6,  v: 0.04 },
+            { t: 4.00, f: 587.33, d: 0.7,  v: 0.046 },
+            { t: 4.85, f: 523.25, d: 0.55, v: 0.034 },
+            { t: 5.55, f: 440.00, d: 0.7,  v: 0.032 },
+            { t: 6.50, f: 349.23, d: 1.2,  v: 0.048 },
+        ],
+        bass: [
+            { t: 0, f: 174.61, d: 1.8, v: 0.036 },
+            { t: 2, f: 261.63, d: 1.6, v: 0.028 },
+            { t: 4, f: 174.61, d: 1.8, v: 0.034 },
+            { t: 6, f: 220.00, d: 1.5, v: 0.026 },
+        ],
+    },
+    {
+        name: 'Sunny Day',
+        melody: [
+            { t: 0.00, f: 392.00, d: 0.4, v: 0.042 },
+            { t: 0.38, f: 493.88, d: 0.4, v: 0.038 },
+            { t: 0.76, f: 587.33, d: 0.55, v: 0.046 },
+            { t: 1.45, f: 392.00, d: 0.4, v: 0.03 },
+            { t: 1.90, f: 659.25, d: 0.6, v: 0.044 },
+            { t: 2.60, f: 587.33, d: 0.45, v: 0.034 },
+            { t: 3.15, f: 493.88, d: 0.5, v: 0.032 },
+            { t: 3.80, f: 392.00, d: 0.7, v: 0.04 },
+            { t: 4.70, f: 440.00, d: 0.4, v: 0.032 },
+            { t: 5.15, f: 493.88, d: 0.45, v: 0.036 },
+            { t: 5.75, f: 587.33, d: 0.55, v: 0.042 },
+            { t: 6.50, f: 493.88, d: 0.4, v: 0.03 },
+            { t: 7.05, f: 392.00, d: 0.8, v: 0.04 },
+        ],
+        bass: [
+            { t: 0, f: 196.00, d: 1.6, v: 0.036 },
+            { t: 2, f: 146.83, d: 1.6, v: 0.03 },
+            { t: 4, f: 196.00, d: 1.6, v: 0.034 },
+            { t: 6, f: 246.94, d: 1.5, v: 0.026 },
+        ],
+    },
+];
+
+function voiceBed(index: number, when: number): void {
+    const bed = BEDS[index % BEDS.length];
+    for (const n of bed.melody) tine(when + n.t, n.f, n.d, n.v, true);
+    for (const n of bed.bass) mallet(when + n.t, n.f, n.d, n.v, true);
+}
+
+function hush(): void {
+    const c = getCtx();
+    if (!c) {
+        _live = [];
+        return;
+    }
+    const now = c.currentTime;
+    for (const n of _live) {
+        try {
+            n.gain.gain.cancelScheduledValues(now);
+            n.gain.gain.setTargetAtTime(0.0001, now, 0.04);
+            n.osc.stop(now + 0.25);
+        } catch {
+            /* node already ended */
+        }
+    }
+    _live = [];
+}
+
+function clearLoop(): void {
+    if (_loopTimer !== null) {
+        clearTimeout(_loopTimer);
+        _loopTimer = null;
+    }
+}
+
+function armLoop(gen: number): void {
+    const c = getCtx();
+    if (!c || !_ambientOn || gen !== _generation) return;
+    voiceBed(_bedIndex, c.currentTime + 0.06);
+    _loopTimer = setTimeout(() => armLoop(gen), LOOP_SEC * 1000);
+}
 
 export const SoundManager = {
-
-    /**
-     * Call once after the first user interaction.
-     * Creates the AudioContext (needed by browsers' autoplay policy).
-     */
     init(): void {
         getCtx();
-        if (!_ambientPlaying) this.startAmbient();
+        if (!_ambientOn) this.startAmbient();
     },
 
     setMuted(muted: boolean): void {
         _muted = muted;
         persistMuted(muted);
-        const m = getMaster();
+        const m = master();
         const c = getCtx();
-        if (m && c) {
-            m.gain.setTargetAtTime(muted ? 0 : 0.38, c.currentTime, 0.15);
-        }
+        if (m && c) m.gain.setTargetAtTime(muted ? 0 : MASTER_VOL, c.currentTime, 0.12);
     },
 
     isMuted(): boolean { return _muted; },
 
-    // ── Slot machine ──────────────────────────────────────────────────────────
-
-    /** Brief mechanical click burst at spin start. */
+    /** Wooden ratchet — the reels starting, not an electronic tick. */
     playSlotSpin(): void {
         const c = getCtx();
         if (!c || _muted) return;
-        for (let i = 0; i < 4; i++) {
-            const t = c.currentTime + i * 0.045;
-            const g = c.createGain();
-            g.gain.setValueAtTime(0.1, t);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
-            const o = c.createOscillator();
-            o.type = 'square';
-            o.frequency.setValueAtTime(100 + i * 30 + Math.random() * 40, t);
-            o.connect(g);
-            g.connect(getMaster() ?? c.destination);
-            o.start(t);
-            o.stop(t + 0.05);
-        }
+        const gaps = [0, 0.055, 0.1, 0.138, 0.17, 0.198, 0.222];
+        gaps.forEach((gap, i) => wood(c.currentTime + gap, 420 + i * 38, 0.07));
     },
 
-    /**
-     * Satisfying thud when a reel stops.
-     * @param reelIndex  0 = left, 1 = centre, 2 = right (pitch varies)
-     */
+    /** Wood knock. Pitch drops from the left reel to the right. */
     playReelStop(reelIndex: number): void {
-        // Low body thud
-        const pitches = [220, 196, 175];
-        tone(pitches[reelIndex % 3] * 0.5, 'sine', 0.002, 0.03, 0.14, 0.32);
-        // Bright click layer
-        noiseBurst(0.055, 0.16, 2200 + reelIndex * 350, 3.5);
+        const c = getCtx();
+        if (!c || _muted) return;
+        const pitches = [740, 620, 510];
+        wood(c.currentTime, pitches[reelIndex % 3], 0.11);
     },
 
-    /**
-     * Win jingle — grows with payout amount.
-     * @param amount chip payout
-     */
+    /** Major mallet arpeggio. Longer when the payout is larger. */
     playWin(amount: number): void {
-        if (_muted) return;
+        const c = getCtx();
+        if (!c || _muted) return;
         const notes = amount >= 1000
-            ? [523.25, 659.25, 783.99, 1046.5, 1318.5]
+            ? [523.25, 659.25, 783.99, 1046.5, 1318.51]
             : amount >= 200
                 ? [523.25, 659.25, 783.99, 1046.5]
                 : [523.25, 659.25, 783.99];
-        const c = getCtx();
-        if (!c) return;
-        notes.forEach((f, i) => {
-            const now = c.currentTime + i * 0.09;
-            const g = c.createGain();
-            g.gain.setValueAtTime(0, now);
-            g.gain.linearRampToValueAtTime(0.28, now + 0.01);
-            g.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
-            const o = c.createOscillator();
-            o.type = 'triangle';
-            o.frequency.setValueAtTime(f, now);
-            o.connect(g);
-            g.connect(getMaster() ?? c.destination);
-            o.start(now);
-            o.stop(now + 0.32);
-        });
-        // Coin jingle
-        const coinVol = amount >= 200 ? 0.38 : 0.22;
-        for (let i = 0; i < (amount >= 200 ? 4 : 2); i++) {
-            noiseBurst(0.07, coinVol * 0.8, 3500 + i * 300, 6, i * 0.06);
-            tone(880 + i * 110, 'sine', 0.001, 0.01, 0.12, coinVol * 0.5, undefined);
+        const now = c.currentTime;
+        notes.forEach((f, i) => mallet(now + i * 0.11, f, 0.28, 0.11));
+        if (amount >= 200) {
+            ceramic(now + notes.length * 0.11, 0.12);
+            ceramic(now + notes.length * 0.11 + 0.09, 0.08);
         }
     },
 
-    /** Full jackpot fanfare + coin shower. */
+    /** One rising flourish, then a few ceramic chimes on the audio clock. */
     playJackpot(): void {
-        if (_muted) return;
         const c = getCtx();
-        if (!c) return;
-        const fanfare: Array<{ f: number; t: number }> = [
-            { f: 523.25, t: 0 },
-            { f: 659.25, t: 0.11 },
-            { f: 783.99, t: 0.22 },
-            { f: 1046.5, t: 0.33 },
-            { f: 1318.5, t: 0.47 },
-            { f: 1567.98, t: 0.62 },
-            { f: 2093,   t: 0.74 },
-        ];
-        fanfare.forEach(({ f, t }) => {
-            const now = c.currentTime + t;
-            const g = c.createGain();
-            g.gain.setValueAtTime(0, now);
-            g.gain.linearRampToValueAtTime(0.32, now + 0.01);
-            g.gain.setValueAtTime(0.32, now + 0.13);
-            g.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
-            const o = c.createOscillator();
-            o.type = 'triangle';
-            o.frequency.setValueAtTime(f, now);
-            const o2 = c.createOscillator();
-            o2.type = 'square';
-            o2.frequency.setValueAtTime(f / 2, now);
-            const g2 = c.createGain();
-            g2.gain.value = 0.12;
-            o2.connect(g2);
-            o.connect(g);
-            g2.connect(g);
-            g.connect(getMaster() ?? c.destination);
-            o.start(now);  o.stop(now + 0.38);
-            o2.start(now); o2.stop(now + 0.38);
+        if (!c || _muted) return;
+        const now = c.currentTime;
+        const flourish = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093];
+        flourish.forEach((f, i) => {
+            mallet(now + i * 0.09, f, 0.36, 0.13);
+            mallet(now + i * 0.09, f / 2, 0.3, 0.04);
         });
-        // Coin shower (spread over 1.5 s)
-        for (let i = 0; i < 10; i++) {
-            const delay = 300 + i * 160;
-            setTimeout(() => {
-                if (!_muted) this.playChipLand(0.45);
-            }, delay);
-        }
+        const chimeAt = now + flourish.length * 0.09;
+        [0, 0.12, 0.26, 0.42].forEach((t, i) => ceramic(chimeAt + t, 0.16 - i * 0.02));
     },
 
-    // ── Poker / card sounds ───────────────────────────────────────────────────
-
-    /** Card deal swoosh. */
+    /** Paper swipe plus a tiny mallet tap. */
     playDeal(): void {
-        noiseBurst(0.09, 0.11, 1400, 0.7);
-        tone(200, 'triangle', 0.002, 0.008, 0.07, 0.09);
-    },
-
-    /** Chip sliding across felt (pot push animation). */
-    playChipSlide(): void {
-        noiseBurst(0.22, 0.09, 700, 1.8);
-    },
-
-    /** Single chip landing / coin clink. */
-    playChipLand(vol = 0.24): void {
-        tone(880,  'sine', 0.001, 0.015, 0.16, vol * 0.55);
-        tone(1320, 'sine', 0.001, 0.008, 0.10, vol * 0.38);
-        noiseBurst(0.065, vol * 0.32, 3200, 5.5);
-    },
-
-    /** Soft UI button click. */
-    playClick(): void {
-        tone(440, 'sine', 0.001, 0.004, 0.04, 0.11);
-        noiseBurst(0.022, 0.07, 2000, 9);
-    },
-
-    /** Fold / cancel sound. */
-    playFold(): void {
-        noiseBurst(0.07, 0.09, 350, 2);
-        tone(220, 'triangle', 0.001, 0.01, 0.11, 0.13);
-    },
-
-    // ── Ambient music ─────────────────────────────────────────────────────────
-
-    /**
-     * Start a looping ambient casino atmosphere:
-     *  – Soft jazz-pad chords (Am → Dm)
-     *  – Low bass drone
-     *  – Gentle high-hat tick (alternating 8th notes)
-     */
-    startAmbient(): void {
         const c = getCtx();
-        if (!c || _ambientPlaying) return;
-        _ambientPlaying = true;
+        if (!c || _muted) return;
+        const now = c.currentTime;
+        filteredNoise(now, 0.09, 0.07, 'bandpass', 2400, 0.7, 700);
+        mallet(now + 0.02, 988, 0.08, 0.045);
+    },
 
-        // Chord frequencies (two chords, 4 s each)
-        const chords: number[][] = [
-            [110, 220, 261.63, 329.63, 392],   // A2 drone + Am7 pad
-            [73.42, 146.83, 220, 293.66, 349.23], // D2 drone + Dm7 pad
-        ];
+    playChipSlide(): void {
+        const c = getCtx();
+        if (!c || _muted) return;
+        filteredNoise(c.currentTime, 0.18, 0.055, 'lowpass', 1400, 0.7, 380);
+    },
 
-        const startPad = (freqs: number[], when: number): void => {
-            freqs.forEach(f => {
-                if (!c) return;
-                const g = c.createGain();
-                const filter = c.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.value = 900;
-                filter.Q.value = 0.8;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(f < 130 ? 0.09 : 0.028, when + 0.6);
-                g.gain.setValueAtTime(f < 130 ? 0.09 : 0.028, when + 3.2);
-                g.gain.linearRampToValueAtTime(0.0001, when + 4.1);
-                const o = c.createOscillator();
-                o.type = f < 130 ? 'sine' : 'triangle';
-                o.frequency.setValueAtTime(f, when);
-                // Slight detune for warmth
-                o.detune.setValueAtTime(Math.random() * 6 - 3, when);
-                o.connect(filter);
-                filter.connect(g);
-                g.connect(getMaster() ?? c.destination);
-                o.start(when);
-                o.stop(when + 4.2);
-                _ambientOscs.push(o);
-                _ambientGains.push(g);
-            });
-        };
+    playChipLand(vol = 0.22): void {
+        const c = getCtx();
+        if (!c || _muted) return;
+        ceramic(c.currentTime, vol);
+    },
 
-        // Play two chords (8 s total) and schedule the loop via setTimeout
-        const playBar = (): void => {
-            const c2 = getCtx();
-            if (!c2 || !_ambientPlaying) return;
-            const now = c2.currentTime;
-            startPad(chords[0], now);
-            startPad(chords[1], now + 4);
-        };
+    playClick(): void {
+        const c = getCtx();
+        if (!c || _muted) return;
+        wood(c.currentTime, 660, 0.08);
+    },
 
-        playBar();
-        // High-hat tick every 500 ms — noiseBurst already checks _muted internally
-        const hihatTick = (): void => {
-            if (!_ambientPlaying) return;
-            noiseBurst(0.04, 0.025, 8000, 12);
-        };
-        const scheduleHihat = (): void => {
-            if (!_ambientPlaying) return;
-            hihatTick();
-            _ambientTickTimer = setTimeout(scheduleHihat, 500);
-        };
-        scheduleHihat();
+    /** A falling fourth on a rounded sine. */
+    playFold(): void {
+        const c = getCtx();
+        const dest = master();
+        if (!c || !dest || _muted) return;
+        const now = c.currentTime;
+        const osc = c.createOscillator();
+        const g = c.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(392, now);
+        osc.frequency.exponentialRampToValueAtTime(293.66, now + 0.16);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.09, now + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+        osc.connect(g);
+        g.connect(dest);
+        osc.start(now);
+        osc.stop(now + 0.26);
+    },
 
-        // Loop every 8 s
-        const loopAmbient = (): void => {
-            if (!_ambientPlaying) return;
-            // Cleanup expired nodes (they've already stopped)
-            _ambientOscs  = _ambientOscs.filter(o => {
-                try { o.frequency.value; return true; } catch { return false; }
-            });
-            _ambientGains = [];
-            playBar();
-            setTimeout(loopAmbient, 8000);
-        };
-        setTimeout(loopAmbient, 8000);
+    /** Quiet alternating footfall. Safe to call every step. */
+    playStep(): void {
+        const c = getCtx();
+        if (!c || _muted) return;
+        _stepFlip = !_stepFlip;
+        wood(c.currentTime, _stepFlip ? 196 : 168, 0.035);
+    },
+
+    startAmbient(): void {
+        if (_ambientOn) return;
+        if (!getCtx()) return;
+        _ambientOn = true;
+        _generation += 1;
+        armLoop(_generation);
     },
 
     stopAmbient(): void {
-        const c = getCtx();
-        _ambientPlaying = false;
-        if (_ambientTickTimer !== null) {
-            clearTimeout(_ambientTickTimer);
-            _ambientTickTimer = null;
+        _ambientOn = false;
+        _generation += 1;
+        clearLoop();
+        hush();
+    },
+
+    /** Advance the lot jukebox and restart the bed on the new phrase. */
+    nextAmbient(): void {
+        _bedIndex = (_bedIndex + 1) % BEDS.length;
+        if (!_ambientOn) {
+            this.startAmbient();
+            return;
         }
-        if (!c) return;
-        const now = c.currentTime;
-        _ambientGains.forEach(g => {
-            try { g.gain.setTargetAtTime(0, now, 0.5); } catch { /* ignore */ }
-        });
-        _ambientOscs.forEach(o => {
-            try { o.stop(now + 1.5); } catch { /* ignore */ }
-        });
-        _ambientOscs  = [];
-        _ambientGains = [];
+        hush();
+        clearLoop();
+        _generation += 1;
+        armLoop(_generation);
+    },
+
+    ambientName(): string {
+        return BEDS[_bedIndex].name;
     },
 };

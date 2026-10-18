@@ -47,11 +47,11 @@ export const COL_BINGO_ACCENT     = 0x00c8ff;   // Cyan (bingo)
 export const COL_HORSES_ACCENT    = 0xe8b020;   // Gold-amber (horse race)
 
 // ── Palette — UI ──────────────────────────────────────────────────────────────
-export const COL_UI_BG        = 0x080f1c;   // Panel background (deep navy)
-export const COL_UI_BG2       = 0x0d1828;   // Secondary panel bg
-export const COL_UI_BG3       = 0x121e32;   // Tertiary (cards, inner sections)
-export const COL_UI_BORDER    = 0xc9a84c;   // Gold border
-export const COL_UI_BORDER_DIM = 0x7a6030;  // Dim gold border
+export const COL_UI_BG        = 0x0e3f38;   // Life-sim teal panel well
+export const COL_UI_BG2       = 0x14675c;   // Teal header band
+export const COL_UI_BG3       = 0x1c7a6c;   // Raised plastic
+export const COL_UI_BORDER    = 0x9ef0dc;   // Highlight rim
+export const COL_UI_BORDER_DIM = 0x2f8f78;  // Deep rim
 export const COL_UI_HOVER     = 0x1c2e44;
 export const COL_UI_SELECTED  = 0x263a54;
 export const COL_BTN_PRIMARY  = 0x1a5028;   // Green button (deal/confirm)
@@ -64,7 +64,7 @@ export const COL_BTN_GOLD     = 0x30280a;   // Gold button (SPIN/raise)
 export const COL_BTN_GOLD_H   = 0x504014;   // Gold hover
 
 // ── Typography ────────────────────────────────────────────────────────────────
-export const FONT = 'monospace';
+export const FONT = 'Verdana, Trebuchet MS, sans-serif';
 
 export const TEXT_XS     = { fontFamily: FONT, fontSize: '9px',  color: '#9090a0' } as const;
 export const TEXT_SM     = { fontFamily: FONT, fontSize: '11px', color: '#c8c0b0' } as const;
@@ -80,8 +80,10 @@ export const TEXT_MUTED     = { fontFamily: FONT, fontSize: '11px', color: '#506
 export const TEXT_TITLE     = { fontFamily: FONT, fontSize: '28px', color: '#c9a84c', fontStyle: 'bold' } as const;
 
 // ── UI Layout ─────────────────────────────────────────────────────────────────
-export const PANEL_RADIUS = 8;    // standard rounded corner radius for panels
-export const BTN_RADIUS   = 4;    // standard button corner radius
+export const PANEL_RADIUS = 16;   // chunky plastic corners
+export const BTN_RADIUS   = 8;    // standard button corner radius
+export const DOCK_H = 64;
+export const DOCK_Y = GAME_HEIGHT - DOCK_H;
 
 // ── Animation Timings (ms) ────────────────────────────────────────────────────
 export const ANIM_FAST = 120;    // quick feedback

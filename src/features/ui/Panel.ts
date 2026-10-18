@@ -2,9 +2,9 @@
 import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
-    COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_TRIM,
-    FONT, ANIM_MED, PANEL_RADIUS, COL_NEON_BLUE, COL_NEON_PINK,
+    FONT, ANIM_MED,
 } from '../../game/constants';
+import { paintLifeSimShell } from './shell';
 
 export interface ButtonConfig {
     label:      string;
@@ -74,130 +74,7 @@ export class Panel {
         const g  = this.panelGfx;
         g.clear();
 
-        const px = cx - this.w / 2;
-        const py = cy - this.h / 2;
-
-        // ── 3-layer blur-simulated drop shadow ────────────────────────────
-        g.fillStyle(0x000000, 0.22);
-        g.fillRoundedRect(px + 12, py + 16, this.w, this.h, PANEL_RADIUS + 4);
-        g.fillStyle(0x000000, 0.38);
-        g.fillRoundedRect(px + 7,  py + 10, this.w, this.h, PANEL_RADIUS + 3);
-        g.fillStyle(0x000000, 0.55);
-        g.fillRoundedRect(px + 4,  py + 6,  this.w, this.h, PANEL_RADIUS + 2);
-
-        // ── 4-layer border glow (outermost first) ─────────────────────────
-        g.lineStyle(12, COL_UI_BORDER, 0.04);
-        g.strokeRoundedRect(px - 4, py - 4, this.w + 8, this.h + 8, PANEL_RADIUS + 5);
-        g.lineStyle(8, COL_UI_BORDER, 0.06);
-        g.strokeRoundedRect(px - 2, py - 2, this.w + 4, this.h + 4, PANEL_RADIUS + 3);
-
-        // Main background with sleek gradient
-        g.fillGradientStyle(0x182436, 0x182436, 0x0a101a, 0x0a101a, 0.95, 0.95, 0.98, 0.98);
-        g.fillRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
-        g.fillStyle(COL_NEON_BLUE, 0.05);
-        g.fillCircle(cx - this.w * 0.2, cy - this.h * 0.15, this.w * 0.28);
-        g.fillStyle(COL_NEON_PINK, 0.05);
-        g.fillCircle(cx + this.w * 0.22, cy + this.h * 0.12, this.w * 0.24);
-
-        // Center highlight simulation
-        g.fillStyle(0x0d1830, 0.6);
-        g.fillCircle(cx, cy - 30, this.w * 0.42);
-        g.fillStyle(COL_UI_BG, 0.78);
-        g.fillRoundedRect(px + 4, py + 4, this.w - 8, this.h - 8, PANEL_RADIUS - 2);
-
-        // Vertical panel bands for a glass-casino feel
-        g.fillStyle(0xffffff, 0.025);
-        g.fillRoundedRect(px + 24, py + 18, 22, this.h - 36, 8);
-        g.fillRoundedRect(px + this.w - 46, py + 18, 22, this.h - 36, 8);
-        g.fillStyle(COL_NEON_BLUE, 0.06);
-        g.fillRoundedRect(px + 30, py + 26, 8, this.h - 52, 6);
-        g.fillStyle(COL_NEON_PINK, 0.05);
-        g.fillRoundedRect(px + this.w - 38, py + 26, 8, this.h - 52, 6);
-
-        // Top header band
-        g.fillStyle(COL_UI_BG2, 1);
-        g.fillRoundedRect(px, py, this.w, 54, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
-        // Header inner highlight
-        g.fillStyle(0x1a2840, 0.4);
-        g.fillRoundedRect(px + 2, py + 2, this.w - 4, 24, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
-        // Diagonal sheen stripe — thin triangle at top-right for a polished glint
-        g.fillStyle(0xffffff, 0.05);
-        g.fillTriangle(
-            px + this.w - PANEL_RADIUS - 72, py + 1,
-            px + this.w - PANEL_RADIUS - 2,  py + 1,
-            px + this.w - PANEL_RADIUS - 2,  py + 46,
-        );
-        g.fillStyle(0xffffff, 0.03);
-        g.fillTriangle(
-            px + PANEL_RADIUS + 2, py + 1,
-            px + PANEL_RADIUS + 56, py + 1,
-            px + PANEL_RADIUS + 2, py + 36,
-        );
-
-        // Gold border — main
-        g.lineStyle(2, COL_UI_BORDER, 0.9);
-        g.strokeRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
-        // Inner border for depth
-        g.lineStyle(1, COL_UI_BORDER, 0.2);
-        g.strokeRoundedRect(px + 3, py + 3, this.w - 6, this.h - 6, PANEL_RADIUS - 1);
-
-        // ── Double-track divider (header/content) ─────────────────────────
-        g.lineStyle(2, COL_TRIM, 0.7);
-        g.lineBetween(px + PANEL_RADIUS, py + 54, px + this.w - PANEL_RADIUS, py + 54);
-        // Inner track line 2 px below at half opacity
-        g.lineStyle(1, COL_TRIM, 0.35);
-        g.lineBetween(px + PANEL_RADIUS, py + 56, px + this.w - PANEL_RADIUS, py + 56);
-        // Faint third line for extra depth
-        g.lineStyle(0.5, COL_TRIM, 0.15);
-        g.lineBetween(px + PANEL_RADIUS + 8, py + 59, px + this.w - PANEL_RADIUS - 8, py + 59);
-
-        // ── Corner ornaments — primary + secondary L-shapes + diamond dots ─
-        const orn     = 12;
-        const ornPad  = PANEL_RADIUS + 4;
-        const ornInset = 2;
-        const op2      = ornPad + ornInset;
-        const orn2     = orn - 3;
-
-        // Primary L-shapes
-        g.lineStyle(1, COL_TRIM, 0.35);
-        g.lineBetween(px + ornPad,          py + ornPad,          px + ornPad + orn,      py + ornPad);
-        g.lineBetween(px + ornPad,          py + ornPad,          px + ornPad,            py + ornPad + orn);
-        g.lineBetween(px + this.w - ornPad, py + ornPad,          px + this.w - ornPad - orn, py + ornPad);
-        g.lineBetween(px + this.w - ornPad, py + ornPad,          px + this.w - ornPad,   py + ornPad + orn);
-        g.lineBetween(px + ornPad,          py + this.h - ornPad, px + ornPad + orn,      py + this.h - ornPad);
-        g.lineBetween(px + ornPad,          py + this.h - ornPad, px + ornPad,            py + this.h - ornPad - orn);
-        g.lineBetween(px + this.w - ornPad, py + this.h - ornPad, px + this.w - ornPad - orn, py + this.h - ornPad);
-        g.lineBetween(px + this.w - ornPad, py + this.h - ornPad, px + this.w - ornPad,   py + this.h - ornPad - orn);
-
-        // Secondary inset L-shapes (2 px inward, lower opacity)
-        g.lineStyle(1, COL_TRIM, 0.16);
-        g.lineBetween(px + op2,             py + op2,             px + op2 + orn2,        py + op2);
-        g.lineBetween(px + op2,             py + op2,             px + op2,               py + op2 + orn2);
-        g.lineBetween(px + this.w - op2,    py + op2,             px + this.w - op2 - orn2, py + op2);
-        g.lineBetween(px + this.w - op2,    py + op2,             px + this.w - op2,      py + op2 + orn2);
-        g.lineBetween(px + op2,             py + this.h - op2,    px + op2 + orn2,        py + this.h - op2);
-        g.lineBetween(px + op2,             py + this.h - op2,    px + op2,               py + this.h - op2 - orn2);
-        g.lineBetween(px + this.w - op2,    py + this.h - op2,    px + this.w - op2 - orn2, py + this.h - op2);
-        g.lineBetween(px + this.w - op2,    py + this.h - op2,    px + this.w - op2,      py + this.h - op2 - orn2);
-
-        // Diamond dots at each primary L-junction
-        const dotR = 2;
-        const dotPositions: Array<[number, number]> = [
-            [px + ornPad,           py + ornPad],
-            [px + this.w - ornPad,  py + ornPad],
-            [px + ornPad,           py + this.h - ornPad],
-            [px + this.w - ornPad,  py + this.h - ornPad],
-        ];
-        g.fillStyle(COL_TRIM, 0.5);
-        for (const [dx, dy] of dotPositions) {
-            g.fillRect(dx - dotR, dy - dotR, dotR * 2, dotR * 2);
-        }
-
-        // Bottom deco rails
-        g.lineStyle(2, COL_NEON_BLUE, 0.12);
-        g.lineBetween(px + 24, py + this.h - 20, px + this.w / 2 - 44, py + this.h - 20);
-        g.lineStyle(2, COL_NEON_PINK, 0.12);
-        g.lineBetween(px + this.w / 2 + 44, py + this.h - 20, px + this.w - 24, py + this.h - 20);
+        paintLifeSimShell(g, cx - this.w / 2, cy - this.h / 2, this.w, this.h);
     }
 
     addTitle(text: string): void {
@@ -227,10 +104,11 @@ export class Panel {
     addButton(cfg: ButtonConfig, fullWidth = false): Phaser.GameObjects.Container {
         const bw = fullWidth ? this.w - 60 : 160;
         const bh = 34;
-        const baseFill  = cfg.disabled ? 0x1a1a1a : (cfg.color ?? 0x1a5028);
-        const hoverFill = cfg.disabled ? 0x1a1a1a : (cfg.hoverColor ?? lighten(baseFill));
-        const pressFill = cfg.disabled ? 0x1a1a1a : darken(baseFill);
-        const r = 4;
+        const baseFill  = cfg.disabled ? 0x8aa39c : (cfg.color ?? 0xe7fff4);
+        const hoverFill = cfg.disabled ? 0x8aa39c : (cfg.hoverColor ?? lighten(baseFill));
+        const pressFill = cfg.disabled ? 0x8aa39c : darken(baseFill);
+        const r = 10;
+        const ink = cfg.disabled ? '#5c6e6a' : (isLight(baseFill) ? '#0e3f38' : '#f4fff8');
 
         // Use Graphics for rounded button background
         const gfx = this.scene.add.graphics();
@@ -250,7 +128,7 @@ export class Panel {
                 gfx.fillRoundedRect(-bw / 2 + 2, by - bh / 2 + 2, bw - 4, bh / 2 - 2, { tl: r - 1, tr: r - 1, bl: 0, br: 0 });
             }
             // Border
-            const bCol = cfg.disabled ? 0x333333 : COL_UI_BORDER;
+            const bCol = cfg.disabled ? 0x5c6e6a : 0x0e3f38;
             const bAlpha = cfg.disabled ? 0.3 : hover ? 0.9 : 0.65;
             gfx.lineStyle(1, bCol, bAlpha);
             gfx.strokeRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
@@ -267,7 +145,7 @@ export class Panel {
 
         const label = this.scene.add.text(0, by, cfg.label, {
             fontFamily: FONT, fontSize: '12px',
-            color: cfg.disabled ? '#555555' : '#f0e6d3',
+            color: ink,
         }).setOrigin(0.5);
 
         if (!cfg.disabled) {
@@ -295,14 +173,14 @@ export class Panel {
         const bw  = 110;
         const bh  = 30;
         const by  = this.h / 2 - 22;
-        const r   = 4;
+        const r   = 10;
 
         const gfx = this.scene.add.graphics();
         const drawClose = (hover: boolean): void => {
             gfx.clear();
-            gfx.fillStyle(hover ? 0x5c2020 : 0x3a1818, 1);
+            gfx.fillStyle(hover ? 0xffffff : 0xe7fff4, 1);
             gfx.fillRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
-            gfx.lineStyle(1, hover ? 0xaa3a3a : 0x7a2a2a, 0.9);
+            gfx.lineStyle(1.5, 0x0e3f38, 0.85);
             gfx.strokeRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
         };
         drawClose(false);
@@ -310,12 +188,12 @@ export class Panel {
         const hitRect = this.scene.add.rectangle(0, by, bw, bh, 0x000000, 0)
             .setInteractive({ useHandCursor: true });
 
-        const label = this.scene.add.text(0, by, '✕  Close', {
-            fontFamily: FONT, fontSize: '12px', color: '#dd5050',
+        const label = this.scene.add.text(0, by, 'Close', {
+            fontFamily: FONT, fontSize: '12px', color: '#0e3f38', fontStyle: 'bold',
         }).setOrigin(0.5);
 
-        hitRect.on('pointerover',  () => { drawClose(true);  label.setColor('#ff6060'); });
-        hitRect.on('pointerout',   () => { drawClose(false); label.setColor('#dd5050'); });
+        hitRect.on('pointerover',  () => drawClose(true));
+        hitRect.on('pointerout',   () => drawClose(false));
         hitRect.on('pointerdown',  () => onClose());
 
         this.escCloseHandler = onClose;
@@ -336,6 +214,13 @@ export class Panel {
 }
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
+
+function isLight(hex: number): boolean {
+    const r = (hex >> 16) & 0xff;
+    const g = (hex >> 8) & 0xff;
+    const b = hex & 0xff;
+    return r + g + b > 420;
+}
 
 function lighten(hex: number, amount = 32): number {
     const r = Math.min(255, ((hex >> 16) & 0xff) + amount);

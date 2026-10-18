@@ -55,10 +55,10 @@ export class EmoteRadialMenu extends Phaser.GameObjects.Container {
         this.add(this.menuGfx);
 
         // 3. Central label
-        this.labelText = scene.add.text(0, 0, 'SELECT\nEMOTE', {
-            fontFamily: 'monospace',
+        this.labelText = scene.add.text(0, 0, 'PICK\nEMOTE', {
+            fontFamily: 'Verdana, Trebuchet MS, sans-serif',
             fontSize: '11px',
-            color: '#c9a84c',
+            color: '#e7fff6',
             fontStyle: 'bold',
             align: 'center'
         }).setOrigin(0.5);
@@ -120,11 +120,10 @@ export class EmoteRadialMenu extends Phaser.GameObjects.Container {
         const segmentAngle = (Math.PI * 2) / N;
 
         // Draw overall base ring shadow/backing
-        g.fillStyle(0x0c1424, 0.85);
+        g.fillStyle(0x14675c, 0.96);
         g.fillCircle(0, 0, this.outerR);
-        
-        // Punch out the middle circle
-        g.fillStyle(0x060c18, 1);
+
+        g.fillStyle(0x0e3f38, 1);
         g.fillCircle(0, 0, this.innerR);
 
         // Draw segments
@@ -135,7 +134,7 @@ export class EmoteRadialMenu extends Phaser.GameObjects.Container {
 
             // Highlight hovered segment
             if (isHovered) {
-                g.fillStyle(0x182a4a, 0.95);
+                g.fillStyle(0x1faf98, 0.95);
                 g.slice(0, 0, this.outerR + 5, startAng, endAng, false);
                 g.fillPath();
 
@@ -146,7 +145,7 @@ export class EmoteRadialMenu extends Phaser.GameObjects.Container {
                 g.strokePath();
 
                 // Update text label in center
-                this.labelText.setText(EMOTES[i].label).setColor('#ffffff');
+                this.labelText.setText(EMOTES[i].label).setColor('#fff6e8');
                 
                 // Scale up hovered emoji slightly
                 this.scene.tweens.add({

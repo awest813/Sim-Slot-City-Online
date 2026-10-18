@@ -4,13 +4,13 @@
 
 import Phaser from 'phaser';
 import {
-    GAME_WIDTH, GAME_HEIGHT, WORLD_W, WORLD_H,
+    GAME_WIDTH, WORLD_W, WORLD_H,
     DEPTH_HUD, FONT,
     ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK,
     ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO, ZONE_HORSES, ZONE_ENTRANCE, ZONE_VIP,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT,
     COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT, COL_HORSES_ACCENT,
-    COL_UI_BG, COL_UI_BORDER, COL_TRIM,
+    COL_UI_BG, COL_UI_BORDER, COL_TRIM, DOCK_Y,
 } from '../../game/constants';
 
 // Minimap size and anchor (bottom-right)
@@ -18,7 +18,7 @@ const MAP_W   = 144;
 const MAP_H   = 108;
 const MARGIN  = 8;
 const MAP_X   = GAME_WIDTH  - MAP_W - MARGIN;   // left edge of minimap
-const MAP_Y   = GAME_HEIGHT - MAP_H - MARGIN;   // top  edge of minimap
+const MAP_Y   = DOCK_Y - MAP_H - MARGIN;
 
 // Scale world coords → minimap coords
 const SX = (wx: number): number => MAP_X + (wx / WORLD_W) * MAP_W;
@@ -85,7 +85,7 @@ export class Minimap {
         g.fillStyle(COL_UI_BG, 0.90);
         g.fillRoundedRect(MAP_X, MAP_Y, MAP_W, MAP_H, 5);
         // Subtle floor grid tint
-        g.fillStyle(0x0c1a0c, 0.35);
+        g.fillStyle(0xc4a36a, 0.28);
         g.fillRoundedRect(MAP_X + 1, MAP_Y + 1, MAP_W - 2, MAP_H - 2, 4);
         // Border
         g.lineStyle(1.5, COL_UI_BORDER, 0.75);

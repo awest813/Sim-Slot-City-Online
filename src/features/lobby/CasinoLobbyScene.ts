@@ -2,15 +2,12 @@
 import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, WORLD_W, WORLD_H,
-    COL_FLOOR, COL_WALL, COL_WALL_STRIPE,
-    COL_TRIM, COL_TRIM_DIM,
-    COL_TABLE,
+    COL_TRIM,
     COL_SLOTS_ACCENT, COL_POKER_ACCENT, COL_BAR_ACCENT, COL_BLACKJACK_ACCENT, COL_ROULETTE_ACCENT, COL_PLINKO_ACCENT, COL_BINGO_ACCENT, COL_HORSES_ACCENT,
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
-    COL_SKY_TOP, COL_SKY_MID, COL_SKY_GLOW, COL_RUNNER, COL_RUNNER_TRIM, COL_NEON_BLUE, COL_NEON_PINK,
-    DEPTH_FLOOR, DEPTH_PROPS, DEPTH_FOREGROUND, DEPTH_HUD, DEPTH_OVERLAY,
+    DEPTH_HUD, DEPTH_OVERLAY,
     ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO, ZONE_HORSES, ZONE_VIP,
-    FONT, ANIM_SLOW,
+    FONT, ANIM_SLOW, DOCK_Y,
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
 import { AvatarController } from '../../core/systems/AvatarController';
@@ -32,6 +29,9 @@ import { HorseRacePanel } from '../horserace/HorseRacePanel';
 import { ScratcherPanel } from '../scratchers/ScratcherPanel';
 import { EmoteRadialMenu } from '../ui/EmoteRadialMenu';
 import { StatsPanel } from '../ui/StatsPanel';
+import { bakeAllSimsArt } from '../../art/bake';
+import { buildSimsLot } from '../../art/lot';
+import { cameraBounds, fromScreen, toScreen, worldDepth } from '../../art/iso';
 
 export class CasinoLobbyScene extends Phaser.Scene {
     private avatar!:      AvatarController;
@@ -40,7 +40,6 @@ export class CasinoLobbyScene extends Phaser.Scene {
     private interaction!: InteractionSystem;
     private minimap!:     Minimap;
     private activePanel:  'none' | 'slots' | 'bar' | 'poker' | 'blackjack' | 'roulette' | 'plinko' | 'bingo' | 'horses' | 'scratchers' | 'menu' = 'none';
-    private graphics!:    Phaser.GameObjects.Graphics;
     // Context hint bar
     private hintBg!:      Phaser.GameObjects.Rectangle;
     private hintText!:    Phaser.GameObjects.Text;
@@ -65,14 +64,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
         }
         resetBarSession();
 
-        this.graphics = this.add.graphics();
-
-        this.buildWorld();
-        this.buildProps();
-        this.buildAmbientLighting();
-        this.buildAnimatedAtmosphere();
-        this.buildLabels();
-        this.buildEntranceFx();
+        bakeAllSimsArt(this);
+        buildSimsLot(this);
 
         // Avatar — spawn at entrance
         const spawnX = WORLD_W / 2;
@@ -83,10 +76,12 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // AI walkers — spawn at staggered positions around the floor
         this.spawnAIWalkers();
 
-        // Camera — manual follow in update()
-        this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
-        this.cameras.main.scrollX = spawnX - GAME_WIDTH / 2;
-        this.cameras.main.scrollY = spawnY - GAME_HEIGHT / 2;
+        // Camera — manual follow in isometric screen space
+        const view = cameraBounds();
+        const spawn = toScreen(spawnX, spawnY);
+        this.cameras.main.setBounds(view.minX, view.minY, view.w, view.h);
+        this.cameras.main.scrollX = spawn.x - GAME_WIDTH / 2;
+        this.cameras.main.scrollY = spawn.y - GAME_HEIGHT * 0.68;
 
         // Interaction system
         this.interaction = new InteractionSystem(this);
@@ -110,14 +105,17 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // Emote radial trigger key register
         this.qKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
-        // Initialise sound engine on the first pointer-down (browser autoplay policy
-        // requires a user gesture before creating / resuming an AudioContext).
-        this.input.once('pointerdown', () => SoundManager.init());
+        // A user gesture has to land before the AudioContext will start. The first
+        // click or keypress on the lot unlocks it; later sounds reuse that context.
+        const unlockAudio = (): void => SoundManager.init();
+        this.input.once('pointerdown', unlockAudio);
+        this.input.keyboard!.once('keydown', unlockAudio);
 
         // Click-to-move listener
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[]) => {
             if (this.activePanel === 'none' && gameObjects.length === 0 && this.avatar.enabled) {
-                this.avatar.setTarget(pointer.worldX, pointer.worldY);
+                const cart = fromScreen(pointer.worldX, pointer.worldY);
+                this.avatar.setTarget(cart.x, cart.y);
             }
         });
 
@@ -129,6 +127,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }
 
     update(_time: number, delta: number): void {
+        this.interaction.setSuspended(this.activePanel !== 'none');
         if (this.activePanel !== 'none') return;
 
         // Handle Emote Radial Menu overlay lifecycle
@@ -160,15 +159,17 @@ export class CasinoLobbyScene extends Phaser.Scene {
             ai.update(delta);
         }
 
-        // Manual camera follow with easing
-        const targetX = this.avatar.x - GAME_WIDTH  / 2;
-        const targetY = this.avatar.y - GAME_HEIGHT / 2;
+        // Manual camera follow in isometric screen space
+        const focus = toScreen(this.avatar.x, this.avatar.y);
+        const view = cameraBounds();
+        // Keep the sim low in the frame so the room ahead, not the front lawn, fills the view.
+        const targetX = focus.x - GAME_WIDTH  / 2;
+        const targetY = focus.y - GAME_HEIGHT * 0.68;
         this.cameras.main.scrollX = Phaser.Math.Linear(this.cameras.main.scrollX, targetX, 0.12);
         this.cameras.main.scrollY = Phaser.Math.Linear(this.cameras.main.scrollY, targetY, 0.12);
 
-        // Clamp to world bounds
-        this.cameras.main.scrollX = Phaser.Math.Clamp(this.cameras.main.scrollX, 0, WORLD_W - GAME_WIDTH);
-        this.cameras.main.scrollY = Phaser.Math.Clamp(this.cameras.main.scrollY, 0, WORLD_H - GAME_HEIGHT);
+        this.cameras.main.scrollX = Phaser.Math.Clamp(this.cameras.main.scrollX, view.minX, view.maxX - GAME_WIDTH);
+        this.cameras.main.scrollY = Phaser.Math.Clamp(this.cameras.main.scrollY, view.minY, view.maxY - GAME_HEIGHT);
 
         this.interaction.update(this.avatar.x, this.avatar.y);
         this.updateZone();
@@ -178,1549 +179,6 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }
 
     // ── World Building ────────────────────────────────────────────────────────
-
-    private buildWorld(): void {
-        const g = this.graphics;
-
-        // === Background ===
-        g.fillStyle(COL_SKY_TOP, 1);
-        g.fillRect(0, 0, WORLD_W, WORLD_H);
-        g.fillStyle(COL_SKY_MID, 0.45);
-        g.fillRect(0, 0, WORLD_W, WORLD_H * 0.45);
-        g.fillStyle(COL_SKY_GLOW, 0.32);
-        g.fillCircle(WORLD_W / 2, WORLD_H * 0.16, 240);
-        g.fillStyle(0x16122e, 0.18);
-        g.fillTriangle(90, WORLD_H, WORLD_W / 2 - 72, 34, WORLD_W / 2 + 12, 34);
-        g.fillTriangle(WORLD_W - 90, WORLD_H, WORLD_W / 2 + 72, 34, WORLD_W / 2 - 12, 34);
-
-        // Neon skyline silhouettes behind the casino.
-        const towerXs = [56, 132, 214, 704, 796, 884];
-        for (let i = 0; i < towerXs.length; i++) {
-            const tw = 34 + (i % 3) * 10;
-            const th = 84 + (i % 4) * 20;
-            const tx = towerXs[i] - tw / 2;
-            const ty = 42;
-            g.fillStyle(0x070a18, 0.82);
-            g.fillRect(tx, ty, tw, th);
-            g.lineStyle(1, i % 2 === 0 ? COL_NEON_BLUE : COL_NEON_PINK, 0.18);
-            g.strokeRect(tx, ty, tw, th);
-            for (let wy = ty + 10; wy < ty + th - 8; wy += 14) {
-                for (let wx = tx + 7; wx < tx + tw - 5; wx += 11) {
-                    const lit = (Math.floor(wx + wy) + i) % 3 !== 0;
-                    g.fillStyle(lit ? 0xffd040 : 0x152030, lit ? 0.35 : 0.28);
-                    g.fillRect(wx, wy, 4, 5);
-                }
-            }
-        }
-
-        // Subtle radial gradient from center
-        g.fillStyle(0x080e20, 0.35);
-        g.fillCircle(WORLD_W / 2, WORLD_H / 2, 600);
-        g.fillStyle(0x0a1428, 0.2);
-        g.fillCircle(WORLD_W / 2, WORLD_H / 2, 400);
-
-        // === Walls ===
-        g.fillStyle(COL_WALL, 1);
-        g.fillRect(0,            0,            WORLD_W, 32);
-        g.fillRect(0,            0,            24,      WORLD_H);
-        g.fillRect(WORLD_W - 24, 0,            24,      WORLD_H);
-        g.fillRect(0,            WORLD_H - 24, WORLD_W, 24);
-
-        // Wall stripe decoration
-        g.fillStyle(COL_WALL_STRIPE, 1);
-        g.fillRect(24, 8, WORLD_W - 48, 6);
-        // Second amber thin stripe
-        g.lineStyle(1, 0xc9a84c, 0.3);
-        g.lineBetween(24, 14, WORLD_W - 24, 14);
-        // Gold wall trim line — higher opacity
-        g.lineStyle(1, COL_TRIM_DIM, 0.65);
-        g.lineBetween(24, 30, WORLD_W - 24, 30);
-
-        // Decorative wall panels (wainscoting effect)
-        const panelCount = 8;
-        const panelW = (WORLD_W - 60) / panelCount;
-        for (let i = 0; i < panelCount; i++) {
-            const px = 30 + i * panelW;
-            g.lineStyle(0.5, COL_TRIM, 0.2);
-            g.strokeRect(px + 4, 2, panelW - 8, 26);
-            g.lineStyle(0.5, COL_TRIM, 0.1);
-            g.strokeRect(px + 7, 5, panelW - 14, 20);
-        }
-
-        // Side wall columns — thin gold vertical accents
-        const colSpacing = 80;
-        for (let cy2 = 80; cy2 < WORLD_H - 24; cy2 += colSpacing) {
-            g.lineStyle(1, COL_TRIM, 0.12);
-            g.lineBetween(24, cy2, 24, cy2 + 40);
-            g.lineBetween(WORLD_W - 24, cy2, WORLD_W - 24, cy2 + 40);
-        }
-
-        // === Casino carpet ===
-        g.fillStyle(COL_FLOOR, 1);
-        g.fillRect(24, 32, WORLD_W - 48, WORLD_H - 56);
-
-        // Soft vignette edge burn for more depth.
-        g.fillStyle(0x000000, 0.16);
-        g.fillRect(24, 32, WORLD_W - 48, 30);
-        g.fillRect(24, WORLD_H - 72, WORLD_W - 48, 48);
-        g.fillRect(24, 32, 36, WORLD_H - 56);
-        g.fillRect(WORLD_W - 60, 32, 36, WORLD_H - 56);
-
-        // === Marble tile checkerboard ===
-        const tileSize    = 48;
-        const TILE_LIGHT  = 0x0d2212;   // lighter marble tile shade
-        const TILE_DARK   = 0x0b1e0f;   // darker marble tile shade
-        for (let ty = 32; ty < WORLD_H - 24; ty += tileSize) {
-            for (let tx = 24; tx < WORLD_W - 24; tx += tileSize) {
-                const col = (((tx - 24) / tileSize) + ((ty - 32) / tileSize)) % 2 === 0
-                    ? TILE_LIGHT : TILE_DARK;
-                g.fillStyle(col, 1);
-                g.fillRect(tx, ty, tileSize, tileSize);
-                // Top-left inner highlight to simulate 3D marble edge
-                g.lineStyle(0.5, 0x1a3a1a, 0.25);
-                g.lineBetween(tx + 2, ty + 2, tx + tileSize - 3, ty + 2);
-                g.lineBetween(tx + 2, ty + 2, tx + 2, ty + tileSize - 3);
-            }
-        }
-
-        // Central velvet runner
-        const runnerX = WORLD_W / 2 - 118;
-        const runnerY = 178;
-        const runnerW = 236;
-        const runnerH = WORLD_H - runnerY - 86;
-        g.fillStyle(COL_RUNNER, 0.88);
-        g.fillRoundedRect(runnerX, runnerY, runnerW, runnerH, 18);
-        g.lineStyle(3, COL_RUNNER_TRIM, 0.35);
-        g.strokeRoundedRect(runnerX + 4, runnerY + 4, runnerW - 8, runnerH - 8, 16);
-        g.lineStyle(1, COL_TRIM, 0.35);
-        g.strokeRoundedRect(runnerX + 14, runnerY + 14, runnerW - 28, runnerH - 28, 10);
-        for (let yy = runnerY + 34; yy < runnerY + runnerH - 22; yy += 56) {
-            g.lineStyle(1, COL_NEON_BLUE, 0.1);
-            g.lineBetween(WORLD_W / 2 - 54, yy, WORLD_W / 2, yy - 10);
-            g.lineStyle(1, COL_NEON_PINK, 0.1);
-            g.lineBetween(WORLD_W / 2, yy - 10, WORLD_W / 2 + 54, yy);
-            g.fillStyle(COL_TRIM, 0.18);
-            g.fillCircle(WORLD_W / 2, yy - 10, 3);
-        }
-
-        // Diamond diagonal overlay — subtle
-        g.lineStyle(0.5, 0x143018, 0.12);
-        const diagSpacing = 40;
-        for (let d = -WORLD_H; d < WORLD_W + WORLD_H; d += diagSpacing) {
-            g.lineBetween(Math.max(24, d), 32, Math.min(WORLD_W - 24, d + WORLD_H), Math.min(WORLD_H - 24, 32 + WORLD_H));
-            g.lineBetween(Math.max(24, WORLD_W - d - diagSpacing), 32, Math.min(WORLD_W - 24, WORLD_W - d), Math.min(WORLD_H - 24, 32 + WORLD_H));
-        }
-
-        // === VIP Lounge Floor overlay ===
-        // Bottom-left corner: x from 24 to 280, y from 580 to 696
-        const vipCarpetX = 24;
-        const vipCarpetY = 580;
-        const vipCarpetW = 256;
-        const vipCarpetH = 116;
-        
-        // Dark purple velvet carpet fill
-        g.fillStyle(0x340a3a, 0.92);
-        g.fillRect(vipCarpetX, vipCarpetY, vipCarpetW, vipCarpetH);
-        
-        // Gold inner border
-        g.lineStyle(2, 0xf6c855, 0.85);
-        g.strokeRect(vipCarpetX, vipCarpetY, vipCarpetW, vipCarpetH);
-        
-        // Velvet ropes and brass stanchions along the top edge (y = 580)
-        // With a gap for entrance at x = 240 to 280 (so stanchions at x = 24, 80, 140, 200, 240)
-        const stanchionXs = [24, 80, 140, 200, 240];
-        stanchionXs.forEach(sx => {
-            // Draw red rope between stanchions
-            if (sx > 24) {
-                const prevX = stanchionXs[stanchionXs.indexOf(sx) - 1];
-                g.lineStyle(2.5, 0xb31010, 0.95);
-                g.beginPath();
-                const midX = (prevX + sx) / 2;
-                const midY = 580 + 8;
-                g.moveTo(prevX, 580);
-                const steps = 10;
-                for (let step = 1; step <= steps; step++) {
-                    const t = step / steps;
-                    const mt = 1 - t;
-                    const rx = mt * mt * prevX + 2 * mt * t * midX + t * t * sx;
-                    const ry = mt * mt * 580 + 2 * mt * t * midY + t * t * 580;
-                    g.lineTo(rx, ry);
-                }
-                g.strokePath();
-            }
-            
-            // Draw brass stanchion post
-            g.fillStyle(0xc9a84c, 1);
-            g.fillRect(sx - 2, 574, 4, 12);
-            g.fillCircle(sx, 574, 3.5);
-            g.fillStyle(0xffe080, 1);
-            g.fillCircle(sx - 1, 573, 1.2);
-            
-            // Shadow at base
-            g.fillStyle(0x000000, 0.35);
-            g.fillEllipse(sx, 586, 8, 3.5);
-        });
-
-        // Add a gold VIP Lounge label written on the floor carpet
-        this.add.text(vipCarpetX + vipCarpetW / 2, vipCarpetY + vipCarpetH / 2, '★ VIP LOUNGE ★', {
-            fontFamily: FONT,
-            fontSize: '11px',
-            color: '#f6c855',
-            fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(DEPTH_FLOOR + 2).setAlpha(0.65);
-
-        // Light reflection pools below chandeliers
-        const chandPos: Array<[number, number]> = [
-            [WORLD_W / 2, 200],
-            [200, 200],
-            [760, 200],
-        ];
-        for (const [lrx, lry] of chandPos) {
-            g.fillStyle(0xffd700, 0.03); g.fillCircle(lrx, lry, 180);
-            g.fillStyle(0xffcc40, 0.04); g.fillCircle(lrx, lry, 100);
-            g.fillStyle(0xffe060, 0.05); g.fillCircle(lrx, lry, 55);
-        }
-
-        // === Zone area fills — two-layer diffuse + focused ===
-        // Slots
-        g.fillStyle(0x0c250c, 0.3);
-        g.fillRect(ZONE_SLOTS.x - 8, ZONE_SLOTS.y - 8, ZONE_SLOTS.w + 16, ZONE_SLOTS.h + 16);
-        g.fillStyle(0x0c250c, 0.6);
-        g.fillRect(ZONE_SLOTS.x, ZONE_SLOTS.y, ZONE_SLOTS.w, ZONE_SLOTS.h);
-        // Poker
-        g.fillStyle(0x0c0c28, 0.3);
-        g.fillRect(ZONE_POKER.x - 8, ZONE_POKER.y - 8, ZONE_POKER.w + 16, ZONE_POKER.h + 16);
-        g.fillStyle(0x0c0c28, 0.6);
-        g.fillRect(ZONE_POKER.x, ZONE_POKER.y, ZONE_POKER.w, ZONE_POKER.h);
-        // Bar
-        g.fillStyle(0x1e1008, 0.3);
-        g.fillRect(ZONE_BAR.x - 8, ZONE_BAR.y - 8, ZONE_BAR.w + 16, ZONE_BAR.h + 16);
-        g.fillStyle(0x1e1008, 0.5);
-        g.fillRect(ZONE_BAR.x, ZONE_BAR.y, ZONE_BAR.w, ZONE_BAR.h);
-        // Blackjack
-        g.fillStyle(0x1a0c1a, 0.3);
-        g.fillRect(ZONE_BLACKJACK.x - 8, ZONE_BLACKJACK.y - 8, ZONE_BLACKJACK.w + 16, ZONE_BLACKJACK.h + 16);
-        g.fillStyle(0x1a0c1a, 0.6);
-        g.fillRect(ZONE_BLACKJACK.x, ZONE_BLACKJACK.y, ZONE_BLACKJACK.w, ZONE_BLACKJACK.h);
-        // Roulette
-        g.fillStyle(0x1a0808, 0.3);
-        g.fillRect(ZONE_ROULETTE.x - 8, ZONE_ROULETTE.y - 8, ZONE_ROULETTE.w + 16, ZONE_ROULETTE.h + 16);
-        g.fillStyle(0x1a0808, 0.6);
-        g.fillRect(ZONE_ROULETTE.x, ZONE_ROULETTE.y, ZONE_ROULETTE.w, ZONE_ROULETTE.h);
-        // Plinko
-        g.fillStyle(0x071a14, 0.3);
-        g.fillRect(ZONE_PLINKO.x - 8, ZONE_PLINKO.y - 8, ZONE_PLINKO.w + 16, ZONE_PLINKO.h + 16);
-        g.fillStyle(0x071a14, 0.6);
-        g.fillRect(ZONE_PLINKO.x, ZONE_PLINKO.y, ZONE_PLINKO.w, ZONE_PLINKO.h);
-        // Bingo
-        g.fillStyle(0x041820, 0.3);
-        g.fillRect(ZONE_BINGO.x - 8, ZONE_BINGO.y - 8, ZONE_BINGO.w + 16, ZONE_BINGO.h + 16);
-        g.fillStyle(0x041820, 0.6);
-        g.fillRect(ZONE_BINGO.x, ZONE_BINGO.y, ZONE_BINGO.w, ZONE_BINGO.h);
-        // Horses
-        g.fillStyle(0x1c1400, 0.3);
-        g.fillRect(ZONE_HORSES.x - 8, ZONE_HORSES.y - 8, ZONE_HORSES.w + 16, ZONE_HORSES.h + 16);
-        g.fillStyle(0x1c1400, 0.6);
-        g.fillRect(ZONE_HORSES.x, ZONE_HORSES.y, ZONE_HORSES.w, ZONE_HORSES.h);
-
-        // Spotlight radial layer on each zone center
-        g.fillStyle(COL_SLOTS_ACCENT, 0.04);
-        g.fillCircle(ZONE_SLOTS.x + ZONE_SLOTS.w / 2, ZONE_SLOTS.y + ZONE_SLOTS.h / 2, Math.max(ZONE_SLOTS.w, ZONE_SLOTS.h) * 0.7);
-        g.fillStyle(COL_POKER_ACCENT, 0.04);
-        g.fillCircle(ZONE_POKER.x + ZONE_POKER.w / 2, ZONE_POKER.y + ZONE_POKER.h / 2, Math.max(ZONE_POKER.w, ZONE_POKER.h) * 0.7);
-        g.fillStyle(COL_BAR_ACCENT, 0.04);
-        g.fillCircle(ZONE_BAR.x + ZONE_BAR.w / 2, ZONE_BAR.y + ZONE_BAR.h / 2, Math.max(ZONE_BAR.w, ZONE_BAR.h) * 0.7);
-        g.fillStyle(COL_BLACKJACK_ACCENT, 0.04);
-        g.fillCircle(ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2, Math.max(ZONE_BLACKJACK.w, ZONE_BLACKJACK.h) * 0.7);
-        g.fillStyle(COL_ROULETTE_ACCENT, 0.04);
-        g.fillCircle(ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2, Math.max(ZONE_ROULETTE.w, ZONE_ROULETTE.h) * 0.7);
-        g.fillStyle(COL_PLINKO_ACCENT, 0.04);
-        g.fillCircle(ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + ZONE_PLINKO.h / 2, Math.max(ZONE_PLINKO.w, ZONE_PLINKO.h) * 0.7);
-        g.fillStyle(COL_BINGO_ACCENT, 0.04);
-        g.fillCircle(ZONE_BINGO.x + ZONE_BINGO.w / 2, ZONE_BINGO.y + ZONE_BINGO.h / 2, Math.max(ZONE_BINGO.w, ZONE_BINGO.h) * 0.7);
-        g.fillStyle(COL_HORSES_ACCENT, 0.04);
-        g.fillCircle(ZONE_HORSES.x + ZONE_HORSES.w / 2, ZONE_HORSES.y + ZONE_HORSES.h / 2, Math.max(ZONE_HORSES.w, ZONE_HORSES.h) * 0.7);
-
-        // === Zone accent borders — 3-layer neon glow ===
-        const zones: Array<[typeof ZONE_SLOTS, number]> = [
-            [ZONE_SLOTS,      COL_SLOTS_ACCENT],
-            [ZONE_POKER,      COL_POKER_ACCENT],
-            [ZONE_BAR,        COL_BAR_ACCENT],
-            [ZONE_BLACKJACK,  COL_BLACKJACK_ACCENT],
-            [ZONE_ROULETTE,   COL_ROULETTE_ACCENT],
-            [ZONE_PLINKO,     COL_PLINKO_ACCENT],
-            [ZONE_BINGO,      COL_BINGO_ACCENT],
-            [ZONE_HORSES,     COL_HORSES_ACCENT],
-        ];
-        for (const [z, col] of zones) {
-            // Outer glow
-            g.lineStyle(10, col, 0.035);
-            g.strokeRoundedRect(z.x - 5, z.y - 5, z.w + 10, z.h + 10, 10);
-            // Mid glow
-            g.lineStyle(2, col, 0.22);
-            g.strokeRoundedRect(z.x + 3, z.y + 3, z.w - 6, z.h - 6, 8);
-            // Inner accent
-            g.lineStyle(1, COL_TRIM, 0.22);
-            g.strokeRoundedRect(z.x + 11, z.y + 11, z.w - 22, z.h - 22, 5);
-
-            const bracket = 18;
-            const brackets: Array<[number, number, number, number]> = [
-                [z.x + 10, z.y + 10, z.x + 10 + bracket, z.y + 10],
-                [z.x + 10, z.y + 10, z.x + 10, z.y + 10 + bracket],
-                [z.x + z.w - 10, z.y + 10, z.x + z.w - 10 - bracket, z.y + 10],
-                [z.x + z.w - 10, z.y + 10, z.x + z.w - 10, z.y + 10 + bracket],
-                [z.x + 10, z.y + z.h - 10, z.x + 10 + bracket, z.y + z.h - 10],
-                [z.x + 10, z.y + z.h - 10, z.x + 10, z.y + z.h - 10 - bracket],
-                [z.x + z.w - 10, z.y + z.h - 10, z.x + z.w - 10 - bracket, z.y + z.h - 10],
-                [z.x + z.w - 10, z.y + z.h - 10, z.x + z.w - 10, z.y + z.h - 10 - bracket],
-            ];
-            g.lineStyle(2, col, 0.4);
-            for (const [x1, y1, x2, y2] of brackets) g.lineBetween(x1, y1, x2, y2);
-        }
-
-        // === Entrance path ===
-        g.fillStyle(0x183818, 1);
-        g.fillRect(ZONE_ENTRANCE.x, ZONE_ENTRANCE.y, ZONE_ENTRANCE.w, ZONE_ENTRANCE.h);
-        g.lineStyle(2, COL_TRIM, 0.75);
-        g.strokeRect(ZONE_ENTRANCE.x, ZONE_ENTRANCE.y, ZONE_ENTRANCE.w, ZONE_ENTRANCE.h);
-
-        g.setDepth(DEPTH_FLOOR);
-    }
-
-    private buildProps(): void {
-        // Slot machines — 4 units
-        const slotPositions: [number, number][] = [
-            [60, 100], [120, 100], [60, 200], [120, 200],
-        ];
-        for (const [mx, my] of slotPositions) {
-            this.drawSlotMachine(mx, my);
-        }
-
-        // Poker table
-        this.drawPokerTable(790, 190);
-
-        // Blackjack table
-        this.drawBlackjackTable(
-            ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,
-            ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2,
-        );
-
-        // Bar counter
-        this.drawBarCounter();
-
-        // Pillars
-        const pillarPositions: [number, number][] = [
-            [30, 230], [WORLD_W - 30, 230],
-            [30, 450], [WORLD_W - 30, 450],
-        ];
-        for (const [px, py] of pillarPositions) {
-            this.drawPillar(px, py);
-        }
-
-        // Roulette table
-        this.drawRouletteTable(
-            ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,
-            ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2,
-        );
-
-        // Plinko board
-        this.drawPlinkoBoard(
-            ZONE_PLINKO.x + ZONE_PLINKO.w / 2,
-            ZONE_PLINKO.y + ZONE_PLINKO.h / 2,
-        );
-
-        // Bingo board
-        this.drawBingoBoard(
-            ZONE_BINGO.x + ZONE_BINGO.w / 2,
-            ZONE_BINGO.y + ZONE_BINGO.h / 2,
-        );
-
-        // Horse race tote board
-        this.drawHorseToteBoard(
-            ZONE_HORSES.x + ZONE_HORSES.w / 2,
-            ZONE_HORSES.y + ZONE_HORSES.h / 2,
-        );
-
-        // Chandeliers
-        this.drawChandelier(WORLD_W / 2, 90);
-        this.drawChandelier(200, 200);
-        this.drawChandelier(760, 200);
-
-        // VIP High-Stakes Slot Machine
-        this.drawVipSlotMachine(80, 640);
-
-        // Interactivity Props
-        this.drawATM(400, WORLD_H - 100);
-        this.drawFountain(WORLD_W / 2, WORLD_H / 2 + 30);
-        this.drawJukebox(ZONE_BAR.x + 40, ZONE_BAR.y + ZONE_BAR.h - 40);
-    }
-
-    private drawSlotMachine(x: number, y: number): void {
-        const depth = DEPTH_PROPS + y * 0.1;
-        const g2 = this.add.graphics().setDepth(depth);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.3);
-        g2.fillEllipse(x, y + 36, 52, 10);
-
-        // Main cabinet body — deep blue-black metallic
-        g2.fillStyle(0x080824, 1);
-        g2.fillRoundedRect(x - 24, y - 42, 48, 80, 5);
-
-        // Side panel highlights for 3D effect
-        g2.fillStyle(0x1c1c4a, 0.8);
-        g2.fillRoundedRect(x - 24, y - 42, 8, 80, { tl: 5, bl: 5, tr: 0, br: 0 });
-        g2.fillStyle(0x141440, 0.8);
-        g2.fillRoundedRect(x + 16, y - 42, 8, 80, { tl: 0, bl: 0, tr: 5, br: 5 });
-
-        // Gold trim — main border + inner highlight
-        g2.lineStyle(2, 0xc9a84c, 1);
-        g2.strokeRoundedRect(x - 24, y - 42, 48, 80, 5);
-        g2.lineStyle(1, 0xe8c870, 0.4);
-        g2.strokeRoundedRect(x - 22, y - 40, 44, 76, 4);
-
-        // Top marquee area
-        g2.fillStyle(0x10103a, 1);
-        g2.fillRoundedRect(x - 21, y - 40, 42, 16, { tl: 3, tr: 3, bl: 0, br: 0 });
-        g2.lineStyle(1, 0xffb020, 0.8);
-        g2.lineBetween(x - 18, y - 33, x + 18, y - 33);
-
-        // Marquee label
-        this.add.text(x, y - 36, '♦ SLOTS ♦', {
-            fontFamily: FONT, fontSize: '7px', color: '#ffb020', fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(depth + 1);
-
-        // Screen outer bezel
-        g2.fillStyle(0x040410, 1);
-        g2.fillRoundedRect(x - 18, y - 24, 36, 30, 3);
-        // Screen inner glass
-        g2.fillStyle(0x060620, 1);
-        g2.fillRoundedRect(x - 17, y - 23, 34, 28, 2);
-        // Screen inner glow — larger blue-purple fill
-        g2.fillStyle(0x1818ee, 0.1);
-        g2.fillRoundedRect(x - 17, y - 23, 34, 28, 2);
-        // Screen border
-        g2.lineStyle(1.5, 0xc9a84c, 0.7);
-        g2.strokeRoundedRect(x - 18, y - 24, 36, 30, 3);
-
-        // Reel dividers
-        g2.lineStyle(1, 0xc9a84c, 0.5);
-        g2.lineBetween(x - 6, y - 23, x - 6, y + 6);
-        g2.lineBetween(x + 6, y - 23, x + 6, y + 6);
-
-        // Reel symbols
-        const symDepth = depth + 1;
-        this.add.text(x - 12, y - 9, '🎰', {
-            fontFamily: FONT, fontSize: '11px', color: '#ffd040', fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(symDepth);
-        this.add.text(x, y - 9, '🎰', {
-            fontFamily: FONT, fontSize: '11px', color: '#ff5050',
-        }).setOrigin(0.5).setDepth(symDepth);
-        this.add.text(x + 12, y - 9, '🎰', {
-            fontFamily: FONT, fontSize: '11px', color: '#5080ff',
-        }).setOrigin(0.5).setDepth(symDepth);
-
-        // Payline indicator
-        g2.lineStyle(1, 0xffb020, 0.5);
-        g2.lineBetween(x - 16, y - 9, x + 16, y - 9);
-
-        // Lower panel
-        g2.fillStyle(0x0a0a22, 1);
-        g2.fillRoundedRect(x - 18, y + 8, 36, 16, 2);
-        g2.lineStyle(1, 0xc9a84c, 0.3);
-        g2.strokeRoundedRect(x - 18, y + 8, 36, 16, 2);
-
-        // Spin button — chrome layered
-        g2.fillStyle(0x000000, 0.4);
-        g2.fillCircle(x + 1, y + 17, 8);
-        g2.fillStyle(0x404060, 1);
-        g2.fillCircle(x, y + 16, 8);
-        g2.fillStyle(0xc9a84c, 1);
-        g2.fillCircle(x, y + 16, 6);
-        g2.fillStyle(0xffffff, 0.3);
-        g2.fillCircle(x - 2, y + 14, 2.5);
-        g2.lineStyle(1, 0xe8c870, 0.8);
-        g2.strokeCircle(x, y + 16, 6);
-
-        // Side accent lights
-        g2.fillStyle(0xffb020, 0.6);
-        g2.fillCircle(x - 20, y - 20, 2);
-        g2.fillCircle(x - 20, y - 5, 2);
-        g2.fillCircle(x + 20, y - 20, 2);
-        g2.fillCircle(x + 20, y - 5, 2);
-
-        // Status ticker dots — row of 5 lights below spin button, alternating amber/off
-        for (let ti = 0; ti < 5; ti++) {
-            g2.fillStyle(ti % 2 === 0 ? 0xffb020 : 0x332200, 0.9);
-            g2.fillCircle(x - 12 + ti * 6, y + 30, 2);
-        }
-    }
-
-    private drawVipSlotMachine(x: number, y: number): void {
-        const depth = DEPTH_PROPS + y * 0.1;
-        const g2 = this.add.graphics().setDepth(depth);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.35);
-        g2.fillEllipse(x, y + 36, 52, 10);
-
-        // Main cabinet body — deep royal purple metallic
-        g2.fillStyle(0x1a051d, 1);
-        g2.fillRoundedRect(x - 24, y - 42, 48, 80, 5);
-
-        // Side panel highlights for 3D effect — purple glow
-        g2.fillStyle(0x3d0d44, 0.8);
-        g2.fillRoundedRect(x - 24, y - 42, 8, 80, { tl: 5, bl: 5, tr: 0, br: 0 });
-        g2.fillStyle(0x28052e, 0.8);
-        g2.fillRoundedRect(x + 16, y - 42, 8, 80, { tl: 0, bl: 0, tr: 5, br: 5 });
-
-        // Premium gold borders
-        g2.lineStyle(2, 0xf6c855, 1);
-        g2.strokeRoundedRect(x - 24, y - 42, 48, 80, 5);
-        g2.lineStyle(1, 0xffe885, 0.45);
-        g2.strokeRoundedRect(x - 22, y - 40, 44, 76, 4);
-
-        // Top marquee area
-        g2.fillStyle(0x2d0532, 1);
-        g2.fillRoundedRect(x - 21, y - 40, 42, 16, { tl: 3, tr: 3, bl: 0, br: 0 });
-        g2.lineStyle(1, 0xf6c855, 0.8);
-        g2.lineBetween(x - 18, y - 33, x + 18, y - 33);
-
-        // Marquee label
-        this.add.text(x, y - 36, '🏆 VIP 🏆', {
-            fontFamily: FONT, fontSize: '7px', color: '#f6c855', fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(depth + 1);
-
-        // Screen outer bezel
-        g2.fillStyle(0x0a0412, 1);
-        g2.fillRoundedRect(x - 18, y - 24, 36, 30, 3);
-        // Screen inner glass
-        g2.fillStyle(0x14051b, 1);
-        g2.fillRoundedRect(x - 17, y - 23, 34, 28, 2);
-        // Screen inner glow — purple-gold fill
-        g2.fillStyle(0x8a2090, 0.12);
-        g2.fillRoundedRect(x - 17, y - 23, 34, 28, 2);
-        // Screen border
-        g2.lineStyle(1.5, 0xf6c855, 0.75);
-        g2.strokeRoundedRect(x - 18, y - 24, 36, 30, 3);
-
-        // Reel dividers
-        g2.lineStyle(1, 0xf6c855, 0.55);
-        g2.lineBetween(x - 6, y - 23, x - 6, y + 6);
-        g2.lineBetween(x + 6, y - 23, x + 6, y + 6);
-
-        // Reel symbols — Premium high roller symbols
-        const symDepth = depth + 1;
-        this.add.text(x - 12, y - 9, '7️⃣', {
-            fontFamily: FONT, fontSize: '10px', color: '#f6c855', fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(symDepth);
-        this.add.text(x, y - 9, '💎', {
-            fontFamily: FONT, fontSize: '10px', color: '#80c8ff',
-        }).setOrigin(0.5).setDepth(symDepth);
-        this.add.text(x + 12, y - 9, '⭐', {
-            fontFamily: FONT, fontSize: '10px', color: '#e0e050',
-        }).setOrigin(0.5).setDepth(symDepth);
-
-        // Payline indicator
-        g2.lineStyle(1, 0xf6c855, 0.6);
-        g2.lineBetween(x - 16, y - 9, x + 16, y - 9);
-
-        // Lower panel
-        g2.fillStyle(0x100412, 1);
-        g2.fillRoundedRect(x - 18, y + 8, 36, 16, 2);
-        g2.lineStyle(1, 0xf6c855, 0.35);
-        g2.strokeRoundedRect(x - 18, y + 8, 36, 16, 2);
-
-        // Spin button — gold plated
-        g2.fillStyle(0x000000, 0.45);
-        g2.fillCircle(x + 1, y + 17, 8);
-        g2.fillStyle(0x4a0e4f, 1);
-        g2.fillCircle(x, y + 16, 8);
-        g2.fillStyle(0xf6c855, 1);
-        g2.fillCircle(x, y + 16, 6);
-        g2.fillStyle(0xffffff, 0.35);
-        g2.fillCircle(x - 2, y + 14, 2.5);
-        g2.lineStyle(1, 0xffe885, 0.85);
-        g2.strokeCircle(x, y + 16, 6);
-
-        // Side accent lights — flashing purple neon
-        g2.fillStyle(0x8a2090, 0.7);
-        g2.fillCircle(x - 20, y - 20, 2);
-        g2.fillCircle(x - 20, y - 5, 2);
-        g2.fillCircle(x + 20, y - 20, 2);
-        g2.fillCircle(x + 20, y - 5, 2);
-
-        // Status ticker dots — alternating purple/gold lights
-        for (let ti = 0; ti < 5; ti++) {
-            g2.fillStyle(ti % 2 === 0 ? 0xf6c855 : 0x8a2090, 0.95);
-            g2.fillCircle(x - 12 + ti * 6, y + 30, 2);
-        }
-    }
-
-    private drawATM(x: number, y: number): void {
-        const depth = DEPTH_PROPS + y * 0.1;
-        const g2 = this.add.graphics().setDepth(depth);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.35);
-        g2.fillEllipse(x, y + 20, 40, 8);
-
-        // ATM Body
-        g2.fillStyle(0x222233, 1);
-        g2.fillRoundedRect(x - 16, y - 30, 32, 50, 4);
-        g2.lineStyle(2, COL_TRIM_DIM, 0.6);
-        g2.strokeRoundedRect(x - 16, y - 30, 32, 50, 4);
-
-        // Screen
-        g2.fillStyle(0x0a1a0a, 1);
-        g2.fillRoundedRect(x - 12, y - 20, 24, 16, 2);
-        g2.fillStyle(0x20d4a0, 0.15);
-        g2.fillRoundedRect(x - 12, y - 20, 24, 16, 2);
-        g2.lineStyle(1, 0x20d4a0, 0.8);
-        g2.strokeRoundedRect(x - 12, y - 20, 24, 16, 2);
-
-        this.add.text(x, y - 12, 'ATM', {
-            fontFamily: FONT, fontSize: '6px', color: '#20d4a0', fontStyle: 'bold'
-        }).setOrigin(0.5).setDepth(depth + 1);
-
-        // Keypad
-        g2.fillStyle(0x111122, 1);
-        g2.fillRoundedRect(x - 10, y + 2, 20, 10, 1);
-    }
-
-    private drawFountain(x: number, y: number): void {
-        const depth = DEPTH_PROPS + y * 0.1 - 5; // Slightly lower depth
-        const g2 = this.add.graphics().setDepth(depth);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.2);
-        g2.fillEllipse(x, y + 30, 90, 35);
-
-        // Base Pool
-        g2.fillStyle(0x1a2a3a, 1);
-        g2.fillEllipse(x, y, 80, 40);
-        g2.lineStyle(3, 0xc9a84c, 0.8);
-        g2.strokeEllipse(x, y, 80, 40);
-        
-        // Water
-        g2.fillStyle(0x2080d0, 0.6);
-        g2.fillEllipse(x, y, 74, 36);
-
-        // Central Pillar
-        g2.fillStyle(0x2a3a4a, 1);
-        g2.fillRect(x - 10, y - 30, 20, 40);
-        g2.lineStyle(1, 0xc9a84c, 0.5);
-        g2.strokeRect(x - 10, y - 30, 20, 40);
-
-        // Top Bowl
-        g2.fillStyle(0x1a2a3a, 1);
-        g2.fillEllipse(x, y - 30, 36, 12);
-        g2.lineStyle(2, 0xc9a84c, 0.8);
-        g2.strokeEllipse(x, y - 30, 36, 12);
-
-        // Water Spouts
-        g2.lineStyle(2, 0x80c0ff, 0.5);
-        g2.beginPath();
-        g2.moveTo(x, y - 30); g2.lineTo(x - 20, y - 10);
-        g2.moveTo(x, y - 30); g2.lineTo(x + 20, y - 10);
-        g2.strokePath();
-
-        // Animated particles for water drops
-        for (let i = 0; i < 4; i++) {
-            const drop = this.add.circle(x, y - 30, 2, 0x80c0ff, 0.6).setDepth(depth + 1);
-            this.tweens.add({
-                targets: drop,
-                y: y + (Math.random() * 10),
-                x: x + (Math.random() - 0.5) * 40,
-                alpha: 0,
-                duration: 600 + Math.random() * 200,
-                repeat: -1,
-                delay: i * 150
-            });
-        }
-    }
-
-    private drawJukebox(x: number, y: number): void {
-        const depth = DEPTH_PROPS + y * 0.1;
-        const g2 = this.add.graphics().setDepth(depth);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.35);
-        g2.fillEllipse(x, y + 25, 46, 10);
-
-        // Cabinet Base
-        g2.fillStyle(0x401010, 1);
-        g2.fillRoundedRect(x - 20, y - 35, 40, 60, { tl: 20, tr: 20, bl: 0, br: 0 });
-        g2.lineStyle(2, 0xe8c870, 0.8);
-        g2.strokeRoundedRect(x - 20, y - 35, 40, 60, { tl: 20, tr: 20, bl: 0, br: 0 });
-
-        // Record Window
-        g2.fillStyle(0x050510, 1);
-        g2.fillEllipse(x, y - 15, 24, 24);
-        g2.lineStyle(1.5, 0xff5050, 0.8);
-        g2.strokeEllipse(x, y - 15, 24, 24);
-
-        // Inner Record
-        const record = this.add.graphics().setDepth(depth + 1);
-        record.fillStyle(0x111111, 1);
-        record.fillCircle(x, y - 15, 10);
-        record.fillStyle(0xffd040, 1);
-        record.fillCircle(x, y - 15, 3);
-        
-        // Spin record
-        this.tweens.add({
-            targets: record,
-            angle: 360,
-            duration: 2000,
-            repeat: -1
-        });
-
-        // Neon Tubes
-        const tube = this.add.graphics().setDepth(depth + 2);
-        tube.lineStyle(3, COL_NEON_PINK, 0.8);
-        tube.beginPath();
-        tube.arc(x, y - 15, 20, Math.PI, 0, false);
-        tube.strokePath();
-
-        this.tweens.add({
-            targets: tube,
-            alpha: { from: 0.6, to: 1.0 },
-            yoyo: true,
-            duration: 500,
-            repeat: -1
-        });
-    }
-
-    private drawBlackjackTable(cx: number, cy: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
-
-        g2.fillStyle(0x000000, 0.25);
-        g2.fillEllipse(cx, cy + 8, 200, 80);
-        g2.fillStyle(COL_TABLE, 1);
-        g2.fillEllipse(cx, cy, 190, 90);
-        // Purple felt
-        g2.fillStyle(0x280d28, 1);
-        g2.fillEllipse(cx, cy, 162, 74);
-        g2.lineStyle(2, 0x6a2a6a, 1);
-        g2.strokeEllipse(cx, cy, 148, 66);
-        g2.lineStyle(1, 0x5a1a5a, 0.6);
-        g2.strokeEllipse(cx, cy - 6, 80, 34);
-
-        // Accent corner — zone color accent line
-        g2.lineStyle(1, COL_BLACKJACK_ACCENT, 0.3);
-        g2.strokeEllipse(cx, cy, 164, 76);
-
-        // Card suits
-        const suits  = ['♠', '♣', '♥', '♦'];
-        const angles = [270, 0, 90, 180];
-        for (let i = 0; i < 4; i++) {
-            const rad = (angles[i] * Math.PI) / 180;
-            this.add.text(
-                cx + Math.cos(rad) * 40, cy + Math.sin(rad) * 18, suits[i], {
-                    fontFamily: FONT, fontSize: '12px',
-                    color: i < 2 ? '#3a1a3a' : '#5a1a1a',
-                },
-            ).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
-        }
-
-        // Dealer indicator
-        g2.fillStyle(COL_TRIM, 0.4);
-        g2.fillRect(cx - 20, cy - 35, 40, 6);
-
-        // Player betting circles
-        for (const bx of [-70, -35, 0, 35, 70]) {
-            g2.lineStyle(1, 0x8a3a8a, 0.6);
-            g2.strokeCircle(cx + bx, cy + 20, 10);
-        }
-
-        // Chip stacks
-        for (let i = 0; i < 2; i++) {
-            g2.fillStyle(0x9b59b6, 1);
-            g2.fillCircle(cx - 20 + i * 40, cy - 8, 6);
-            g2.lineStyle(1, 0x6c3483, 1);
-            g2.strokeCircle(cx - 20 + i * 40, cy - 8, 6);
-        }
-    }
-
-    private drawPokerTable(cx: number, cy: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.35);
-        g2.fillEllipse(cx + 4, cy + 12, 236, 108);
-
-        // Mahogany wood rim — outer dark
-        g2.fillStyle(0x2a1408, 1);
-        g2.fillEllipse(cx, cy, 230, 128);
-        // Rim highlight (lighter on top for 3D)
-        g2.fillStyle(0x5a3018, 0.6);
-        g2.fillEllipse(cx, cy - 8, 225, 110);
-        g2.fillStyle(0x2a1408, 1);
-        g2.fillEllipse(cx, cy + 2, 222, 120);
-
-        // Felt surface
-        g2.fillStyle(0x0a2a0a, 1);
-        g2.fillEllipse(cx, cy, 200, 108);
-        // Felt center highlight
-        g2.fillStyle(0x0d320d, 0.5);
-        g2.fillEllipse(cx, cy - 8, 170, 80);
-
-        // Inner felt ring
-        g2.lineStyle(2.5, 0x3a8a3a, 0.9);
-        g2.strokeEllipse(cx, cy, 184, 96);
-
-        // Poker accent
-        g2.lineStyle(1, COL_POKER_ACCENT, 0.3);
-        g2.strokeEllipse(cx, cy, 202, 110);
-
-        // Center ring
-        g2.lineStyle(1, 0x2a6a2a, 0.5);
-        g2.strokeEllipse(cx, cy, 110, 58);
-
-        // Simulated wood grain on rim — 10 lines with varying opacities
-        for (let i = 0; i < 10; i++) {
-            g2.lineStyle(0.5, 0x5a3018, 0.1 + (i % 3) * 0.06);
-            g2.strokeEllipse(cx, cy, 230 - i * 3, 128 - i * 2);
-        }
-
-        // Card suits
-        const suits  = ['♠', '♣', '♥', '♦'];
-        const angles = [270, 0, 90, 180];
-        const suitColors = ['#1a5a1a', '#1a5a1a', '#5a1a1a', '#5a1a1a'];
-        for (let i = 0; i < 4; i++) {
-            const rad = (angles[i] * Math.PI) / 180;
-            this.add.text(
-                cx + Math.cos(rad) * 52, cy + Math.sin(rad) * 26, suits[i], {
-                    fontFamily: FONT, fontSize: '14px', color: suitColors[i],
-                },
-            ).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
-        }
-
-        // Center diamond logo
-        this.add.text(cx, cy, '♦', {
-            fontFamily: FONT, fontSize: '16px', color: '#1a5a1a',
-        }).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
-
-        // Chip stacks — gold color with darker border
-        for (let i = 0; i < 3; i++) {
-            const chipX = cx - 40 + i * 40;
-            const chipY = cy - 12;
-            g2.fillStyle(0x000000, 0.25);
-            g2.fillCircle(chipX + 1, chipY + 2, 7);
-            g2.fillStyle(0x8a6a20, 1);
-            g2.fillCircle(chipX, chipY, 7);
-            g2.fillStyle(0xc9a84c, 0.9);
-            g2.fillCircle(chipX, chipY - 2, 7);
-            g2.fillStyle(0xe8c870, 0.6);
-            g2.fillCircle(chipX, chipY - 4, 7);
-            g2.lineStyle(1, 0x5a3a10, 0.9);
-            g2.strokeCircle(chipX, chipY - 4, 7);
-            g2.lineStyle(0.5, 0xffffff, 0.2);
-            g2.lineBetween(chipX - 5, chipY - 4, chipX + 5, chipY - 4);
-        }
-    }
-
-    private drawBarCounter(): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
-        const bx = ZONE_BAR.x + 20;
-        const by = ZONE_BAR.y + 30;
-        const bw = ZONE_BAR.w - 40;
-        const bh = 54;
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.35);
-        g2.fillRoundedRect(bx + 5, by + 6, bw, bh, 5);
-
-        // Counter body — dark mahogany
-        g2.fillStyle(0x1a0c04, 1);
-        g2.fillRoundedRect(bx, by, bw, bh, 5);
-
-        // Wood grain lines
-        for (let i = 0; i < 4; i++) {
-            g2.fillStyle(0x2a1808, 0.4);
-            g2.fillRect(bx + 4, by + 8 + i * 10, bw - 8, 3);
-        }
-
-        // Counter top — lighter surface
-        g2.fillStyle(0x3a1e0a, 1);
-        g2.fillRoundedRect(bx, by, bw, 10, { tl: 5, tr: 5, bl: 0, br: 0 });
-        // Top edge highlight
-        g2.fillStyle(0x6a3a14, 0.5);
-        g2.fillRoundedRect(bx + 2, by + 1, bw - 4, 3, { tl: 4, tr: 4, bl: 0, br: 0 });
-        // Under-counter LED glow — thin amber line along bottom of counter top
-        g2.lineStyle(1.5, 0xffb020, 0.35);
-        g2.lineBetween(bx + 6, by + 10, bx + bw - 6, by + 10);
-
-        // Gold trim
-        g2.lineStyle(2, 0xc9a84c, 0.8);
-        g2.strokeRoundedRect(bx, by, bw, bh, 5);
-        g2.lineStyle(1, 0xe8c870, 0.3);
-        g2.strokeRoundedRect(bx + 2, by + 2, bw - 4, bh - 4, 4);
-        // Bar zone accent
-        g2.lineStyle(1, COL_BAR_ACCENT, 0.2);
-        g2.strokeRoundedRect(bx + 3, by + 3, bw - 6, bh - 6, 3);
-
-        // Bar stools — detailed with legs and cushions
-        const stoolCount   = 5;
-        const stoolSpacing = bw / (stoolCount + 1);
-        for (let i = 0; i < stoolCount; i++) {
-            const sx = bx + stoolSpacing * (i + 1);
-            const sy = by + bh + 20;
-            // Stool shadow
-            g2.fillStyle(0x000000, 0.2);
-            g2.fillEllipse(sx, sy + 2, 22, 5);
-            // Stool legs
-            g2.lineStyle(2, 0x2a1408, 1);
-            g2.lineBetween(sx - 4, sy + 12, sx - 6, sy + 26);
-            g2.lineBetween(sx + 4, sy + 12, sx + 6, sy + 26);
-            // Cross brace
-            g2.lineStyle(1, 0x3a2010, 0.8);
-            g2.lineBetween(sx - 5, sy + 18, sx + 5, sy + 18);
-            // Seat cushion
-            g2.fillStyle(0x4a2a10, 1);
-            g2.fillEllipse(sx, sy, 22, 9);
-            g2.fillStyle(0x6a3e1a, 0.6);
-            g2.fillEllipse(sx, sy - 1, 18, 6);
-            g2.lineStyle(1, 0xc9a84c, 0.4);
-            g2.strokeEllipse(sx, sy, 22, 9);
-        }
-
-        // Bottle shelf (back wall)
-        const shelfY = by - 16;
-        g2.fillStyle(0x1a0c04, 1);
-        g2.fillRect(bx, shelfY - 18, bw, 18);
-        g2.fillStyle(0x3a2010, 0.5);
-        g2.fillRect(bx, shelfY - 18, bw, 4);
-        g2.lineStyle(1, 0xc9a84c, 0.3);
-        g2.strokeRect(bx, shelfY - 18, bw, 18);
-
-        // Mirror/glass backdrop behind bottles
-        g2.fillStyle(0x0a1a2a, 0.5);
-        g2.fillRect(bx, shelfY - 36, bw, 36);
-        // Subtle blue-tint reflective highlight at top of mirror
-        g2.fillStyle(0x4080c0, 0.06);
-        g2.fillRect(bx, shelfY - 36, bw, 6);
-
-        // Bottles — colorful and detailed
-        const bottleColors: Array<[number, number]> = [
-            [0x2040c0, 0x4060ff],
-            [0x40a020, 0x60d040],
-            [0xa04020, 0xd06040],
-            [0xc0a000, 0xffd040],
-            [0x802080, 0xb030b0],
-            [0x208080, 0x40c0c0],
-            [0xb04000, 0xe06020],
-            [0x4040c0, 0x6060ff],
-            [0x606020, 0xa0a030],
-        ];
-        for (let i = 0; i < 9; i++) {
-            const btx = bx + 16 + i * Math.floor((bw - 32) / 9);
-            const bty = shelfY - 14;
-            const [darkC, lightC] = bottleColors[i % bottleColors.length];
-            g2.fillStyle(darkC, 0.85);
-            g2.fillRoundedRect(btx - 4, bty + 4, 8, 10, 2);
-            g2.fillStyle(lightC, 0.6);
-            g2.fillRoundedRect(btx - 3, bty + 2, 6, 5, 2);
-            g2.fillStyle(darkC, 0.9);
-            g2.fillRect(btx - 1, bty - 4, 3, 8);
-            // White specular highlight dot
-            g2.fillStyle(0xffffff, 0.35);
-            g2.fillCircle(btx - 2, bty + 5, 1.5);
-            g2.fillStyle(0xffffff, 0.2);
-            g2.fillRect(btx - 3, bty + 5, 2, 6);
-        }
-    }
-
-    private drawRouletteTable(cx: number, cy: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.25);
-        g2.fillEllipse(cx, cy + 8, 200, 56);
-        // Table rim
-        g2.fillStyle(0x3a1c08, 1);
-        g2.fillEllipse(cx, cy, 190, 60);
-        // Green felt
-        g2.fillStyle(0x0c2a0c, 1);
-        g2.fillEllipse(cx, cy, 162, 50);
-        // Red roulette accent ring
-        g2.lineStyle(2, 0x882222, 0.8);
-        g2.strokeEllipse(cx, cy, 148, 44);
-        // Gold rim highlight
-        g2.lineStyle(1, COL_ROULETTE_ACCENT, 0.3);
-        g2.strokeEllipse(cx, cy, 164, 52);
-
-        // Wheel representation (small circle left of table)
-        const wx = cx - 52;
-        g2.fillStyle(0x3a1c08, 1);
-        g2.fillCircle(wx, cy, 22);
-        g2.fillStyle(0x881818, 1);
-        g2.fillCircle(wx, cy, 17);
-        g2.fillStyle(0x000000, 0.8);
-        g2.fillCircle(wx, cy, 9);
-        g2.lineStyle(1, COL_ROULETTE_ACCENT, 0.6);
-        g2.strokeCircle(wx, cy, 17);
-        // Wheel spokes
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            g2.lineStyle(0.5, 0xcc3333, 0.4);
-            g2.lineBetween(wx, cy, wx + Math.cos(angle) * 9, cy + Math.sin(angle) * 9);
-        }
-
-        // Betting grid lines on felt
-        g2.lineStyle(0.5, 0x1a4a1a, 0.7);
-        for (let i = 0; i < 4; i++) {
-            g2.lineBetween(cx - 30 + i * 20, cy - 18, cx - 30 + i * 20, cy + 18);
-        }
-        g2.lineBetween(cx - 32, cy - 6, cx + 32, cy - 6);
-        g2.lineBetween(cx - 32, cy + 6, cx + 32, cy + 6);
-
-        // Chip stack
-        g2.fillStyle(COL_ROULETTE_ACCENT, 1);
-        g2.fillCircle(cx + 55, cy - 8, 5);
-        g2.lineStyle(1, 0x882222, 1);
-        g2.strokeCircle(cx + 55, cy - 8, 5);
-        g2.fillStyle(0x111111, 1);
-        g2.fillCircle(cx + 55, cy + 4, 5);
-        g2.lineStyle(1, 0x444444, 1);
-        g2.strokeCircle(cx + 55, cy + 4, 5);
-    }
-
-    private drawPlinkoBoard(cx: number, cy: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
-        const bw = 120;
-        const bh = 70;
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.3);
-        g2.fillRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 4, bw, bh, 5);
-        // Board background
-        g2.fillStyle(0x040e0a, 1);
-        g2.fillRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
-        // Teal border
-        g2.lineStyle(2, COL_PLINKO_ACCENT, 0.85);
-        g2.strokeRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
-        // Inner inset
-        g2.lineStyle(1, COL_PLINKO_ACCENT, 0.2);
-        g2.strokeRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 3, bw - 6, bh - 6, 3);
-
-        // Mini peg grid (decorative)
-        const pegRows = 4;
-        const pegCols = 5;
-        const pegSpX  = (bw - 24) / (pegCols + 1);
-        const pegSpY  = (bh - 28) / (pegRows + 1);
-        for (let row = 0; row < pegRows; row++) {
-            const offset = row % 2 === 0 ? 0 : pegSpX / 2;
-            const colsThisRow = row % 2 === 0 ? pegCols : pegCols - 1;
-            for (let col = 0; col < colsThisRow; col++) {
-                const px = cx - bw / 2 + 12 + offset + col * pegSpX;
-                const py = cy - bh / 2 + 14 + row * pegSpY;
-                g2.fillStyle(COL_PLINKO_ACCENT, 0.7);
-                g2.fillCircle(px, py, 2);
-            }
-        }
-
-        // Slot bins at bottom
-        const slotColors = [0x445060, 0x3a90e0, 0x2ecc71, 0xf5a020, 0xffd700];
-        const nSlots = 5;
-        const slotW  = (bw - 8) / nSlots;
-        const slotBaseY = cy + bh / 2 - 10;
-        for (let i = 0; i < nSlots; i++) {
-            const sx = cx - bw / 2 + 4 + i * slotW;
-            g2.fillStyle(slotColors[i], 0.4);
-            g2.fillRect(sx, slotBaseY - 6, slotW - 1, 8);
-            g2.lineStyle(1, slotColors[i], 0.6);
-            g2.strokeRect(sx, slotBaseY - 6, slotW - 1, 8);
-        }
-
-        // Drop ball indicator
-        g2.fillStyle(0xffffff, 0.9);
-        g2.fillCircle(cx, cy - bh / 2 + 6, 3);
-        g2.fillStyle(COL_PLINKO_ACCENT, 0.5);
-        g2.fillCircle(cx, cy - bh / 2 + 6, 5);
-    }
-
-    private drawBingoBoard(cx: number, cy: number): void {
-        const g2  = this.add.graphics().setDepth(DEPTH_PROPS);
-        const bw  = 130;
-        const bh  = 70;
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.3);
-        g2.fillRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 4, bw, bh, 5);
-        // Board background
-        g2.fillStyle(0x030c14, 1);
-        g2.fillRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
-        // Cyan border
-        g2.lineStyle(2, COL_BINGO_ACCENT, 0.85);
-        g2.strokeRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
-        // Inner inset
-        g2.lineStyle(1, COL_BINGO_ACCENT, 0.2);
-        g2.strokeRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 3, bw - 6, bh - 6, 3);
-
-        // Mini 5×5 grid (decorative)
-        const cellW = (bw - 16) / 5;
-        const cellH = (bh - 24) / 5;
-        const gridX = cx - bw / 2 + 8;
-        const gridY = cy - bh / 2 + 16;
-
-        for (let r = 0; r < 5; r++) {
-            for (let c = 0; c < 5; c++) {
-                const rx = gridX + c * cellW;
-                const ry = gridY + r * cellH;
-                // FREE center + aesthetic checker — purely decorative for the lobby prop
-                const isMarked = (r === 2 && c === 2) || (r + c) % 3 === 0;
-                g2.fillStyle(isMarked ? 0x004060 : 0x020a12, isMarked ? 0.7 : 0.9);
-                g2.fillRect(rx, ry, cellW - 1, cellH - 1);
-                g2.lineStyle(0.5, COL_BINGO_ACCENT, isMarked ? 0.5 : 0.2);
-                g2.strokeRect(rx, ry, cellW - 1, cellH - 1);
-            }
-        }
-
-        // B I N G O header
-        const headers = ['B', 'I', 'N', 'G', 'O'];
-        const headerColors = ['#4080ff', '#ff4080', '#40c040', '#ffa020', '#c040ff'];
-        for (let c = 0; c < 5; c++) {
-            this.add.text(
-                gridX + c * cellW + cellW / 2,
-                cy - bh / 2 + 9,
-                headers[c],
-                { fontFamily: FONT, fontSize: '7px', color: headerColors[c], fontStyle: 'bold' },
-            ).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
-        }
-    }
-
-    private drawHorseToteBoard(cx: number, cy: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS);
-        const bw = 150;
-        const bh = 72;
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.3);
-        g2.fillRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 4, bw, bh, 5);
-        // Board background
-        g2.fillStyle(0x100c00, 1);
-        g2.fillRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
-        // Amber border
-        g2.lineStyle(2, COL_HORSES_ACCENT, 0.85);
-        g2.strokeRoundedRect(cx - bw / 2, cy - bh / 2, bw, bh, 5);
-        g2.lineStyle(1, COL_HORSES_ACCENT, 0.18);
-        g2.strokeRoundedRect(cx - bw / 2 + 3, cy - bh / 2 + 3, bw - 6, bh - 6, 3);
-
-        // Decorative odds rows (6 horses)
-        const rowH  = (bh - 20) / 6;
-        const rowX  = cx - bw / 2 + 8;
-        const rowY0 = cy - bh / 2 + 18;
-        const oddsLabels = ['2×', '3×', '4×', '6×', '10×', '20×'];
-        for (let r = 0; r < 6; r++) {
-            const ry = rowY0 + r * rowH;
-            g2.fillStyle(r % 2 === 0 ? 0x181000 : 0x120e00, 1);
-            g2.fillRect(rowX, ry, bw - 16, rowH - 1);
-            // Bar fill — purely decorative
-            const barFrac = [0.72, 0.58, 0.44, 0.32, 0.18, 0.10][r];
-            g2.fillStyle(COL_HORSES_ACCENT, 0.3 + barFrac * 0.2);
-            g2.fillRect(rowX, ry, (bw - 16) * barFrac, rowH - 1);
-            // Odds text placed later via this.add.text below
-        }
-
-        // Header text
-        this.add.text(cx, cy - bh / 2 + 9, '🏇 ODDS BOARD', {
-            fontFamily: FONT, fontSize: '7px',
-            color: Phaser.Display.Color.IntegerToColor(COL_HORSES_ACCENT).rgba,
-            fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(DEPTH_PROPS + 1);
-
-        // Odds labels
-        for (let r = 0; r < 6; r++) {
-            const ry = rowY0 + r * rowH + rowH / 2;
-            this.add.text(rowX + bw - 24, ry, oddsLabels[r], {
-                fontFamily: FONT, fontSize: '7px', color: '#c9a84c',
-            }).setOrigin(1, 0.5).setDepth(DEPTH_PROPS + 1);
-        }
-    }
-
-    private drawPillar(x: number, y: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_PROPS + 1);
-
-        // Shadow
-        g2.fillStyle(0x000000, 0.25);
-        g2.fillEllipse(x + 3, y + 46, 18, 6);
-
-        // Pillar shaft
-        g2.fillStyle(0x1e1008, 1);
-        g2.fillRect(x - 10, y - 42, 20, 86);
-        // Side highlights for 3D
-        g2.fillStyle(0x3a2010, 0.5);
-        g2.fillRect(x - 10, y - 42, 4, 86);
-        g2.fillStyle(0x0e0804, 0.5);
-        g2.fillRect(x + 6, y - 42, 4, 86);
-        // Main border
-        g2.lineStyle(1.5, COL_TRIM, 0.6);
-        g2.strokeRect(x - 10, y - 42, 20, 86);
-        // Fluting grooves
-        g2.lineStyle(0.5, 0x4a3018, 0.3);
-        g2.lineBetween(x - 4, y - 40, x - 4, y + 42);
-        g2.lineBetween(x + 4, y - 40, x + 4, y + 42);
-
-        // Capital (top ornament)
-        g2.fillStyle(0x2a1808, 1);
-        g2.fillRect(x - 14, y - 46, 28, 8);
-        g2.fillStyle(0x5a3018, 0.4);
-        g2.fillRect(x - 14, y - 46, 28, 3);
-        g2.lineStyle(1.5, COL_TRIM, 0.7);
-        g2.strokeRect(x - 14, y - 46, 28, 8);
-
-        // Base (bottom ornament)
-        g2.fillStyle(0x2a1808, 1);
-        g2.fillRect(x - 14, y + 38, 28, 8);
-        g2.fillStyle(0x5a3018, 0.4);
-        g2.fillRect(x - 14, y + 38, 28, 3);
-        g2.lineStyle(1.5, COL_TRIM, 0.7);
-        g2.strokeRect(x - 14, y + 38, 28, 8);
-
-        // Gold accent lines on shaft
-        g2.lineStyle(1, COL_TRIM, 0.3);
-        g2.lineBetween(x - 8, y - 28, x + 8, y - 28);
-        g2.lineBetween(x - 8, y + 20, x + 8, y + 20);
-    }
-
-    private drawChandelier(x: number, y: number): void {
-        const g2 = this.add.graphics().setDepth(DEPTH_FOREGROUND);
-
-        // Hanging chain
-        g2.lineStyle(1.5, 0xc9a84c, 0.5);
-        g2.lineBetween(x, 0, x, y - 16);
-        g2.lineStyle(1, 0xe8c870, 0.2);
-        g2.lineBetween(x, 0, x, y - 16);
-
-        // Long radial light rays (star burst)
-        const RAY_COUNT  = 12;
-        const RAY_LENGTH = 70;
-        for (let i = 0; i < RAY_COUNT; i++) {
-            const angle = (i / RAY_COUNT) * Math.PI * 2;
-            g2.lineStyle(0.5, 0xffd700, 0.06);
-            g2.lineBetween(x, y, x + Math.cos(angle) * RAY_LENGTH, y + Math.sin(angle) * RAY_LENGTH);
-        }
-
-        // Glow rings — outer to inner
-        g2.fillStyle(0xffd700, 0.03);
-        g2.fillCircle(x, y, 80);
-        g2.fillStyle(0xffd700, 0.05);
-        g2.fillCircle(x, y, 60);
-        g2.fillStyle(0xffaa20, 0.08);
-        g2.fillCircle(x, y, 40);
-        g2.fillStyle(0xffcc40, 0.12);
-        g2.fillCircle(x, y, 24);
-        g2.fillStyle(0xffe080, 0.18);
-        g2.fillCircle(x, y, 14);
-
-        // Crystal arms (spokes)
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const ax = x + Math.cos(angle) * 22;
-            const ay = y + Math.sin(angle) * 22;
-            g2.lineStyle(1.5, 0xc9a84c, 0.5);
-            g2.lineBetween(x, y, ax, ay);
-            g2.fillStyle(0xffe080, 0.7);
-            g2.fillCircle(ax, ay, 2.5);
-            g2.fillStyle(0xffffff, 0.4);
-            g2.fillCircle(ax - 0.5, ay - 0.5, 1);
-        }
-        // Secondary inner ring spokes
-        for (let i = 0; i < 8; i++) {
-            const angle = ((i + 0.5) / 8) * Math.PI * 2;
-            const ax = x + Math.cos(angle) * 14;
-            const ay = y + Math.sin(angle) * 14;
-            g2.lineStyle(1, 0xc9a84c, 0.35);
-            g2.lineBetween(x, y, ax, ay);
-        }
-
-        // 4 outer pendant chains at 45° offsets with tiny crystal tips
-        for (let i = 0; i < 4; i++) {
-            const angle = Math.PI / 4 + (i / 4) * Math.PI * 2;
-            const px = x + Math.cos(angle) * 30;
-            const py = y + Math.sin(angle) * 30;
-            g2.lineStyle(1, 0xc9a84c, 0.3);
-            g2.lineBetween(x + Math.cos(angle) * 14, y + Math.sin(angle) * 14, px, py);
-            g2.fillStyle(0xffe080, 0.6);
-            g2.fillCircle(px, py, 2);
-            g2.fillStyle(0xffffff, 0.3);
-            g2.fillCircle(px - 0.5, py - 0.5, 0.8);
-        }
-
-        // Main crystal sphere
-        g2.lineStyle(1.5, 0xe8c870, 0.6);
-        g2.strokeCircle(x, y, 14);
-        g2.fillStyle(0x7a6030, 1);
-        g2.fillCircle(x, y, 13);
-        g2.fillStyle(0xc9a84c, 0.9);
-        g2.fillCircle(x, y, 11);
-        g2.fillStyle(0xffe880, 0.6);
-        g2.fillCircle(x, y, 8);
-        g2.fillStyle(0xffffff, 0.35);
-        g2.fillCircle(x - 3, y - 4, 5);
-        g2.fillStyle(0xffffff, 0.15);
-        g2.fillCircle(x + 2, y + 3, 3);
-
-        // Bottom pendant
-        g2.fillStyle(0xc9a84c, 0.7);
-        g2.fillCircle(x, y + 16, 3);
-        g2.lineStyle(1, 0xe8c870, 0.5);
-        g2.strokeCircle(x, y + 16, 3);
-        g2.lineStyle(1, 0xc9a84c, 0.4);
-        g2.lineBetween(x, y + 14, x, y + 13);
-    }
-
-    private buildAmbientLighting(): void {
-        const lightPools: Array<[number, number, number, number]> = [
-            [ZONE_SLOTS.x + ZONE_SLOTS.w / 2,           ZONE_SLOTS.y + ZONE_SLOTS.h / 2,           0xf5a020, 140],
-            [ZONE_POKER.x + ZONE_POKER.w / 2,           ZONE_POKER.y + ZONE_POKER.h / 2,           0x3a90e0, 150],
-            [ZONE_BAR.x + ZONE_BAR.w / 2,               ZONE_BAR.y + ZONE_BAR.h / 2,               0xe06820, 140],
-            [ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,   ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2,   0x9b50c0, 110],
-            [ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,     ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2,     0xcc3333, 100],
-            [ZONE_PLINKO.x + ZONE_PLINKO.w / 2,         ZONE_PLINKO.y + ZONE_PLINKO.h / 2,         0x20d4a0, 100],
-            [ZONE_BINGO.x  + ZONE_BINGO.w  / 2,         ZONE_BINGO.y  + ZONE_BINGO.h  / 2,         0x00c8ff, 100],
-            [ZONE_HORSES.x + ZONE_HORSES.w / 2,         ZONE_HORSES.y + ZONE_HORSES.h / 2,         0xe8b020, 90],
-        ];
-
-        const ambientGfx = this.add.graphics().setDepth(DEPTH_FLOOR + 2);
-        for (const [lx, ly, col, radius] of lightPools) {
-            ambientGfx.fillStyle(col, 0.035);
-            ambientGfx.fillCircle(lx, ly, radius);
-            ambientGfx.fillStyle(col, 0.05);
-            ambientGfx.fillCircle(lx, ly, radius * 0.55);
-            ambientGfx.fillStyle(col, 0.075);
-            ambientGfx.fillCircle(lx, ly, radius * 0.28);
-        }
-
-        const shaftGfx = this.add.graphics().setDepth(DEPTH_FLOOR + 1);
-        shaftGfx.fillStyle(0xffd040, 0.03);
-        shaftGfx.fillTriangle(WORLD_W / 2 - 46, 104, WORLD_W / 2 + 46, 104, WORLD_W / 2, 258);
-        shaftGfx.fillTriangle(154, 216, 246, 216, 200, 320);
-        shaftGfx.fillTriangle(714, 216, 806, 216, 760, 320);
-
-        // Breathe the ambient glow and light shafts
-        this.tweens.add({
-            targets: ambientGfx,
-            alpha: { from: 0.8, to: 1.0 },
-            duration: 2500,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1
-        });
-
-        this.tweens.add({
-            targets: shaftGfx,
-            alpha: { from: 0.6, to: 1.0 },
-            duration: 3200,
-            ease: 'Sine.easeInOut',
-            yoyo: true,
-            repeat: -1
-        });
-    }
-
-    private buildAnimatedAtmosphere(): void {
-        const zoneGlows: Array<[number, number, number, number]> = [
-            [ZONE_SLOTS.x + ZONE_SLOTS.w / 2, ZONE_SLOTS.y + ZONE_SLOTS.h / 2, COL_SLOTS_ACCENT, 190],
-            [ZONE_POKER.x + ZONE_POKER.w / 2, ZONE_POKER.y + ZONE_POKER.h / 2, COL_POKER_ACCENT, 210],
-            [ZONE_BAR.x + ZONE_BAR.w / 2, ZONE_BAR.y + ZONE_BAR.h / 2, COL_BAR_ACCENT, 170],
-            [ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2, COL_BLACKJACK_ACCENT, 150],
-            [ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + ZONE_ROULETTE.h / 2, COL_ROULETTE_ACCENT, 130],
-            [ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + ZONE_PLINKO.h / 2, COL_PLINKO_ACCENT, 135],
-        ];
-
-        for (const [x, y, color, radius] of zoneGlows) {
-            const glow = this.add.ellipse(x, y, radius, radius * 0.55, color, 0.055)
-                .setDepth(DEPTH_FLOOR + 3)
-                .setBlendMode(Phaser.BlendModes.ADD);
-
-            this.tweens.add({
-                targets: glow,
-                alpha: { from: 0.28, to: 0.72 },
-                scaleX: { from: 0.96, to: 1.06 },
-                scaleY: { from: 0.96, to: 1.08 },
-                duration: 1600 + (x % 5) * 240,
-                ease: 'Sine.easeInOut',
-                yoyo: true,
-                repeat: -1,
-            });
-        }
-
-        const sparklePositions: Array<[number, number, number]> = [
-            [152, 92, COL_SLOTS_ACCENT], [216, 328, COL_SLOTS_ACCENT],
-            [702, 104, COL_POKER_ACCENT], [890, 314, COL_POKER_ACCENT],
-            [342, 74, COL_BAR_ACCENT], [612, 82, COL_BAR_ACCENT],
-            [430, 368, COL_BLACKJACK_ACCENT], [546, 418, COL_BLACKJACK_ACCENT],
-            [166, 512, COL_ROULETTE_ACCENT], [808, 506, COL_PLINKO_ACCENT],
-            [466, 500, COL_BINGO_ACCENT], [788, 638, COL_HORSES_ACCENT],
-        ];
-
-        for (let i = 0; i < sparklePositions.length; i++) {
-            const [x, y, color] = sparklePositions[i];
-            const sparkle = this.add.star(x, y, 4, 2, 7, color, 0.55)
-                .setDepth(DEPTH_PROPS + 8)
-                .setBlendMode(Phaser.BlendModes.ADD);
-
-            this.tweens.add({
-                targets: sparkle,
-                alpha: { from: 0.15, to: 0.9 },
-                angle: 360,
-                scale: { from: 0.75, to: 1.35 },
-                duration: 900 + i * 110,
-                delay: i * 90,
-                ease: 'Sine.easeInOut',
-                yoyo: true,
-                repeat: -1,
-            });
-        }
-
-        for (let i = 0; i < 9; i++) {
-            const runnerLight = this.add.circle(
-                WORLD_W / 2 - 76 + (i % 2) * 152,
-                218 + i * 38,
-                3,
-                i % 2 === 0 ? COL_NEON_BLUE : COL_NEON_PINK,
-                0.45,
-            )
-                .setDepth(DEPTH_FLOOR + 4)
-                .setBlendMode(Phaser.BlendModes.ADD);
-
-            this.tweens.add({
-                targets: runnerLight,
-                alpha: { from: 0.2, to: 0.85 },
-                scale: { from: 0.8, to: 1.4 },
-                duration: 720,
-                ease: 'Sine.easeInOut',
-                yoyo: true,
-                repeat: -1,
-                delay: i * 90,
-            });
-        }
-    }
-
-    private buildLabels(): void {
-        const d = DEPTH_PROPS + 5;
-        this.buildZoneSign(ZONE_SLOTS.x + ZONE_SLOTS.w / 2, ZONE_SLOTS.y + 18, '🎰 SLOTS CORNER', COL_SLOTS_ACCENT, d);
-        this.buildZoneSign(ZONE_POKER.x + ZONE_POKER.w / 2, ZONE_POKER.y + 18, '♠ POKER ROOM', COL_POKER_ACCENT, d);
-        this.buildZoneSign(ZONE_BAR.x + ZONE_BAR.w / 2, ZONE_BAR.y + 14, '🍹 BAR & LOUNGE', COL_BAR_ACCENT, d);
-        this.buildZoneSign(ZONE_ENTRANCE.x + ZONE_ENTRANCE.w / 2, ZONE_ENTRANCE.y + 14, '↑ ENTRANCE', COL_TRIM, d);
-        this.buildZoneSign(ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2, ZONE_BLACKJACK.y + 14, '🃏 BLACKJACK', COL_BLACKJACK_ACCENT, d);
-        this.buildZoneSign(ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2, ZONE_ROULETTE.y + 14, '🎡 ROULETTE', COL_ROULETTE_ACCENT, d);
-        this.buildZoneSign(ZONE_PLINKO.x + ZONE_PLINKO.w / 2, ZONE_PLINKO.y + 14, '🎯 PLINKO', COL_PLINKO_ACCENT, d);
-        this.buildZoneSign(ZONE_BINGO.x + ZONE_BINGO.w / 2, ZONE_BINGO.y + 14, '🎱 BINGO', COL_BINGO_ACCENT, d);
-        this.buildZoneSign(ZONE_HORSES.x + ZONE_HORSES.w / 2, ZONE_HORSES.y + 14, '🏇 HORSE RACING', COL_HORSES_ACCENT, d);
-    }
-
-    private buildZoneSign(x: number, y: number, text: string, accentColor: number, depth: number): void {
-        const t = this.add.text(x, y, text, {
-            fontFamily: FONT, fontSize: '13px',
-            color: Phaser.Display.Color.IntegerToColor(accentColor).rgba,
-            fontStyle: 'bold',
-        }).setOrigin(0.5).setDepth(depth);
-
-        const pad = 14;
-        const sw = t.width + pad * 2;
-        const sh = t.height + 10;
-
-        const bgGfx = this.add.graphics().setDepth(depth - 1);
-
-        // Extra outer neon glow (4th ring)
-        bgGfx.lineStyle(10, accentColor, 0.04);
-        bgGfx.strokeRoundedRect(x - sw / 2 - 7, y - sh / 2 - 7, sw + 14, sh + 14, 10);
-        // Outer neon glow
-        bgGfx.lineStyle(6, accentColor, 0.08);
-        bgGfx.strokeRoundedRect(x - sw / 2 - 3, y - sh / 2 - 3, sw + 6, sh + 6, 7);
-        // Mid glow
-        bgGfx.lineStyle(3, accentColor, 0.15);
-        bgGfx.strokeRoundedRect(x - sw / 2 - 1, y - sh / 2 - 1, sw + 2, sh + 2, 6);
-
-        // Background fill — 3-layer vertical gradient: dark top (30%), lighter centre (40%), dark bottom (30%)
-        bgGfx.fillStyle(0x000000, 0.75);
-        bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
-        bgGfx.fillStyle(accentColor, 0.04);
-        bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2 + sh * 0.3, sw, sh * 0.4, 0);
-        bgGfx.fillStyle(accentColor, 0.06);
-        bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
-        bgGfx.fillStyle(0xffffff, 0.04);
-        bgGfx.fillRoundedRect(x - sw / 2 + 4, y - sh / 2 + 3, sw - 8, 7, { tl: 4, tr: 4, bl: 0, br: 0 });
-
-        // Neon border
-        bgGfx.lineStyle(1.5, accentColor, 0.8);
-        bgGfx.strokeRoundedRect(x - sw / 2, y - sh / 2, sw, sh, 5);
-        bgGfx.lineStyle(1, COL_TRIM, 0.18);
-        bgGfx.strokeRoundedRect(x - sw / 2 + 3, y - sh / 2 + 3, sw - 6, sh - 6, 4);
-
-        // Left accent bar
-        bgGfx.fillStyle(accentColor, 0.8);
-        bgGfx.fillRoundedRect(x - sw / 2, y - sh / 2, 3, sh, { tl: 5, bl: 5, tr: 0, br: 0 });
-
-        // Double bottom reflection (neon tube effect)
-        bgGfx.lineStyle(1, accentColor, 0.25);
-        bgGfx.lineBetween(x - sw / 2 + 8, y + sh / 2 - 2, x + sw / 2 - 8, y + sh / 2 - 2);
-        bgGfx.lineStyle(0.5, accentColor, 0.12);
-        bgGfx.lineBetween(x - sw / 2 + 10, y + sh / 2 - 4, x + sw / 2 - 10, y + sh / 2 - 4);
-    }
-
-    private buildEntranceFx(): void {
-        const g3  = this.add.graphics().setDepth(DEPTH_FLOOR + 1);
-        const ex  = ZONE_ENTRANCE.x;
-        const ey  = ZONE_ENTRANCE.y;
-        const ew  = ZONE_ENTRANCE.w;
-        const eh  = ZONE_ENTRANCE.h;
-
-        // Welcome mat base
-        g3.fillStyle(0x0a1c0a, 1);
-        g3.fillRoundedRect(ex + 12, ey + 12, ew - 24, eh - 24, 4);
-
-        // Mat border strips — layered
-        g3.lineStyle(3, COL_TRIM, 0.5);
-        g3.strokeRoundedRect(ex + 12, ey + 12, ew - 24, eh - 24, 4);
-        g3.lineStyle(1, COL_TRIM, 0.2);
-        g3.strokeRoundedRect(ex + 18, ey + 18, ew - 36, eh - 36, 3);
-        g3.lineStyle(1, COL_TRIM_DIM, 0.15);
-        g3.strokeRoundedRect(ex + 22, ey + 22, ew - 44, eh - 44, 2);
-
-        // Mat diagonal pattern — 45° lines clipped to mat inner bounds [ex+14..ex+ew-14, ey+14..ey+eh-14]
-        g3.lineStyle(0.5, 0x1a3a1a, 0.4);
-        const mdiag = 16;
-        const matX1 = ex + 14, matX2 = ex + ew - 14;
-        const matY1 = ey + 14, matY2 = ey + eh - 14;
-        for (let d = -(eh); d < ew + eh; d += mdiag) {
-            // Each diagonal line goes from (ex+d, ey+14) to (ex+d+eh, ey+eh-14), clipped to mat bounds
-            const x1 = Math.max(matX1, ex + d);
-            const y1 = matY1 + Math.max(0, matX1 - (ex + d));   // slide y down if x was clamped left
-            const x2 = Math.min(matX2, ex + d + eh);
-            const y2 = matY2 - Math.max(0, (ex + d + eh) - matX2); // slide y up if x was clamped right
-            if (x1 < x2) g3.lineBetween(x1, y1, x2, y2);
-        }
-
-        // Glow overlay
-        g3.fillStyle(0x1a3a1a, 0.15);
-        g3.fillRoundedRect(ex + 12, ey + 12, ew - 24, eh - 24, 4);
-
-        this.add.text(ex + ew / 2, ey + eh / 2, '✦ WELCOME ✦', {
-            fontFamily: FONT, fontSize: '11px', color: '#5a9a5a', fontStyle: 'bold', letterSpacing: 3,
-        }).setOrigin(0.5).setDepth(DEPTH_FLOOR + 2);
-
-        // Golden arrow guide lights up the path
-        const arrowY = ey + eh / 2 + 10;
-        for (let i = 0; i < 5; i++) {
-            g3.fillStyle(COL_TRIM, i % 2 === 0 ? 0.7 : 0.3);
-            g3.fillCircle(ex + ew / 2, arrowY - i * 12, 3);
-        }
-
-        // Neon arch above the entrance path
-        g3.lineStyle(2, COL_TRIM, 0.5);
-        g3.beginPath();
-        g3.arc(ex + ew / 2, ey + 12, ew / 2 - 8, Math.PI, 0, false);
-        g3.strokePath();
-        g3.lineStyle(4, COL_TRIM, 0.12);
-        g3.beginPath();
-        g3.arc(ex + ew / 2, ey + 12, ew / 2 - 6, Math.PI, 0, false);
-        g3.strokePath();
-    }
-
-    // ── Avatar Blockers ───────────────────────────────────────────────────────
 
     private registerAvatarBlockers(): void {
         for (const b of this.getSharedBlockers()) {
@@ -1773,7 +231,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // Gigi (Showgirl right of entrance approach)
         const gigiQuotes = ["Feeling lucky? Scratch and win today!"];
         const gigi = new StationaryNPC(
-            this, 560, 520, "Gigi 💃", "avatar_showgirl", 0xff40a0, gigiQuotes
+            this, 560, 520, "Gigi 💃", "avatar_gigi", 0xff40a0, gigiQuotes
         );
         this.interaction.register({
             id: 'gigi_scratchers', x: 560, y: 520, radius: 60,
@@ -1813,7 +271,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             "Only the elite can enter here. You've earned it."
         ];
         const buster = new StationaryNPC(
-            this, 270, 620, "Buster 🕶️", "avatar_ai_male", 0xc9a84c, busterQuotes
+            this, 270, 620, "Buster 🕶️", "avatar_bouncer", 0xc9a84c, busterQuotes
         );
 
         // Duke (VIP inside the lounge)
@@ -1921,8 +379,6 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
     /** Returns the shared list of blocker rects used by all walkers (player + AI). */
     private getSharedBlockers(): Array<{ x: number; y: number; w: number; h: number }> {
-        const bjCx = ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2;
-        const bjCy = ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2;
         const rtCx = ZONE_ROULETTE.x  + ZONE_ROULETTE.w  / 2;
         const rtCy = ZONE_ROULETTE.y  + ZONE_ROULETTE.h  / 2;
 
@@ -1941,8 +397,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
             { x: 80 - 22,  y: 640 - 38, w: 44, h: 70 },
             // Poker table
             { x: 790 - 110, y: 190 - 60, w: 220, h: 120 },
-            // Blackjack table
-            { x: bjCx - 95, y: bjCy - 45, w: 190, h: 90 },
+            // Blackjack table, west of the fountain
+            { x: 400 - 80, y: 310 - 36, w: 160, h: 72 },
             // Bar counter
             { x: ZONE_BAR.x + 20, y: ZONE_BAR.y + 30, w: ZONE_BAR.w - 40, h: 50 },
             // Roulette table
@@ -2063,9 +519,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         });
         this.interaction.register({
             id: 'blackjack',
-            x: ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,
-            y: ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2,
-            radius: 100,
+            x: 400, y: 360, radius: 110,
             label: 'Play Blackjack',
             onInteract: () => this.openBlackjack(),
         });
@@ -2260,12 +714,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
         
         // Create an upward throwing arc particle
         const x = WORLD_W / 2;
-        const y = WORLD_H / 2 + 30;
-        const chip = this.add.circle(this.avatar.x, this.avatar.y - 20, 4, 0xc9a84c).setDepth(DEPTH_PROPS + 10);
+        const y = WORLD_H / 2 + 10;
+        const from = toScreen(this.avatar.x, this.avatar.y);
+        const splash = toScreen(x, y);
+        const chip = this.add.circle(from.x, from.y - 20, 5, 0xe7c84a).setDepth(worldDepth(this.avatar.x, this.avatar.y) + 6);
         this.tweens.add({
             targets: chip,
-            x: x,
-            y: y - 20,
+            x: splash.x,
+            y: splash.y - 16,
             duration: 600,
             ease: 'Quad.easeOut',
             onComplete: () => {
@@ -2290,42 +746,38 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }
 
     private useJukebox(): void {
-        const tracks = ['Jazz', 'Synthwave', 'Casino Ambient'];
-        const currentTrack = (this as any)._jukeboxTrack || 0;
-        const nextTrack = (currentTrack + 1) % tracks.length;
-        (this as any)._jukeboxTrack = nextTrack;
-        
-        ToastManager.show(this, `🎵 Playing: ${tracks[nextTrack]}`, 'info');
-        SoundManager.playClick();
+        SoundManager.nextAmbient();
+        ToastManager.show(this, `Playing: ${SoundManager.ambientName()}`, 'info');
     }
 
     // ── Context-sensitive hint bar ────────────────────────────────────────────
 
     private buildHintBar(): void {
         const cx = GAME_WIDTH / 2;
-        this.hintBg = this.add.rectangle(cx, GAME_HEIGHT - 13, GAME_WIDTH - 16, 18, 0x000000, 0.72)
+        this.hintBg = this.add.rectangle(cx, DOCK_Y + 32, 10, 10, 0x000000, 0)
             .setScrollFactor(0).setDepth(DEPTH_HUD + 1).setAlpha(0);
 
-        this.hintText = this.add.text(cx, GAME_HEIGHT - 13, '', {
-            fontFamily: FONT, fontSize: '9px', color: '#3a5a4a',
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
+        this.hintText = this.add.text(300, DOCK_Y + 32, '', {
+            fontFamily: FONT, fontSize: '11px', color: '#f4fff8', fontStyle: 'bold',
+            wordWrap: { width: 280 },
+        }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
 
         this.updateHintForZone('floor');
     }
 
     private updateHintForZone(zone: Zone): void {
         const HINTS: Record<Zone, string> = {
-            floor:     'WASD / ↑↓←→ move  ·  Hold  Q  for Emotes  ·  approach a zone and press  E  to interact  ·  ESC close',
-            entrance:  'WASD / ↑↓←→ move  ·  Hold  Q  for Emotes  ·  walk north to explore the casino',
-            slots:     'Walk up and press  E  to play  ·  SPACE spin  ·  ESC close',
-            poker:     'Walk up and press  E  to join  ·  F=Fold  C=Call  R=Raise  ·  ESC close',
-            bar:       'Walk up and press  E  to order  ·  ESC close',
-            blackjack: 'Walk up and press  E  to play  ·  H=Hit  S=Stand  ·  ESC close',
-            roulette:  'Walk up and press  E  to play  ·  SPACE spin  ·  ESC close',
-            plinko:    'Walk up and press  E  to play  ·  SPACE drop  ·  ESC close',
-            bingo:     'Walk up and press  E  to play  ·  ESC close',
-            horses:    'Walk up and press  E  to bet  ·  Pick horse, set bet, press RACE  ·  ESC close',
-            vip:       '★ VIP HIGH ROLLERS LOUNGE  ·  Requires 15,000◈ to enter  ·  High-Stakes Slots: 10× bets',
+            floor:     'WASD move   ·   Q emotes   ·   E interact',
+            entrance:  'Walk north to explore the casino',
+            slots:     'E play   ·   Space spin   ·   Esc close',
+            poker:     'E join   ·   F fold   ·   C call   ·   R raise',
+            bar:       'E order a drink   ·   Esc close',
+            blackjack: 'E play   ·   H hit   ·   S stand',
+            roulette:  'E play   ·   Space spin   ·   Esc close',
+            plinko:    'E play   ·   Space drop   ·   Esc close',
+            bingo:     'E play bingo   ·   Esc close',
+            horses:    'E bet   ·   Pick a horse, then Race',
+            vip:       'VIP lounge   ·   15,000◈ to enter',
         };
 
         if (this.hintText) {
@@ -2384,14 +836,14 @@ export class CasinoLobbyScene extends Phaser.Scene {
             }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
 
             const descT = this.add.text(cx - 224, sy + 9, s.desc, {
-                fontFamily: FONT, fontSize: '10px', color: '#4a6a5a',
+                fontFamily: FONT, fontSize: '11px', color: '#d7f3ea',
             }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
 
             tutObjs.push(iconT, titleT, descT);
         });
 
         const dismiss = this.add.text(cx, tutY + tutH / 2 - 18, 'Press any key or click to dismiss  ·  Closes automatically in 12s', {
-            fontFamily: FONT, fontSize: '9px', color: '#3a5a4a',
+            fontFamily: FONT, fontSize: '9px', color: '#b7efe0',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
         tutObjs.push(dismiss);
 

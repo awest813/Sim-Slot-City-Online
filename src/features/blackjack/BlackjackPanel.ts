@@ -3,10 +3,10 @@ import Phaser from 'phaser';
 import { GameState } from '../../core/state/GameState';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
-    COL_FELT, COL_TRIM, COL_TRIM_DIM,
+    COL_FELT, COL_TRIM_DIM,
     COL_BTN_PRIMARY, COL_BTN_BLUE,
     COL_BTN_DANGER,
-    COL_UI_BG, COL_UI_BG2, COL_UI_BG3, COL_UI_BORDER_DIM,
+    COL_UI_BG2, COL_UI_BG3, COL_UI_BORDER_DIM,
     FONT, PANEL_RADIUS, ANIM_MED,
     TEXT_MD, TEXT_GOLD, TEXT_GOLD_LG,
 } from '../../game/constants';
@@ -18,6 +18,7 @@ import {
     Card,
 } from './BlackjackEngine';
 import { rankLabel } from '../poker/PokerEngine';
+import { paintLifeSimShell } from '../ui/shell';
 import { ToastManager } from '../ui/ToastManager';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -220,21 +221,8 @@ export class BlackjackPanel {
         const cy = GAME_HEIGHT / 2;
         const px = cx - PW / 2;
         const py = cy - PH / 2;
-        const g  = this.panelGfx;
-        g.clear();
-
-        g.fillStyle(0x000000, 0.55);
-        g.fillRoundedRect(px + 5, py + 6, PW, PH, PANEL_RADIUS + 2);
-        g.fillStyle(COL_UI_BG, 1);
-        g.fillRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        g.fillStyle(COL_UI_BG2, 1);
-        g.fillRoundedRect(px, py, PW, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
-        g.lineStyle(2, COL_TRIM, 0.85);
-        g.strokeRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        g.lineStyle(1, COL_TRIM_DIM, 0.2);
-        g.strokeRoundedRect(px + 3, py + 3, PW - 6, PH - 6, PANEL_RADIUS - 1);
-        g.lineStyle(1.5, COL_TRIM, 0.5);
-        g.lineBetween(px + 16, py + 52, px + PW - 16, py + 52);
+        this.panelGfx.clear();
+        paintLifeSimShell(this.panelGfx, px, py, PW, PH);
     }
 
     private buildCloseButton(): void {
