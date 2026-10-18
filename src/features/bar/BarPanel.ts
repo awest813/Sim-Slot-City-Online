@@ -5,6 +5,7 @@ import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, COL_TRIM, FONT,
 } from '../../game/constants';
 import { ToastManager } from '../ui/ToastManager';
+import { paintLifeSimShell } from '../ui/shell';
 import { SoundManager } from '../../core/systems/SoundManager';
 
 // ── Session-level tracking for once-per-session items ─────────────────────────
@@ -165,27 +166,8 @@ export class BarPanel {
 
         this.container = this.scene.add.container(cx, cy).setScrollFactor(0).setDepth(DEPTH_PANEL + 1);
 
-        // Panel BG — warm wood tones
         const bg = this.scene.add.graphics();
-        // Shadow
-        bg.fillStyle(0x000000, 0.5);
-        bg.fillRoundedRect(-pw / 2 + 5, -ph / 2 + 7, pw, ph, 10);
-        // Main body
-        // Main body with Rich Amber Gradient
-        bg.fillGradientStyle(0x1e0f05, 0x1e0f05, 0x4a1f05, 0x4a1f05, 1, 1, 1, 1);
-        bg.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 8);
-        
-        // Warm amber radial glow at center-bottom (simulates bar under-lighting)
-        const GLOW_LAYERS = [
-            { alpha: 0.04, radius: 200 },
-            { alpha: 0.06, radius: 150 },
-            { alpha: 0.08, radius: 100 },
-            { alpha: 0.06, radius: 60 },
-        ];
-        for (const layer of GLOW_LAYERS) {
-            bg.fillStyle(0xff8800, layer.alpha);
-            bg.fillEllipse(0, ph / 2 - 40, layer.radius * 2, layer.radius * 0.7);
-        }
+        paintLifeSimShell(bg, -pw / 2, -ph / 2, pw, ph);
 
         // Champagne Bubbles Particles
         for (let i = 0; i < 20; i++) {

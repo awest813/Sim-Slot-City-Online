@@ -8,7 +8,7 @@
 
 import Phaser from 'phaser';
 import {
-    GAME_WIDTH, GAME_HEIGHT, DEPTH_OVERLAY,
+    GAME_WIDTH, DEPTH_OVERLAY, DOCK_Y,
     FONT,
 } from '../../game/constants';
 
@@ -24,16 +24,16 @@ interface Toast {
 const TOAST_W    = 260;
 const TOAST_H    = 36;
 const TOAST_X    = GAME_WIDTH / 2;       // horizontal centre
-const TOAST_BASE_Y = GAME_HEIGHT - 90;   // start above hint bar
+const TOAST_BASE_Y = DOCK_Y - 72;
 const TOAST_GAP  = TOAST_H + 6;
 const MAX_TOASTS = 4;
 
 // Per-type visual config
 const TYPE_CONFIG: Record<ToastType, { fill: number; border: number; text: string; icon: string }> = {
-    win:     { fill: 0x0d2e10, border: 0x2ecc71, text: '#2ecc71', icon: '▲' },
-    loss:    { fill: 0x2e0d0d, border: 0xe74c3c, text: '#e74c3c', icon: '▼' },
-    jackpot: { fill: 0x2e240a, border: 0xffd040, text: '#ffd040', icon: '★' },
-    info:    { fill: 0x0d1828, border: 0x5090c0, text: '#80b8e0', icon: '●' },
+    win:     { fill: 0xf3fff6, border: 0x1f8a45, text: '#146b32', icon: '▲' },
+    loss:    { fill: 0xfff1ef, border: 0xc4473a, text: '#8a2420', icon: '▼' },
+    jackpot: { fill: 0xfff8e4, border: 0xc9a24a, text: '#6b4e10', icon: '★' },
+    info:    { fill: 0xf4fffc, border: 0x178f7c, text: '#0e4f48', icon: '●' },
 };
 
 const activeToasts: Toast[] = [];

@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { GameState } from '../../core/state/GameState';
-import { GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, FONT, COL_TRIM } from '../../game/constants';
+import { GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, FONT } from '../../game/constants';
 import { SoundManager } from '../../core/systems/SoundManager';
 import { ToastManager } from '../ui/ToastManager';
+import { paintLifeSimShell } from '../ui/shell';
 import { PAYOUTS } from '../slots/SlotsEngine';
 
 export class ScratcherPanel {
@@ -46,17 +47,14 @@ export class ScratcherPanel {
 
         // BG
         const bg = this.scene.add.graphics();
-        bg.fillGradientStyle(0x2a1535, 0x2a1535, 0x10051a, 0x10051a, 1, 1, 1, 1);
-        bg.fillRoundedRect(-pw / 2, -ph / 2, pw, ph, 12);
-        bg.lineStyle(3, COL_TRIM, 1);
-        bg.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 12);
+        paintLifeSimShell(bg, -pw / 2, -ph / 2, pw, ph);
         
         const title = this.scene.add.text(0, -ph / 2 + 30, '🎟️ SHOWGIRL SCRATCHERS', {
             fontFamily: FONT, fontSize: '20px', color: '#ff66b2', fontStyle: 'bold',
         }).setOrigin(0.5);
 
         this.statusText = this.scene.add.text(0, -ph / 2 + 64, 'Match 3 to win! Buy a card to start.', {
-            fontFamily: FONT, fontSize: '13px', color: '#aaaaaa'
+            fontFamily: FONT, fontSize: '13px', color: '#d7f3ea'
         }).setOrigin(0.5);
 
         this.container.add([bg, title, this.statusText]);

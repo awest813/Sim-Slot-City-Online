@@ -82,6 +82,8 @@ export const TEXT_TITLE     = { fontFamily: FONT, fontSize: '28px', color: '#c9a
 // ── UI Layout ─────────────────────────────────────────────────────────────────
 export const PANEL_RADIUS = 16;   // chunky plastic corners
 export const BTN_RADIUS   = 8;    // standard button corner radius
+export const DOCK_H = 64;
+export const DOCK_Y = GAME_HEIGHT - DOCK_H;
 
 // ── Animation Timings (ms) ────────────────────────────────────────────────────
 export const ANIM_FAST = 120;    // quick feedback

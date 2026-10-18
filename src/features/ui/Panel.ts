@@ -2,9 +2,9 @@
 import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
-    COL_UI_BORDER, COL_TRIM,
-    FONT, ANIM_MED, PANEL_RADIUS,
+    FONT, ANIM_MED,
 } from '../../game/constants';
+import { paintLifeSimShell } from './shell';
 
 export interface ButtonConfig {
     label:      string;
@@ -74,39 +74,7 @@ export class Panel {
         const g  = this.panelGfx;
         g.clear();
 
-        const px = cx - this.w / 2;
-        const py = cy - this.h / 2;
-        const r = PANEL_RADIUS;
-
-        // Soft drop shadow
-        g.fillStyle(0x06362f, 0.35);
-        g.fillRoundedRect(px + 5, py + 8, this.w, this.h, r);
-
-        // Bright plastic shell
-        g.fillStyle(0x178f7c, 1);
-        g.fillRoundedRect(px, py, this.w, this.h, r);
-        g.fillStyle(0xb8ffe8, 0.55);
-        g.fillRoundedRect(px + 3, py + 3, this.w - 6, 16, 8);
-        g.fillStyle(0x0c6e60, 1);
-        g.fillRoundedRect(px, py + this.h - 14, this.w, 14, { tl: 0, tr: 0, bl: r, br: r });
-
-        // Dark well so existing light type stays readable
-        g.fillStyle(0x102e2a, 1);
-        g.fillRoundedRect(px + 10, py + 10, this.w - 20, this.h - 20, r - 6);
-
-        // Header band
-        g.fillStyle(0x14685c, 1);
-        g.fillRoundedRect(px + 10, py + 10, this.w - 20, 44, { tl: r - 6, tr: r - 6, bl: 0, br: 0 });
-        g.fillStyle(0xffffff, 0.12);
-        g.fillRoundedRect(px + 14, py + 12, this.w - 28, 10, 5);
-
-        g.lineStyle(2, 0xd8ffe8, 0.85);
-        g.strokeRoundedRect(px, py, this.w, this.h, r);
-        g.lineStyle(1, 0x06362f, 0.45);
-        g.strokeRoundedRect(px + 10, py + 10, this.w - 20, this.h - 20, r - 6);
-
-        g.lineStyle(2, COL_TRIM, 0.55);
-        g.lineBetween(px + 22, py + 54, px + this.w - 22, py + 54);
+        paintLifeSimShell(g, cx - this.w / 2, cy - this.h / 2, this.w, this.h);
     }
 
     addTitle(text: string): void {
@@ -136,10 +104,11 @@ export class Panel {
     addButton(cfg: ButtonConfig, fullWidth = false): Phaser.GameObjects.Container {
         const bw = fullWidth ? this.w - 60 : 160;
         const bh = 34;
-        const baseFill  = cfg.disabled ? 0x1a1a1a : (cfg.color ?? 0x1a5028);
-        const hoverFill = cfg.disabled ? 0x1a1a1a : (cfg.hoverColor ?? lighten(baseFill));
-        const pressFill = cfg.disabled ? 0x1a1a1a : darken(baseFill);
-        const r = 4;
+        const baseFill  = cfg.disabled ? 0x8aa39c : (cfg.color ?? 0xe7fff4);
+        const hoverFill = cfg.disabled ? 0x8aa39c : (cfg.hoverColor ?? lighten(baseFill));
+        const pressFill = cfg.disabled ? 0x8aa39c : darken(baseFill);
+        const r = 10;
+        const ink = cfg.disabled ? '#5c6e6a' : (isLight(baseFill) ? '#0e3f38' : '#f4fff8');
 
         // Use Graphics for rounded button background
         const gfx = this.scene.add.graphics();
@@ -159,7 +128,7 @@ export class Panel {
                 gfx.fillRoundedRect(-bw / 2 + 2, by - bh / 2 + 2, bw - 4, bh / 2 - 2, { tl: r - 1, tr: r - 1, bl: 0, br: 0 });
             }
             // Border
-            const bCol = cfg.disabled ? 0x333333 : COL_UI_BORDER;
+            const bCol = cfg.disabled ? 0x5c6e6a : 0x0e3f38;
             const bAlpha = cfg.disabled ? 0.3 : hover ? 0.9 : 0.65;
             gfx.lineStyle(1, bCol, bAlpha);
             gfx.strokeRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
@@ -176,7 +145,7 @@ export class Panel {
 
         const label = this.scene.add.text(0, by, cfg.label, {
             fontFamily: FONT, fontSize: '12px',
-            color: cfg.disabled ? '#555555' : '#f0e6d3',
+            color: ink,
         }).setOrigin(0.5);
 
         if (!cfg.disabled) {
@@ -204,14 +173,14 @@ export class Panel {
         const bw  = 110;
         const bh  = 30;
         const by  = this.h / 2 - 22;
-        const r   = 4;
+        const r   = 10;
 
         const gfx = this.scene.add.graphics();
         const drawClose = (hover: boolean): void => {
             gfx.clear();
-            gfx.fillStyle(hover ? 0x5c2020 : 0x3a1818, 1);
+            gfx.fillStyle(hover ? 0xffffff : 0xe7fff4, 1);
             gfx.fillRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
-            gfx.lineStyle(1, hover ? 0xaa3a3a : 0x7a2a2a, 0.9);
+            gfx.lineStyle(1.5, 0x0e3f38, 0.85);
             gfx.strokeRoundedRect(-bw / 2, by - bh / 2, bw, bh, r);
         };
         drawClose(false);
@@ -219,12 +188,12 @@ export class Panel {
         const hitRect = this.scene.add.rectangle(0, by, bw, bh, 0x000000, 0)
             .setInteractive({ useHandCursor: true });
 
-        const label = this.scene.add.text(0, by, '✕  Close', {
-            fontFamily: FONT, fontSize: '12px', color: '#dd5050',
+        const label = this.scene.add.text(0, by, 'Close', {
+            fontFamily: FONT, fontSize: '12px', color: '#0e3f38', fontStyle: 'bold',
         }).setOrigin(0.5);
 
-        hitRect.on('pointerover',  () => { drawClose(true);  label.setColor('#ff6060'); });
-        hitRect.on('pointerout',   () => { drawClose(false); label.setColor('#dd5050'); });
+        hitRect.on('pointerover',  () => drawClose(true));
+        hitRect.on('pointerout',   () => drawClose(false));
         hitRect.on('pointerdown',  () => onClose());
 
         this.escCloseHandler = onClose;
@@ -245,6 +214,13 @@ export class Panel {
 }
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
+
+function isLight(hex: number): boolean {
+    const r = (hex >> 16) & 0xff;
+    const g = (hex >> 8) & 0xff;
+    const b = hex & 0xff;
+    return r + g + b > 420;
+}
 
 function lighten(hex: number, amount = 32): number {
     const r = Math.min(255, ((hex >> 16) & 0xff) + amount);

@@ -7,7 +7,7 @@ import {
     COL_UI_BG, COL_UI_BG2, COL_UI_BORDER,
     DEPTH_HUD, DEPTH_OVERLAY,
     ZONE_ENTRANCE, ZONE_SLOTS, ZONE_POKER, ZONE_BAR, ZONE_BLACKJACK, ZONE_ROULETTE, ZONE_PLINKO, ZONE_BINGO, ZONE_HORSES, ZONE_VIP,
-    FONT, ANIM_SLOW,
+    FONT, ANIM_SLOW, DOCK_Y,
 } from '../../game/constants';
 import { GameState, Zone } from '../../core/state/GameState';
 import { AvatarController } from '../../core/systems/AvatarController';
@@ -760,29 +760,30 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
     private buildHintBar(): void {
         const cx = GAME_WIDTH / 2;
-        this.hintBg = this.add.rectangle(cx, GAME_HEIGHT - 13, GAME_WIDTH - 16, 20, 0x0e4f48, 0.92)
+        this.hintBg = this.add.rectangle(cx, DOCK_Y + 32, 10, 10, 0x000000, 0)
             .setScrollFactor(0).setDepth(DEPTH_HUD + 1).setAlpha(0);
 
-        this.hintText = this.add.text(cx, GAME_HEIGHT - 13, '', {
-            fontFamily: FONT, fontSize: '10px', color: '#e7fff6',
-        }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
+        this.hintText = this.add.text(300, DOCK_Y + 32, '', {
+            fontFamily: FONT, fontSize: '11px', color: '#f4fff8', fontStyle: 'bold',
+            wordWrap: { width: 280 },
+        }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 2).setAlpha(0);
 
         this.updateHintForZone('floor');
     }
 
     private updateHintForZone(zone: Zone): void {
         const HINTS: Record<Zone, string> = {
-            floor:     'WASD / ↑↓←→ move  ·  Hold  Q  for Emotes  ·  approach a zone and press  E  to interact  ·  ESC close',
-            entrance:  'WASD / ↑↓←→ move  ·  Hold  Q  for Emotes  ·  walk north to explore the casino',
-            slots:     'Walk up and press  E  to play  ·  SPACE spin  ·  ESC close',
-            poker:     'Walk up and press  E  to join  ·  F=Fold  C=Call  R=Raise  ·  ESC close',
-            bar:       'Walk up and press  E  to order  ·  ESC close',
-            blackjack: 'Walk up and press  E  to play  ·  H=Hit  S=Stand  ·  ESC close',
-            roulette:  'Walk up and press  E  to play  ·  SPACE spin  ·  ESC close',
-            plinko:    'Walk up and press  E  to play  ·  SPACE drop  ·  ESC close',
-            bingo:     'Walk up and press  E  to play  ·  ESC close',
-            horses:    'Walk up and press  E  to bet  ·  Pick horse, set bet, press RACE  ·  ESC close',
-            vip:       '★ VIP HIGH ROLLERS LOUNGE  ·  Requires 15,000◈ to enter  ·  High-Stakes Slots: 10× bets',
+            floor:     'WASD move   ·   Q emotes   ·   E interact',
+            entrance:  'Walk north to explore the casino',
+            slots:     'E play   ·   Space spin   ·   Esc close',
+            poker:     'E join   ·   F fold   ·   C call   ·   R raise',
+            bar:       'E order a drink   ·   Esc close',
+            blackjack: 'E play   ·   H hit   ·   S stand',
+            roulette:  'E play   ·   Space spin   ·   Esc close',
+            plinko:    'E play   ·   Space drop   ·   Esc close',
+            bingo:     'E play bingo   ·   Esc close',
+            horses:    'E bet   ·   Pick a horse, then Race',
+            vip:       'VIP lounge   ·   15,000◈ to enter',
         };
 
         if (this.hintText) {

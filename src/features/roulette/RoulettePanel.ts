@@ -7,8 +7,9 @@ import { GameState } from '../../core/state/GameState';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
     COL_TRIM, COL_TRIM_LIGHT, COL_TRIM_DIM,
-    FONT, PANEL_RADIUS, ANIM_MED,
+    FONT, ANIM_MED,
 } from '../../game/constants';
+import { paintLifeSimShell } from '../ui/shell';
 import {
     BetType, RouletteBet,
     WHEEL_ORDER, RED_NUMBERS,
@@ -169,27 +170,8 @@ export class RoulettePanel {
         const cy = GAME_HEIGHT / 2;
         const px = cx - PW / 2;
         const py = cy - PH / 2;
-        const g  = this.panelGfx;
-        g.clear();
-
-        // Shadow
-        g.fillStyle(0x000000, 0.5);
-        g.fillRoundedRect(px + 5, py + 6, PW, PH, PANEL_RADIUS + 2);
-        // Body
-        g.fillStyle(0x061010, 1);
-        g.fillRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        // Header band
-        g.fillStyle(0x021a10, 1);
-        g.fillRoundedRect(px, py, PW, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
-        // Gold border
-        g.lineStyle(2, COL_GREEN + 0x004400, 0.9);
-        g.strokeRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        // Inner inset
-        g.lineStyle(1, 0x0a3a14, 0.25);
-        g.strokeRoundedRect(px + 3, py + 3, PW - 6, PH - 6, PANEL_RADIUS - 1);
-        // Header divider
-        g.lineStyle(1.5, 0x1a7a30, 0.5);
-        g.lineBetween(px + 16, py + 52, px + PW - 16, py + 52);
+        this.panelGfx.clear();
+        paintLifeSimShell(this.panelGfx, px, py, PW, PH);
     }
 
     // ── Header ────────────────────────────────────────────────────────────────

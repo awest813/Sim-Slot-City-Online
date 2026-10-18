@@ -7,9 +7,10 @@ import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
     COL_TRIM_LIGHT, COL_TRIM_DIM,
     COL_PLINKO_ACCENT,
-    FONT, PANEL_RADIUS, ANIM_MED,
+    FONT, ANIM_MED,
 } from '../../game/constants';
 import { ToastManager } from '../ui/ToastManager';
+import { paintLifeSimShell } from '../ui/shell';
 
 import { RiskLevel, RISK_MULTIPLIERS, SLOT_COUNT, BOARD_ROWS, BET_OPTIONS, simulateDrop, DropResult } from './PlinkoEngine';
 
@@ -189,27 +190,8 @@ export class PlinkoPanel {
         const cy = GAME_HEIGHT / 2;
         const px = cx - PW / 2;
         const py = cy - PH / 2;
-        const g  = this.panelGfx;
-        g.clear();
-
-        // Outer shadow
-        g.fillStyle(0x000000, 0.55);
-        g.fillRoundedRect(px + 5, py + 6, PW, PH, PANEL_RADIUS + 2);
-        // Body
-        g.fillStyle(0x071a14, 1);
-        g.fillRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        // Header band
-        g.fillStyle(0x091c18, 1);
-        g.fillRoundedRect(px, py, PW, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
-        // Teal border
-        g.lineStyle(2, COL_PLINKO_ACCENT, 0.85);
-        g.strokeRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        // Inner inset
-        g.lineStyle(1, COL_PLINKO_ACCENT, 0.12);
-        g.strokeRoundedRect(px + 3, py + 3, PW - 6, PH - 6, PANEL_RADIUS - 1);
-        // Header divider
-        g.lineStyle(1.5, COL_PLINKO_ACCENT, 0.45);
-        g.lineBetween(px + 16, py + 52, px + PW - 16, py + 52);
+        this.panelGfx.clear();
+        paintLifeSimShell(this.panelGfx, px, py, PW, PH);
     }
 
     private buildCloseButton(): void {

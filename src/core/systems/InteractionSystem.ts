@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { INTERACT_RADIUS, DEPTH_OVERLAY, COL_UI_BG, COL_UI_BORDER, COL_TRIM, FONT } from '../../game/constants';
+import { INTERACT_RADIUS, DEPTH_OVERLAY, COL_UI_BG, COL_UI_BORDER, FONT, DOCK_Y } from '../../game/constants';
 
 export interface Hotspot {
     id:          string;
@@ -30,7 +30,7 @@ export class InteractionSystem {
 
     constructor(scene: Phaser.Scene) {
         this.scene    = scene;
-        this.PROMPT_Y = scene.scale.height - 54;
+        this.PROMPT_Y = DOCK_Y - 24;
         this.buildPromptUI();
         this.eKey = scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     }
@@ -61,7 +61,7 @@ export class InteractionSystem {
 
         // [E] key label
         this.keyBadgeText = this.scene.add.text(cx, py, 'E', {
-            fontFamily: FONT, fontSize: '11px', color: '#c9a84c', fontStyle: 'bold',
+            fontFamily: FONT, fontSize: '12px', color: '#0e3f38', fontStyle: 'bold',
         })
             .setOrigin(0.5)
             .setScrollFactor(0)
@@ -71,7 +71,7 @@ export class InteractionSystem {
 
         // Prompt text
         this.promptText = this.scene.add.text(cx, py, '', {
-            fontFamily: FONT, fontSize: '12px', color: '#e0d0a0',
+            fontFamily: FONT, fontSize: '12px', color: '#f4fff8',
         })
             .setOrigin(0.5)
             .setScrollFactor(0)
@@ -151,9 +151,9 @@ export class InteractionSystem {
         const kbX = pillX + 4;
         const kbR = (h - 8) / 2;
         kb.clear();
-        kb.fillStyle(0x1a1a0a, 1);
+        kb.fillStyle(0xfff6e8, 1);
         kb.fillRoundedRect(kbX, pillY + 4, kbW, h - 8, kbR);
-        kb.lineStyle(1, COL_TRIM, 0.65);
+        kb.lineStyle(1.5, 0x0e3f38, 0.7);
         kb.strokeRoundedRect(kbX, pillY + 4, kbW, h - 8, kbR);
 
         // Position [E] text center of badge
@@ -198,7 +198,7 @@ export class InteractionSystem {
     private startPulseRing(pillX: number, pillY: number, pillW: number, h: number): void {
         const g = this.pulseRingGfx;
         g.clear();
-        g.lineStyle(2, COL_TRIM, 0.75);
+        g.lineStyle(2, 0xd8ffe8, 0.75);
         g.strokeRoundedRect(pillX - 3, pillY - 3, pillW + 6, h + 6, h / 2 + 3);
         g.setVisible(true);
         g.setAlpha(0.75);

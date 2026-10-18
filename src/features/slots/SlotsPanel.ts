@@ -6,10 +6,11 @@ import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
     COL_UI_BG2, COL_UI_BORDER_DIM,
     COL_TRIM, COL_TRIM_LIGHT, COL_TRIM_DIM,
-    COL_SLOT_BODY, COL_SLOT_TRIM,
-    FONT, PANEL_RADIUS, ANIM_MED,
+    COL_SLOT_TRIM,
+    FONT, ANIM_MED,
 } from '../../game/constants';
 import { SoundManager } from '../../core/systems/SoundManager';
+import { paintLifeSimShell } from '../ui/shell';
 import { ToastManager } from '../ui/ToastManager';
 
 import { SYMBOLS, PAYOUTS, weightedRandom, evaluateSpin, SpinResult } from './SlotsEngine';
@@ -192,84 +193,8 @@ export class SlotsPanel {
         const { PW, PH } = this;
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
-        const px = cx - PW / 2;
-        const py = cy - PH / 2;
-        const g  = this.panelGfx;
-        g.clear();
-
-        // High-Stakes color theme overrides
-        const bodyColor = this.isHighStakes ? 0x2b0830 : COL_SLOT_BODY;       // royal purple vs blue-black
-        const highlightColor = this.isHighStakes ? 0x4d1654 : 0x1c1c5a;  // dark purple highlight vs blue-highlight
-        const stripeColor = this.isHighStakes ? 0x8a2090 : 0x4444aa;     // purple neon stripes vs blue neon stripes
-        const trimColor = this.isHighStakes ? 0xf6c855 : COL_SLOT_TRIM;       // gold border vs default trim
-        const innerTrim = this.isHighStakes ? 0xffe885 : COL_TRIM;
-        const innerTrimDim = this.isHighStakes ? 0xcba84a : COL_TRIM_DIM;
-        const headerBg = this.isHighStakes ? 0x1a051d : 0x0d0d28;
-        const headerHighlight = this.isHighStakes ? 0x3d0d44 : 0x1a1a4a;
-
-        // Outer shadow
-        g.fillStyle(0x000000, 0.55);
-        g.fillRoundedRect(px + 5, py + 6, PW, PH, PANEL_RADIUS + 2);
-        // Body
-        g.fillStyle(bodyColor, 1);
-        g.fillRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        // Metallic left edge highlight
-        g.fillStyle(highlightColor, 0.35);
-        g.fillRoundedRect(px, py, 6, PH, { tl: PANEL_RADIUS, bl: PANEL_RADIUS, tr: 0, br: 0 });
-        // Metallic right edge shadow
-        g.fillStyle(0x000000, 0.2);
-        g.fillRoundedRect(px + PW - 6, py, 6, PH, { tl: 0, bl: 0, tr: PANEL_RADIUS, br: PANEL_RADIUS });
-
-        // ── Vertical chrome stripe decorations on panel sides ─────────────
-        const stripeX1 = px + 10;
-        const stripeX2 = px + PW - 14;
-        const stripesAboveY = py + 56;
-        const stripesAboveH = 46;
-        const stripesBelowY = cy - 26 + 59 + 20;
-        const stripesBelowH = 46;
-        const STRIPE_COUNT  = 3;
-        const STRIPE_STEP   = 5;
-        const STRIPE_ALPHAS = [0.18, 0.10, 0.06];
-        for (let si = 0; si < STRIPE_COUNT; si++) {
-            const sx1    = stripeX1 + si * STRIPE_STEP;
-            const sx2    = stripeX2 - si * STRIPE_STEP;
-            const sAlpha = STRIPE_ALPHAS[si];
-            g.fillStyle(stripeColor, sAlpha);
-            g.fillRect(sx1, stripesAboveY, 3, stripesAboveH);
-            g.fillStyle(stripeColor, sAlpha);
-            g.fillRect(sx1, stripesBelowY, 3, stripesBelowH);
-            g.fillStyle(stripeColor, sAlpha);
-            g.fillRect(sx2, stripesAboveY, 3, stripesAboveH);
-            g.fillStyle(stripeColor, sAlpha);
-            g.fillRect(sx2, stripesBelowY, 3, stripesBelowH);
-        }
-
-        // Header band
-        g.fillStyle(headerBg, 1);
-        g.fillRoundedRect(px, py, PW, 52, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
-        // Header inner highlight
-        g.fillStyle(headerHighlight, 0.4);
-        g.fillRoundedRect(px + 2, py + 2, PW - 4, 20, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
-        // Scan lines over header band
-        for (let sl = 0; sl < 6; sl++) {
-            g.lineStyle(0.5, 0xffffff, 0.03);
-            g.lineBetween(px + PANEL_RADIUS, py + 6 + sl * 7, px + PW - PANEL_RADIUS, py + 6 + sl * 7);
-        }
-        // Amber/gold gradient simulation
-        g.fillStyle(0xff9900, 0.04);
-        g.fillRoundedRect(px + PANEL_RADIUS - 2, py + 2, PW - (PANEL_RADIUS - 2) * 2, 26, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
-        g.fillStyle(0xffcc44, 0.03);
-        g.fillRoundedRect(px + PANEL_RADIUS - 2, py + 28, PW - (PANEL_RADIUS - 2) * 2, 22, { tl: 0, tr: 0, bl: 0, br: 0 });
-
-        // Gold border
-        g.lineStyle(2, trimColor, 0.9);
-        g.strokeRoundedRect(px, py, PW, PH, PANEL_RADIUS);
-        // Inner inset
-        g.lineStyle(1, innerTrimDim, 0.20);
-        g.strokeRoundedRect(px + 3, py + 3, PW - 6, PH - 6, PANEL_RADIUS - 1);
-        // Header divider
-        g.lineStyle(1.5, innerTrim, 0.5);
-        g.lineBetween(px + 16, py + 52, px + PW - 16, py + 52);
+        this.panelGfx.clear();
+        paintLifeSimShell(this.panelGfx, cx - PW / 2, cy - PH / 2, PW, PH);
     }
 
     private buildCloseButton(): void {

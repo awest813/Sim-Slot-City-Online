@@ -6,8 +6,8 @@ import { GameState } from '../../core/state/GameState';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
     COL_HORSES_ACCENT,
-    FONT, PANEL_RADIUS, ANIM_MED,
-    COL_UI_BG, COL_UI_BG2, COL_UI_BG3, COL_UI_BORDER,
+    FONT, ANIM_MED,
+    COL_UI_BG2, COL_UI_BG3, COL_UI_BORDER,
     COL_TRIM,
     TEXT_MD,
 } from '../../game/constants';
@@ -17,6 +17,7 @@ import {
     createRace, resolveRace, chipDelta,
 } from './HorseRaceEngine';
 import { ToastManager } from '../ui/ToastManager';
+import { paintLifeSimShell } from '../ui/shell';
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 const PW = 640;
@@ -134,27 +135,7 @@ export class HorseRacePanel {
         const cy = GAME_HEIGHT / 2;
 
         this.panelGfx.clear();
-
-        // Drop shadow
-        this.panelGfx.fillStyle(0x000000, 0.55);
-        this.panelGfx.fillRoundedRect(cx - PW / 2 + 4, cy - PH / 2 + 6, PW, PH, PANEL_RADIUS);
-
-        // Main body
-        this.panelGfx.fillStyle(COL_UI_BG, 1);
-        this.panelGfx.fillRoundedRect(cx - PW / 2, cy - PH / 2, PW, PH, PANEL_RADIUS);
-
-        // Header bar
-        this.panelGfx.fillStyle(COL_UI_BG2, 1);
-        this.panelGfx.fillRoundedRect(cx - PW / 2, cy - PH / 2, PW, 50,
-            { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
-
-        // Gold border
-        this.panelGfx.lineStyle(2, COL_UI_BORDER, 0.85);
-        this.panelGfx.strokeRoundedRect(cx - PW / 2, cy - PH / 2, PW, PH, PANEL_RADIUS);
-
-        // Accent top stripe
-        this.panelGfx.lineStyle(2, COL_HORSES_ACCENT, 0.9);
-        this.panelGfx.lineBetween(cx - PW / 2 + 8, cy - PH / 2 + 2, cx + PW / 2 - 8, cy - PH / 2 + 2);
+        paintLifeSimShell(this.panelGfx, cx - PW / 2, cy - PH / 2, PW, PH);
     }
 
     // ── Header ────────────────────────────────────────────────────────────────
