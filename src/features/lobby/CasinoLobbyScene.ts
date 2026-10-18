@@ -748,13 +748,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }
 
     private useJukebox(): void {
-        const tracks = ['Jazz', 'Synthwave', 'Casino Ambient'];
-        const currentTrack = (this as any)._jukeboxTrack || 0;
-        const nextTrack = (currentTrack + 1) % tracks.length;
-        (this as any)._jukeboxTrack = nextTrack;
-        
-        ToastManager.show(this, `🎵 Playing: ${tracks[nextTrack]}`, 'info');
-        SoundManager.playClick();
+        SoundManager.nextAmbient();
+        ToastManager.show(this, `Playing: ${SoundManager.ambientName()}`, 'info');
     }
 
     // ── Context-sensitive hint bar ────────────────────────────────────────────

@@ -7,6 +7,7 @@ import { GameState } from '../state/GameState';
 import { SIM_NAME_STYLE, syncSimSprite } from '../../art/actor';
 import { toScreen } from '../../art/iso';
 import type { FacingDir } from '../../art/characters';
+import { SoundManager } from './SoundManager';
 
 interface Blocker {
     x: number; y: number; w: number; h: number;
@@ -172,7 +173,11 @@ export class AvatarController {
                 this.trailTimer = 0;
                 this.emitTrailParticle();
             }
+            const prevWalk = this.walkTime;
             this.walkTime += delta;
+            if (Math.floor(this.walkTime / 280) !== Math.floor(prevWalk / 280)) {
+                SoundManager.playStep();
+            }
         } else {
             this.trailTimer = 0;
             this.walkTime = 0;
