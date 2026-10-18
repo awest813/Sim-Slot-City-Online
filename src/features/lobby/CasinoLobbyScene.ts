@@ -105,9 +105,11 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // Emote radial trigger key register
         this.qKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
 
-        // Initialise sound engine on the first pointer-down (browser autoplay policy
-        // requires a user gesture before creating / resuming an AudioContext).
-        this.input.once('pointerdown', () => SoundManager.init());
+        // A user gesture has to land before the AudioContext will start. The first
+        // click or keypress on the lot unlocks it; later sounds reuse that context.
+        const unlockAudio = (): void => SoundManager.init();
+        this.input.once('pointerdown', unlockAudio);
+        this.input.keyboard!.once('keydown', unlockAudio);
 
         // Click-to-move listener
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, gameObjects: Phaser.GameObjects.GameObject[]) => {
