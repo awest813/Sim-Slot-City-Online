@@ -379,8 +379,6 @@ export class CasinoLobbyScene extends Phaser.Scene {
 
     /** Returns the shared list of blocker rects used by all walkers (player + AI). */
     private getSharedBlockers(): Array<{ x: number; y: number; w: number; h: number }> {
-        const bjCx = ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2;
-        const bjCy = ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2;
         const rtCx = ZONE_ROULETTE.x  + ZONE_ROULETTE.w  / 2;
         const rtCy = ZONE_ROULETTE.y  + ZONE_ROULETTE.h  / 2;
 
@@ -399,8 +397,8 @@ export class CasinoLobbyScene extends Phaser.Scene {
             { x: 80 - 22,  y: 640 - 38, w: 44, h: 70 },
             // Poker table
             { x: 790 - 110, y: 190 - 60, w: 220, h: 120 },
-            // Blackjack table
-            { x: bjCx - 95, y: bjCy - 45, w: 190, h: 90 },
+            // Blackjack table, west of the fountain
+            { x: 400 - 80, y: 310 - 36, w: 160, h: 72 },
             // Bar counter
             { x: ZONE_BAR.x + 20, y: ZONE_BAR.y + 30, w: ZONE_BAR.w - 40, h: 50 },
             // Roulette table
@@ -521,9 +519,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         });
         this.interaction.register({
             id: 'blackjack',
-            x: ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,
-            y: ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2,
-            radius: 100,
+            x: 400, y: 360, radius: 110,
             label: 'Play Blackjack',
             onInteract: () => this.openBlackjack(),
         });

@@ -329,9 +329,9 @@ export function buildSimsLot(scene: Phaser.Scene): void {
     placeProp(scene, 'prop_slot', 120, 197);
     placeProp(scene, 'prop_slot_vip', 80, 637);
     placeProp(scene, 'prop_poker', 790, 190);
-    placeProp(scene, 'prop_blackjack',
-        ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,
-        ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2 + 10);
+    // West of the fountain. The zone center sits on the fountain, so the
+    // table lives on the open carpet beside it.
+    placeProp(scene, 'prop_blackjack', 400, 310);
     placeProp(scene, 'prop_bar', ZONE_BAR.x + ZONE_BAR.w / 2, ZONE_BAR.y + 78);
     placeProp(scene, 'prop_roulette',
         ZONE_ROULETTE.x + ZONE_ROULETTE.w / 2,
@@ -361,7 +361,7 @@ export function buildSimsLot(scene: Phaser.Scene): void {
     floorSign(scene, 210, 150, 'Slots');
     floorSign(scene, 700, 100, 'Poker');
     floorSign(scene, 480, 48, 'Bar');
-    floorSign(scene, 390, 248, 'Blackjack');
+    floorSign(scene, 320, 270, 'Blackjack');
     floorSign(scene, 150, 470, 'Roulette');
     floorSign(scene, 800, 470, 'Plinko');
     floorSign(scene, 600, 458, 'Bingo');
