@@ -125,6 +125,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
     }
 
     update(_time: number, delta: number): void {
+        this.interaction.setSuspended(this.activePanel !== 'none');
         if (this.activePanel !== 'none') return;
 
         // Handle Emote Radial Menu overlay lifecycle

@@ -20,6 +20,7 @@ export class InteractionSystem {
     private pulseRingGfx!: Phaser.GameObjects.Graphics;
     private pulseTween:    Phaser.Tweens.Tween | null = null;
     private activeHotspot: Hotspot | null = null;
+    private suspended = false;
     private eKey!:         Phaser.Input.Keyboard.Key;
 
     // Current prompt dimensions (rebuilt when label changes)
@@ -88,7 +89,16 @@ export class InteractionSystem {
         this.hotspots = this.hotspots.filter(h => h.id !== id);
     }
 
+    /** Hide the prompt while a panel is open, and bring it back when the panel closes. */
+    setSuspended(on: boolean): void {
+        if (on === this.suspended) return;
+        this.suspended = on;
+        if (on) this.hidePrompt();
+        else if (this.activeHotspot) this.showPrompt(this.activeHotspot.label);
+    }
+
     update(playerX: number, playerY: number): void {
+        if (this.suspended) return;
         let nearest:     Hotspot | null = null;
         let nearestDist: number         = Infinity;
 

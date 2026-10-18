@@ -133,14 +133,14 @@ export class ScratcherPanel {
         this.buyBtn.on('pointerdown', () => this.buyCard());
 
         // Close Button
-        const closeBtn = this.scene.add.rectangle(0, ph / 2 - 30, 120, 28, 0x3a1e1e, 1)
-            .setStrokeStyle(1, 0x8a3a3a, 1)
+        const closeBtn = this.scene.add.rectangle(0, ph / 2 - 30, 120, 28, 0xe7fff4, 1)
+            .setStrokeStyle(2, 0x0e3f38, 1)
             .setInteractive({ useHandCursor: true });
-        const closeLabel = this.scene.add.text(0, ph / 2 - 30, 'Leave [ESC]', {
-            fontFamily: FONT, fontSize: '11px', color: '#e05050'
+        const closeLabel = this.scene.add.text(0, ph / 2 - 30, 'Leave', {
+            fontFamily: FONT, fontSize: '12px', color: '#0e3f38', fontStyle: 'bold'
         }).setOrigin(0.5);
-        closeBtn.on('pointerover', () => closeBtn.setFillStyle(0x5a2a2a));
-        closeBtn.on('pointerout', () => closeBtn.setFillStyle(0x3a1e1e));
+        closeBtn.on('pointerover', () => closeBtn.setFillStyle(0xffffff));
+        closeBtn.on('pointerout', () => closeBtn.setFillStyle(0xe7fff4));
         closeBtn.on('pointerdown', () => this.close());
 
         this.container.add([this.buyBtn, this.buyLabel, closeBtn, closeLabel]);
