@@ -94,11 +94,14 @@ function wallSegment(
         ctx.stroke();
     }
     // tiny floral dots
-    ctx.fillStyle = 'rgba(196, 92, 92, 0.28)';
-    for (let y = minY + 14; y < maxY - 20; y += 18) {
-        for (let x = minX + 4; x < maxX; x += 16) {
+    ctx.fillStyle = 'rgba(186, 84, 96, 0.42)';
+    for (let y = minY + 12; y < maxY - 18; y += 16) {
+        for (let x = minX + 4; x < maxX; x += 14) {
             ctx.beginPath();
-            ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+            ctx.arc(x, y, 1.7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x + 4, y + 3, 1.1, 0, Math.PI * 2);
             ctx.fill();
         }
     }
@@ -319,12 +322,13 @@ export function buildSimsLot(scene: Phaser.Scene): void {
     scene.add.image(origin.x, origin.y, key).setOrigin(0, 0).setDepth(1);
 
     // Furniture, grounded on the same spots the collision boxes use.
-    placeProp(scene, 'prop_slot', 60, 118);
-    placeProp(scene, 'prop_slot', 130, 118);
-    placeProp(scene, 'prop_slot', 60, 210);
-    placeProp(scene, 'prop_slot', 130, 210);
-    placeProp(scene, 'prop_slot_vip', 80, 650);
-    placeProp(scene, 'prop_poker', 790, 200);
+    // Ground points match the collision-box centers in the lobby.
+    placeProp(scene, 'prop_slot', 60, 97);
+    placeProp(scene, 'prop_slot', 120, 97);
+    placeProp(scene, 'prop_slot', 60, 197);
+    placeProp(scene, 'prop_slot', 120, 197);
+    placeProp(scene, 'prop_slot_vip', 80, 637);
+    placeProp(scene, 'prop_poker', 790, 190);
     placeProp(scene, 'prop_blackjack',
         ZONE_BLACKJACK.x + ZONE_BLACKJACK.w / 2,
         ZONE_BLACKJACK.y + ZONE_BLACKJACK.h / 2 + 10);
@@ -341,9 +345,9 @@ export function buildSimsLot(scene: Phaser.Scene): void {
     placeProp(scene, 'prop_horses',
         ZONE_HORSES.x + ZONE_HORSES.w / 2,
         ZONE_HORSES.y + ZONE_HORSES.h / 2);
-    placeProp(scene, 'prop_atm', 400, WORLD_H - 90);
-    placeProp(scene, 'prop_fountain', WORLD_W / 2, WORLD_H / 2 + 20);
-    placeProp(scene, 'prop_jukebox', ZONE_BAR.x + 48, ZONE_BAR.y + ZONE_BAR.h - 28);
+    placeProp(scene, 'prop_atm', 400, WORLD_H - 105);
+    placeProp(scene, 'prop_fountain', WORLD_W / 2, WORLD_H / 2 + 10);
+    placeProp(scene, 'prop_jukebox', ZONE_BAR.x + 40, ZONE_BAR.y + ZONE_BAR.h - 40);
     placeProp(scene, 'prop_sofa', 470, 560);
     placeProp(scene, 'prop_plant', 200, 48);
     placeProp(scene, 'prop_plant_b', 760, 48);

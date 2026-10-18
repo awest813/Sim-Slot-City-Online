@@ -142,7 +142,7 @@ export class HUD {
             .setOrigin(0, 0.5);
 
         // Chip counter — larger text with drop shadow
-        this.chipsText = this.scene.add.text(barX + 74, barY + 40, '', {
+        this.chipsText = this.scene.add.text(barX + 84, barY + 40, '', {
             fontFamily: FONT, fontSize: '14px', color: '#2ecc71', fontStyle: 'bold',
             shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 3, fill: true },
         })
@@ -177,8 +177,8 @@ export class HUD {
         // Zone badge bg — redrawn per zone in drawZoneBadge()
         this.drawZoneBadge('floor');
 
-        this.zoneText = this.scene.add.text(zoneX + zoneW / 2, zoneY + zoneH / 2, '', {
-            fontFamily: FONT, fontSize: '10px', color: '#7a8a9a',
+        this.zoneText = this.scene.add.text(zoneX + zoneW / 2 + 8, zoneY + zoneH / 2, '', {
+            fontFamily: FONT, fontSize: '10px', color: '#e7fff6',
         })
             .setScrollFactor(0)
             .setDepth(DEPTH_HUD + 1)
@@ -414,38 +414,45 @@ export class HUD {
         const acc = ZONE_ACCENT[zone] ?? ZONE_ACCENT['floor'];
         const g = this.zoneGfx;
         g.clear();
-        // Outer halo glow
-        g.lineStyle(6, acc.border, 0.12);
-        g.strokeRoundedRect(zoneX - 2, zoneY - 2, zoneW + 4, zoneH + 4, 16);
-        // Background fill with zone accent
-        g.fillStyle(acc.fill, 0.92);
+        g.fillStyle(0x06362f, 0.35);
+        g.fillRoundedRect(zoneX + 2, zoneY + 2, zoneW, zoneH, 14);
+        g.fillStyle(0x14675c, 0.96);
         g.fillRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
-        // Border
-        g.lineStyle(1, acc.border, 0.7);
+        g.lineStyle(1.5, COL_UI_BORDER, 0.9);
         g.strokeRoundedRect(zoneX, zoneY, zoneW, zoneH, 14);
-        // Inner border tint
-        g.lineStyle(0.5, acc.border, 0.3);
-        g.strokeRoundedRect(zoneX + 2, zoneY + 2, zoneW - 4, zoneH - 4, 12);
-        // Update text color to match accent
-        if (this.zoneText) this.zoneText.setColor(acc.text);
+        g.fillStyle(acc.border, 1);
+        g.fillCircle(zoneX + 14, zoneY + zoneH / 2, 5);
+        g.lineStyle(1, 0xffffff, 0.55);
+        g.strokeCircle(zoneX + 14, zoneY + zoneH / 2, 5);
+        if (this.zoneText) {
+            this.zoneText.setColor('#e7fff6');
+            this.zoneText.setX(zoneX + zoneW / 2 + 8);
+        }
+    }
+
+    private drawActionBtn(
+        g: Phaser.GameObjects.Graphics,
+        x: number, y: number, w: number, h: number,
+        hover: boolean,
+    ): void {
+        g.fillStyle(0x06362f, 0.35);
+        g.fillRoundedRect(x + 2, y + 2, w, h, 8);
+        g.fillStyle(hover ? 0x1faf98 : 0x14786c, 0.96);
+        g.fillRoundedRect(x, y, w, h, 8);
+        g.lineStyle(1.5, 0xd8ffe8, 0.9);
+        g.strokeRoundedRect(x, y, w, h, 8);
     }
 
     private drawFreeChipsBtn(hover: boolean): void {
-        const barW = 220;
-        const barH = 48;
         const fbX = 0;
-        const fbY = barH + 4;
-        const fbW = barW;
+        const fbY = PLAYER_BAR_H + 4;
+        const fbW = PLAYER_BAR_W;
         const fbH = 26;
         const g = this.freeChipsGfx;
         g.clear();
 
         if (!this.freeChipsVisible) return;
-
-        g.fillStyle(hover ? 0x1e3812 : 0x141e0c, 0.92);
-        g.fillRoundedRect(fbX, fbY, fbW, fbH, { tl: 0, tr: 0, bl: 5, br: 5 });
-        g.lineStyle(1, hover ? 0x4a9a1a : 0x304a10, 0.9);
-        g.strokeRoundedRect(fbX, fbY, fbW, fbH, { tl: 0, tr: 0, bl: 5, br: 5 });
+        this.drawActionBtn(g, fbX, fbY, fbW, fbH, hover);
     }
 
     private setFreeChipsVisible(visible: boolean): void {
@@ -463,21 +470,15 @@ export class HUD {
     }
 
     private drawDailyBonusBtn(hover: boolean): void {
-        const barW = 220;
-        const barH = 48;
         const dbX = 0;
-        const dbY = barH + 34;
-        const dbW = barW;
+        const dbY = PLAYER_BAR_H + 34;
+        const dbW = PLAYER_BAR_W;
         const dbH = 26;
         const g = this.dailyBonusGfx;
         g.clear();
 
         if (!this.dailyBonusVisible) return;
-
-        g.fillStyle(hover ? 0x3d300b : 0x241d08, 0.92);
-        g.fillRoundedRect(dbX, dbY, dbW, dbH, { tl: 0, tr: 0, bl: 5, br: 5 });
-        g.lineStyle(1, hover ? 0xcca610 : 0x826907, 0.9);
-        g.strokeRoundedRect(dbX, dbY, dbW, dbH, { tl: 0, tr: 0, bl: 5, br: 5 });
+        this.drawActionBtn(g, dbX, dbY, dbW, dbH, hover);
     }
 
     private setDailyBonusVisible(visible: boolean): void {

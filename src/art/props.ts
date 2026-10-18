@@ -2,7 +2,7 @@
 
 import type Phaser from 'phaser';
 import type { Pt } from './iso';
-import { box, cylinder, disc, hex, project, scale, shadow } from './draw3d';
+import { box, cylinder, disc, hex, poly, project, scale, shadow } from './draw3d';
 
 export interface PropOrigin {
     x: number;
@@ -94,25 +94,32 @@ function drawSlot(ctx: CanvasRenderingContext2D, g: Pt, vip: boolean): void {
     ctx.textAlign = 'center';
     ctx.fillText(vip ? 'VIP' : '777', sign.x, sign.y + 4);
 
-    // Reel glass, drawn large so it reads at lot scale
-    const glass = project(g, 4, 4, 46);
-    ctx.fillStyle = '#1a2430';
-    ctx.fillRect(glass.x - 16, glass.y - 16, 30, 28);
-    ctx.fillStyle = '#f4fbff';
-    ctx.fillRect(glass.x - 14, glass.y - 14, 26, 24);
+    // Reel glass sits on the south face so it follows the cabinet.
+    const gy = d / 2 - 0.5;
+    const glass = (x0: number, x1: number, lift0: number, lift1: number) => [
+        project(g, x0, gy, lift0),
+        project(g, x1, gy, lift0),
+        project(g, x1, gy, lift1),
+        project(g, x0, gy, lift1),
+    ];
+    poly(ctx, glass(-11, 11, 28, 58), '#1a2430');
+    poly(ctx, glass(-9, 9, 31, 55), '#f4fbff');
     ctx.strokeStyle = '#8aa0b0';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(glass.x - 5, glass.y - 14);
-    ctx.lineTo(glass.x - 5, glass.y + 10);
-    ctx.moveTo(glass.x + 5, glass.y - 14);
-    ctx.lineTo(glass.x + 5, glass.y + 10);
-    ctx.stroke();
+    for (const x of [-3, 3]) {
+        const a = project(g, x, gy, 55);
+        const b = project(g, x, gy, 31);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+    }
     const symbols = ['#e23b4a', '#f2c84a', '#3dbb5a'];
     symbols.forEach((c, i) => {
+        const p = project(g, -6 + i * 6, gy, 43);
         ctx.fillStyle = c;
         ctx.beginPath();
-        ctx.arc(glass.x - 9 + i * 9, glass.y - 1, 3.2, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2);
         ctx.fill();
     });
 

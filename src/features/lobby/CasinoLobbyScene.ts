@@ -715,7 +715,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         
         // Create an upward throwing arc particle
         const x = WORLD_W / 2;
-        const y = WORLD_H / 2 + 30;
+        const y = WORLD_H / 2 + 10;
         const from = toScreen(this.avatar.x, this.avatar.y);
         const splash = toScreen(x, y);
         const chip = this.add.circle(from.x, from.y - 20, 5, 0xe7c84a).setDepth(worldDepth(this.avatar.x, this.avatar.y) + 6);

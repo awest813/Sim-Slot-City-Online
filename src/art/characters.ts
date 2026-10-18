@@ -297,7 +297,8 @@ function paintSim(
     const far = -face;
     const near = face;
     if (o.clothes !== 'dress') {
-        drawLeg(far, -step * far, o.pants, o.pants, o.pantsLo);
+        drawLeg(far, -step, o.pants, o.pants, o.pantsLo);
+        drawLeg(near, step, o.pants, o.pants, o.pantsLo);
     }
     drawArm(far, step);
 
@@ -367,9 +368,6 @@ function paintSim(
         ctx.stroke();
     }
 
-    if (o.clothes !== 'dress') {
-        drawLeg(near, step * near, o.pants, o.pants, o.pantsLo);
-    }
     drawArm(near, -step);
 
     const neck = ctx.createLinearGradient(cx - 4, shoulder - 8, cx + 4, shoulder);
@@ -414,6 +412,17 @@ function paintSim(
     ctx.strokeStyle = 'rgba(90, 48, 32, 0.28)';
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    if (!front) {
+        ctx.fillStyle = o.hair;
+        ctx.beginPath();
+        ctx.ellipse(headX, headY - 1, headR + 2.2, headR + 1.2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = o.skinLo;
+        ctx.beginPath();
+        ctx.ellipse(headX, headY + headR - 3, 4.2, 2.6, 0, 0, Math.PI);
+        ctx.fill();
+    }
 
     drawHair(ctx, o, headX, headY, headR, front, face);
 
