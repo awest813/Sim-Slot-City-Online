@@ -1,14 +1,16 @@
 import Phaser from 'phaser';
 import {
     AVATAR_SPEED, AVATAR_SIZE, WORLD_W, WORLD_H,
-    DEPTH_AVATAR_BASE, DEPTH_SHADOW, FONT,
+    DEPTH_SHADOW, FONT,
 } from '../../game/constants';
+import { SIM_NAME_STYLE, syncSimSprite } from '../../art/actor';
+import { toScreen, worldDepth } from '../../art/iso';
+import type { FacingDir } from '../../art/characters';
 
 interface Blocker {
     x: number; y: number; w: number; h: number;
 }
 
-type FacingDir = 'down' | 'up' | 'left' | 'right';
 
 // Walkable waypoints spread around the casino floor (avoiding furniture)
 const WAYPOINTS: [number, number][] = [
@@ -49,11 +51,11 @@ const WALK_COMMENTS = [
 
 export class AIWalker {
     private scene:    Phaser.Scene;
-    private aura!:    Phaser.GameObjects.Ellipse;
     private sprite!:  Phaser.GameObjects.Image;
     private walkTime: number = 0;
     private shadow!:  Phaser.GameObjects.Ellipse;
     private nameTag!: Phaser.GameObjects.Text;
+    private outfit = 'avatar_ai_male';
     private blockers: Blocker[] = [];
     private activeBubble: Phaser.GameObjects.Container | null = null;
     private bubbleTimer: Phaser.Time.TimerEvent | null = null;
@@ -67,18 +69,16 @@ export class AIWalker {
     private targetY:    number;
     private pauseTimer: number = 0;
     private stuckTimer: number = 0;
-    private bodyColor:  number;
 
     constructor(
         scene: Phaser.Scene,
         startX: number, startY: number,
         name: string,
-        bodyColor: number,
+        _bodyColor: number,
     ) {
         this.scene     = scene;
         this.x         = startX;
         this.y         = startY;
-        this.bodyColor = bodyColor;
 
         const wp    = WAYPOINTS[Math.floor(Math.random() * WAYPOINTS.length)];
         this.targetX = wp[0];
@@ -88,51 +88,26 @@ export class AIWalker {
     }
 
     private buildSprite(name: string): void {
-        const r = AVATAR_SIZE;
-
+        const here = toScreen(this.x, this.y);
         this.shadow = this.scene.add
-            .ellipse(this.x, this.y + r - 2, r * 2, r * 0.8, 0x000000, 0.30)
+            .ellipse(here.x, here.y, 24, 10, 0x1a2410, 0.32)
             .setDepth(DEPTH_SHADOW);
 
-        // Select visitor avatar sprite based on index modulo 3
         const idx = AI_NAMES.indexOf(name);
-        let key = 'avatar_ai_male';
-        let auraColor = this.bodyColor;
-        let nameColorStr = Phaser.Display.Color.IntegerToColor(this.bodyColor).rgba;
-        let isBold = false;
         let labelName = name;
-
-        if (idx % 3 === 0) {
-            key = 'avatar_ai_male';
-        } else if (idx % 3 === 1) {
-            key = 'avatar_ai_female';
-        } else {
-            key = 'avatar_ai_vip';
-            auraColor = 0xd4af37;      // Glowing luxury gold neon aura
-            nameColorStr = '#ffd700';   // Elegant gold color
-            isBold = true;
-            labelName = `${name} 👑`;
+        if (idx % 3 === 0) this.outfit = 'avatar_ai_male';
+        else if (idx % 3 === 1) this.outfit = 'avatar_ai_female';
+        else {
+            this.outfit = 'avatar_ai_vip';
+            labelName = `${name}`;
         }
 
-        this.aura = this.scene.add
-            .ellipse(this.x, this.y - 2, r * 2.3, r * 2.75, auraColor, key === 'avatar_ai_vip' ? 0.12 : 0.08)
-            .setDepth(DEPTH_AVATAR_BASE - 2)
-            .setBlendMode(Phaser.BlendModes.ADD);
-
-        this.sprite = this.scene.add.image(this.x, this.y, key);
-        this.sprite.setOrigin(0.5, 0.72);
-        this.sprite.setDisplaySize(30, 44);
-        this.sprite.setDepth(DEPTH_AVATAR_BASE);
-
-        this.nameTag = this.scene.add
-            .text(this.x, this.y - r * 2.2, labelName, {
-                fontFamily: FONT,
-                fontSize:   '10px',
-                color:      nameColorStr,
-                fontStyle:  isBold ? 'bold' : 'normal',
-            })
-            .setOrigin(0.5, 1)
-            .setDepth(DEPTH_AVATAR_BASE + 3);
+        this.sprite = this.scene.add.image(here.x, here.y, this.outfit);
+        this.nameTag = this.scene.add.text(here.x, here.y, labelName, {
+            ...SIM_NAME_STYLE,
+            color: this.outfit === 'avatar_ai_vip' ? '#6a4a12' : SIM_NAME_STYLE.color,
+        }).setOrigin(0.5, 1);
+        this.syncSprite();
     }
 
     addBlocker(b: Blocker): void {
@@ -235,36 +210,23 @@ export class AIWalker {
     }
 
     private syncSprite(): void {
-        const r = AVATAR_SIZE;
-
-        this.shadow.setPosition(this.x, this.y + r - 2);
-        this.aura.setPosition(this.x, this.y - 2);
-
-        // Chibi bobbing walking animation
-        let bobY = 0;
-        if (this.pauseTimer <= 0) {
-            bobY = Math.sin(this.walkTime * 0.016) * 3.4;
-        }
-
-        // Horizontal flip depending on traveling direction
-        if (this.facing === 'left') {
-            this.sprite.setFlipX(true);
-        } else if (this.facing === 'right') {
-            this.sprite.setFlipX(false);
-        }
-
-        this.sprite.setPosition(this.x, this.y + bobY);
-        this.nameTag.setPosition(this.x, this.y - r * 2.4 + bobY);
-
-        const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
-        this.aura.setDepth(depth - 2);
-        this.sprite.setDepth(depth);
-        this.nameTag.setDepth(depth + 3);
-        this.shadow.setDepth(depth - 5);
-
+        const moving = this.pauseTimer <= 0;
+        const frame = moving ? Math.floor(this.walkTime / 150) % 4 : 0;
+        const bob = moving ? Math.sin(this.walkTime * 0.02) * 1.2 : 0;
+        const s = syncSimSprite({
+            sprite: this.sprite,
+            shadow: this.shadow,
+            nameTag: this.nameTag,
+            x: this.x,
+            y: this.y,
+            bob,
+            outfit: this.outfit,
+            facing: this.facing,
+            frame,
+        });
         if (this.activeBubble) {
-            this.activeBubble.setPosition(this.x, this.y + this.bubbleOffsetY + bobY);
-            this.activeBubble.setDepth(depth + 10);
+            this.activeBubble.setPosition(s.x, s.y + this.bubbleOffsetY + bob);
+            this.activeBubble.setDepth(worldDepth(this.x, this.y) + 8);
         }
     }
 
@@ -279,8 +241,7 @@ export class AIWalker {
         }
 
         const comment = WALK_COMMENTS[Math.floor(Math.random() * WALK_COMMENTS.length)];
-        
-        const r = AVATAR_SIZE;
+
         const text = this.scene.add.text(0, 0, comment, {
             fontFamily: FONT,
             fontSize: '9px',
@@ -307,11 +268,12 @@ export class AIWalker {
 
         text.setPosition(0, -1);
 
-        this.bubbleOffsetY = -r * 2.2 - bh / 2 - 2;
-        const bx = this.x;
-        const by = this.y + this.bubbleOffsetY;
+        const head = toScreen(this.x, this.y);
+        this.bubbleOffsetY = -108 - bh / 2;
+        const bx = head.x;
+        const by = head.y + this.bubbleOffsetY;
 
-        const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
+        const depth = worldDepth(this.x, this.y);
 
         this.activeBubble = this.scene.add.container(bx, by, [bubbleGfx, text])
             .setDepth(depth + 10)
@@ -355,7 +317,6 @@ export class AIWalker {
             this.bubbleTimer.remove();
         }
         this.shadow.destroy();
-        this.aura.destroy();
         this.sprite.destroy();
         this.nameTag.destroy();
     }

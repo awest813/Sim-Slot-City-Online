@@ -85,7 +85,7 @@ export class Minimap {
         g.fillStyle(COL_UI_BG, 0.90);
         g.fillRoundedRect(MAP_X, MAP_Y, MAP_W, MAP_H, 5);
         // Subtle floor grid tint
-        g.fillStyle(0x0c1a0c, 0.35);
+        g.fillStyle(0xc4a36a, 0.28);
         g.fillRoundedRect(MAP_X + 1, MAP_Y + 1, MAP_W - 2, MAP_H - 2, 4);
         // Border
         g.lineStyle(1.5, COL_UI_BORDER, 0.75);

@@ -8,7 +8,7 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     type:            Phaser.AUTO,
     width:           GAME_WIDTH,
     height:          GAME_HEIGHT,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#7ec4ee',
     pixelArt:        false,   // smooth geometry shapes
     roundPixels:     false,
     parent:          'game-container',

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
-import { AVATAR_SIZE, DEPTH_AVATAR_BASE, DEPTH_SHADOW, FONT, COL_TRIM } from '../../game/constants';
+import { DEPTH_SHADOW, FONT, COL_TRIM } from '../../game/constants';
 import { SoundManager } from './SoundManager';
+import { SIM_NAME_STYLE, syncSimSprite } from '../../art/actor';
+import { toScreen, worldDepth } from '../../art/iso';
 
 export class StationaryNPC {
     private scene: Phaser.Scene;
@@ -8,10 +10,8 @@ export class StationaryNPC {
     public y: number;
     public name: string;
     private textureKey: string;
-    private auraColor: number;
 
     private shadow!: Phaser.GameObjects.Ellipse;
-    private aura!: Phaser.GameObjects.Ellipse;
     private sprite!: Phaser.GameObjects.Image;
     private nameTag!: Phaser.GameObjects.Text;
 
@@ -25,7 +25,7 @@ export class StationaryNPC {
         y: number,
         name: string,
         textureKey: string,
-        auraColor: number,
+        _auraColor: number,
         quotes: string[]
     ) {
         this.scene = scene;
@@ -33,49 +33,36 @@ export class StationaryNPC {
         this.y = y;
         this.name = name;
         this.textureKey = textureKey;
-        this.auraColor = auraColor;
         this.quotes = quotes;
 
         this.build();
     }
 
     private build(): void {
-        const r = AVATAR_SIZE;
-
-        // Shadow
+        const here = toScreen(this.x, this.y);
         this.shadow = this.scene.add
-            .ellipse(this.x, this.y + r - 2, r * 2, r * 0.8, 0x000000, 0.30)
+            .ellipse(here.x, here.y, 24, 10, 0x1a2410, 0.32)
             .setDepth(DEPTH_SHADOW);
 
-        // Aura glow
-        this.aura = this.scene.add
-            .ellipse(this.x, this.y - 2, r * 2.3, r * 2.75, this.auraColor, 0.08)
-            .setDepth(DEPTH_AVATAR_BASE - 2)
-            .setBlendMode(Phaser.BlendModes.ADD);
-
-        // Chibi Sprite
-        this.sprite = this.scene.add.image(this.x, this.y, this.textureKey);
-        this.sprite.setOrigin(0.5, 0.72);
-        this.sprite.setDisplaySize(30, 44);
-        this.sprite.setDepth(DEPTH_AVATAR_BASE);
-
-        // Name tag
+        this.sprite = this.scene.add.image(here.x, here.y, this.textureKey);
         this.nameTag = this.scene.add
-            .text(this.x, this.y - r * 2.2, this.name, {
-                fontFamily: FONT,
-                fontSize: '10px',
-                color: '#f0e6d3',
-                fontStyle: 'bold',
-            })
-            .setOrigin(0.5, 1)
-            .setDepth(DEPTH_AVATAR_BASE + 3);
+            .text(here.x, here.y, this.name, SIM_NAME_STYLE)
+            .setOrigin(0.5, 1);
+        this.place();
+    }
 
-        // Apply depth sort sorting based on y-coordinate
-        const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
-        this.shadow.setDepth(depth - 5);
-        this.aura.setDepth(depth - 2);
-        this.sprite.setDepth(depth);
-        this.nameTag.setDepth(depth + 3);
+    private place(): void {
+        syncSimSprite({
+            sprite: this.sprite,
+            shadow: this.shadow,
+            nameTag: this.nameTag,
+            x: this.x,
+            y: this.y,
+            bob: 0,
+            outfit: this.textureKey,
+            facing: 'down',
+            frame: 0,
+        });
     }
 
     public interact(customQuote?: string): void {
@@ -121,10 +108,11 @@ export class StationaryNPC {
 
         text.setPosition(0, -1);
 
-        const bx = this.x;
-        const by = this.y - AVATAR_SIZE * 2.2 - bh / 2 - 4;
+        const here = toScreen(this.x, this.y);
+        const bx = here.x;
+        const by = here.y - 112 - bh / 2;
 
-        const depth = DEPTH_AVATAR_BASE + this.y * 0.1;
+        const depth = worldDepth(this.x, this.y);
 
         this.activeBubble = this.scene.add.container(bx, by, [bubbleGfx, text])
             .setDepth(depth + 10)
@@ -165,17 +153,7 @@ export class StationaryNPC {
     public setPosition(x: number, y: number): void {
         this.x = x;
         this.y = y;
-        const r = AVATAR_SIZE;
-        this.shadow.setPosition(x, y + r - 2);
-        this.aura.setPosition(x, y - 2);
-        this.sprite.setPosition(x, y);
-        this.nameTag.setPosition(x, y - r * 2.2);
-
-        const depth = DEPTH_AVATAR_BASE + y * 0.1;
-        this.shadow.setDepth(depth - 5);
-        this.aura.setDepth(depth - 2);
-        this.sprite.setDepth(depth);
-        this.nameTag.setDepth(depth + 3);
+        this.place();
     }
 
     public destroy(): void {
@@ -186,7 +164,6 @@ export class StationaryNPC {
             this.bubbleTimer.remove();
         }
         this.shadow.destroy();
-        this.aura.destroy();
         this.sprite.destroy();
         this.nameTag.destroy();
     }

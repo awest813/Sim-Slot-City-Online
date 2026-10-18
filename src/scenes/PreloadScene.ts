@@ -8,6 +8,8 @@ import {
     FONT, ANIM_MED, ANIM_SLOW,
 } from '../game/constants';
 import { GameState } from '../core/state/GameState';
+import { paintTitleBackdrop } from '../art/lot';
+import { bakeAllSimsArt } from '../art/bake';
 
 // ── PreloadScene ──────────────────────────────────────────────────────────────
 
@@ -37,113 +39,8 @@ export class PreloadScene extends Phaser.Scene {
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
 
-        // ── Deep multi-layer background ──────────────────────────────────────
-        const bgGfx = this.add.graphics();
+        paintTitleBackdrop(this);
 
-        // Base fill
-        bgGfx.fillStyle(0x050b16, 1);
-        bgGfx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-        // Radial gradient simulation — concentric circles from center outward
-        bgGfx.fillStyle(0x0a1830, 0.55);
-        bgGfx.fillCircle(cx, cy, 500);
-        bgGfx.fillStyle(0x0c1e38, 0.35);
-        bgGfx.fillCircle(cx, cy, 360);
-        bgGfx.fillStyle(0x0e2040, 0.20);
-        bgGfx.fillCircle(cx, cy, 240);
-        bgGfx.fillStyle(0x102248, 0.12);
-        bgGfx.fillCircle(cx, cy, 140);
-        bgGfx.fillStyle(0x122448, 0.08);
-        bgGfx.fillCircle(cx, cy, 70);
-        // 3 additional inner layers for smoother centre transition
-        bgGfx.fillStyle(0x162040, 0.06);
-        bgGfx.fillCircle(cx, cy, 50);
-        bgGfx.fillStyle(0x1a2a4a, 0.04);
-        bgGfx.fillCircle(cx, cy, 32);
-        bgGfx.fillStyle(0xc9a84c, 0.02);  // warm gold tint at very centre
-        bgGfx.fillCircle(cx, cy, 18);
-
-
-
-        // Diagonal diamond-grid carpet pattern
-        bgGfx.lineStyle(0.5, COL_TRIM_DIM, 0.07);
-        const gs = 60;
-        for (let x = 0; x < GAME_WIDTH + gs; x += gs) {
-            bgGfx.lineBetween(x - gs / 2, 0, x + gs / 2, GAME_HEIGHT);
-            bgGfx.lineBetween(x + gs / 2, 0, x - gs / 2, GAME_HEIGHT);
-        }
-
-        // Neon skyline silhouette
-        const skylineBase = GAME_HEIGHT - 110;
-        const skylineBars = [
-            [26, 72], [64, 118], [112, 86], [150, 146], [204, 98], [252, 126], [304, 92],
-            [360, 166], [420, 104], [474, 136], [536, 96], [588, 152], [650, 112], [706, 134],
-            [764, 90], [816, 146], [874, 80],
-        ];
-        bgGfx.fillStyle(0x08101e, 0.95);
-        for (const [sx, h] of skylineBars) {
-            bgGfx.fillRect(sx, skylineBase - h, 28, h);
-            bgGfx.fillStyle(0xc9a84c, 0.08);
-            bgGfx.fillRect(sx + 8, skylineBase - h + 12, 4, h - 22);
-            bgGfx.fillRect(sx + 16, skylineBase - h + 24, 4, h - 34);
-            bgGfx.fillStyle(0x08101e, 0.95);
-        }
-        bgGfx.fillStyle(0x0b1324, 1);
-        bgGfx.fillRect(0, skylineBase, GAME_WIDTH, GAME_HEIGHT - skylineBase);
-
-        // Outer frames — nested gold rectangles
-        bgGfx.lineStyle(1, COL_UI_BORDER, 0.25);
-        bgGfx.strokeRect(10, 10, GAME_WIDTH - 20, GAME_HEIGHT - 20);
-        bgGfx.lineStyle(1, COL_UI_BORDER, 0.15);
-        bgGfx.strokeRect(16, 16, GAME_WIDTH - 32, GAME_HEIGHT - 32);
-        bgGfx.lineStyle(0.5, COL_UI_BORDER, 0.08);
-        bgGfx.strokeRect(22, 22, GAME_WIDTH - 44, GAME_HEIGHT - 44);
-
-        // Decorative dot row between frames
-        bgGfx.lineStyle(1, COL_TRIM, 0.12);
-        for (let dx = 30; dx < GAME_WIDTH - 30; dx += 10) {
-            bgGfx.fillStyle(COL_TRIM, 0.08);
-            bgGfx.fillRect(dx, 13, 2, 2);
-            bgGfx.fillRect(dx, GAME_HEIGHT - 15, 2, 2);
-        }
-
-        // Corner ornaments — elaborate L-shapes with diamond + 3 diagonals
-        const orn = 40;   // longer arms
-        const orn2 = 14;
-        const ornOff = 10;
-        const corners: Array<[number, number]> = [
-            [ornOff, ornOff],
-            [GAME_WIDTH - ornOff, ornOff],
-            [ornOff, GAME_HEIGHT - ornOff],
-            [GAME_WIDTH - ornOff, GAME_HEIGHT - ornOff],
-        ];
-        corners.forEach(([ox, oy]) => {
-            const sx = ox < GAME_WIDTH / 2 ? 1 : -1;
-            const sy = oy < GAME_HEIGHT / 2 ? 1 : -1;
-            // Main L-shape arms (longer)
-            bgGfx.lineStyle(1.5, COL_TRIM, 0.7);
-            bgGfx.lineBetween(ox, oy, ox + sx * orn, oy);
-            bgGfx.lineBetween(ox, oy, ox, oy + sy * orn);
-            // Secondary inner L-shape
-            bgGfx.lineStyle(1, COL_TRIM, 0.4);
-            bgGfx.lineBetween(ox + sx * orn2, oy + sy * 4, ox + sx * orn2, oy + sy * orn2);
-            bgGfx.lineBetween(ox + sx * 4, oy + sy * orn2, ox + sx * orn2, oy + sy * orn2);
-            // Diagonal accent 1: corner to arm-end
-            bgGfx.lineStyle(0.5, COL_TRIM, 0.3);
-            bgGfx.lineBetween(ox + sx * 8, oy + sy * 8, ox + sx * orn, oy + sy * orn);
-            // Diagonal accent 2: short cross inside the corner notch
-            bgGfx.lineStyle(0.5, COL_TRIM, 0.2);
-            bgGfx.lineBetween(ox + sx * 14, oy + sy * 6, ox + sx * 6, oy + sy * 14);
-            // Filled diamond at the corner tip (single polygon)
-            const ds = 4;
-            bgGfx.fillStyle(COL_TRIM, 0.8);
-            bgGfx.fillPoints([
-                { x: ox,      y: oy - ds },
-                { x: ox + ds, y: oy      },
-                { x: ox,      y: oy + ds },
-                { x: ox - ds, y: oy      },
-            ], true);
-        });
 
         // ── Slot emoji logo with glow ────────────────────────────────────────
         const logoY = cy - 148;
@@ -255,8 +152,8 @@ export class PreloadScene extends Phaser.Scene {
         const pillY = cy - 16;
 
         // Persistent tooltip text centered below feature pills
-        const tooltipText = this.add.text(cx, pillY + pillH + 12, 'Hover over any game to learn more!', {
-            fontFamily: FONT, fontSize: '10px', color: '#4a6070', fontStyle: 'bold',
+        const tooltipText = this.add.text(cx, pillY + pillH + 10, '', {
+            fontFamily: FONT, fontSize: '10px', color: '#d5eee6', fontStyle: 'bold',
         }).setOrigin(0.5);
 
         features.forEach((f, i) => {
@@ -294,7 +191,7 @@ export class PreloadScene extends Phaser.Scene {
             }).setOrigin(0.5, 0);
 
             const labelText = this.add.text(0, -pillH / 2 + 27, f.label, {
-                fontFamily: FONT, fontSize: '8px', color: '#888888', fontStyle: 'bold',
+                fontFamily: FONT, fontSize: '8px', color: '#d5eee6', fontStyle: 'bold',
             }).setOrigin(0.5, 0);
 
             pillContainer.add([pGfx, iconText, labelText]);
@@ -318,7 +215,7 @@ export class PreloadScene extends Phaser.Scene {
             hitArea.on('pointerout', () => {
                 drawPill(false);
                 labelText.setColor('#888888');
-                tooltipText.setText('Hover over any game to learn more!').setColor('#4a6070');
+                tooltipText.setText('').setColor('#d5eee6');
                 this.tweens.add({
                     targets: pillContainer,
                     scaleX: 1.0,
@@ -349,12 +246,7 @@ export class PreloadScene extends Phaser.Scene {
         this.load.image('suit_C', 'assets/cards/clubs.png');
         this.load.image('suit_D', 'assets/cards/diamonds.png');
 
-        // Avatars
-        this.load.image('avatar_player', 'assets/avatars/avatar_player.png');
-        this.load.image('avatar_ai_male', 'assets/avatars/avatar_ai_male.png');
-        this.load.image('avatar_ai_female', 'assets/avatars/avatar_ai_female.png');
-        this.load.image('avatar_ai_vip', 'assets/avatars/avatar_ai_vip.png');
-        this.load.image('avatar_showgirl', 'assets/avatars/avatar_showgirl.png');
+        // People are painted in create() — original isometric sprites, not the old portraits.
 
         // Asset loading progress bar — soft glow behind narrow bar
         const barBg = this.add.graphics();
@@ -380,6 +272,7 @@ export class PreloadScene extends Phaser.Scene {
     // ── create ───────────────────────────────────────────────────────────────
 
     create(): void {
+        bakeAllSimsArt(this);
         const cx = GAME_WIDTH  / 2;
         const cy = GAME_HEIGHT / 2;
 
@@ -412,11 +305,10 @@ export class PreloadScene extends Phaser.Scene {
 
         // ── Avatar Skin Selection section (Left Column) ──────────────────────
         const cxLeft = cx - 160;
-        const inputSectionY = cy + 44;
+        const inputSectionY = cy + 64;
         
-        this.add.text(cxLeft, inputSectionY, 'SELECT YOUR COSMETIC SKIN', {
-            fontFamily: FONT, fontSize: '10px', color: '#7090a0', fontStyle: 'bold',
-            letterSpacing: 4,
+        this.add.text(cxLeft, inputSectionY, 'PICK A SIM', {
+            fontFamily: FONT, fontSize: '11px', color: '#e7fff6', fontStyle: 'bold',
         }).setOrigin(0.5);
 
         this.skinButtonsGfx = this.add.graphics();
@@ -438,13 +330,13 @@ export class PreloadScene extends Phaser.Scene {
 
             // Avatar sprite image
             const img = this.add.image(bx, selectY + 3, s.key);
-            img.setOrigin(0.5, 0.5);
-            img.setDisplaySize(25, 36);
+            img.setOrigin(0.5, 0.85);
+            img.setScale(0.42);
             this.skinImages.push(img);
 
             // Small text label underneath avatar
             const labelText = this.add.text(bx, selectY + 28, s.label, {
-                fontFamily: FONT, fontSize: '8px', color: '#4a6070', fontStyle: 'bold',
+                fontFamily: FONT, fontSize: '8px', color: '#d5eee6', fontStyle: 'bold',
             }).setOrigin(0.5);
 
             // Invisible interactive click zone
@@ -454,12 +346,12 @@ export class PreloadScene extends Phaser.Scene {
             hit.on('pointerover', () => {
                 if (this.selectedSkinKey !== s.key) {
                     labelText.setColor('#c9a84c');
-                    this.tweens.add({
-                        targets: img,
-                        scaleX: 1.15,
-                        scaleY: 1.15,
-                        duration: 120,
-                    });
+                this.tweens.add({
+                    targets: img,
+                    scaleX: 0.48,
+                    scaleY: 0.48,
+                    duration: 120,
+                });
                 }
             });
 
@@ -467,8 +359,8 @@ export class PreloadScene extends Phaser.Scene {
                 labelText.setColor(this.selectedSkinKey === s.key ? '#ffd700' : '#4a6070');
                 this.tweens.add({
                     targets: img,
-                    scaleX: 1.0,
-                    scaleY: 1.0,
+                    scaleX: 0.42,
+                    scaleY: 0.42,
                     duration: 120,
                 });
             });
@@ -493,8 +385,8 @@ export class PreloadScene extends Phaser.Scene {
                 // Play scale bounce pop on selected image
                 this.tweens.add({
                     targets: img,
-                    scaleX: [1.35, 1],
-                    scaleY: [1.35, 1],
+                    scaleX: [0.55, 0.42],
+                    scaleY: [0.55, 0.42],
                     duration: 200,
                     ease: 'Back.easeOut'
                 });
@@ -506,9 +398,8 @@ export class PreloadScene extends Phaser.Scene {
         // ── Name entry section (Right Column) ─────────────────────────────
         const cxRight = cx + 160;
 
-        this.add.text(cxRight, inputSectionY, 'CHOOSE YOUR PLAYER NAME', {
-            fontFamily: FONT, fontSize: '10px', color: '#7090a0', fontStyle: 'bold',
-            letterSpacing: 4,
+        this.add.text(cxRight, inputSectionY, 'YOUR NAME', {
+            fontFamily: FONT, fontSize: '11px', color: '#e7fff6', fontStyle: 'bold',
         }).setOrigin(0.5);
 
         // Input border (drawn via Graphics so we can animate it)
@@ -604,14 +495,14 @@ export class PreloadScene extends Phaser.Scene {
             }).setOrigin(0, 0.5);
 
             this.add.text(kx + 70, ky, desc, {
-                fontFamily: FONT, fontSize: '10px', color: '#445566',
+                fontFamily: FONT, fontSize: '10px', color: '#d5eee6',
             }).setOrigin(0, 0.5);
         });
 
         // Chips hint
         this.add.text(cx, refY + 60,
             'Start with 1,000 ◈ chips  ·  Poker buy-in 500 ◈  ·  Slots from 10 ◈  ·  Free reload when broke', {
-            fontFamily: FONT, fontSize: '9px', color: '#4a6070',
+            fontFamily: FONT, fontSize: '9px', color: '#d5eee6',
         }).setOrigin(0.5);
 
         // ── Keyboard input ────────────────────────────────────────────────
@@ -672,7 +563,7 @@ export class PreloadScene extends Phaser.Scene {
         const x1 = cx - 210;
         const y1 = GAME_HEIGHT;
         const angle1 = -0.35 + angle;
-        g.fillStyle(0x40b0ff, 0.055);
+        g.fillStyle(0xfff6d0, 0.05);
         g.fillTriangle(
             x1, y1,
             x1 + Math.cos(angle1 - 0.07) * 480, y1 + Math.sin(angle1 - 0.07) * 480,
@@ -683,7 +574,7 @@ export class PreloadScene extends Phaser.Scene {
         const x2 = cx + 210;
         const y2 = GAME_HEIGHT;
         const angle2 = -Math.PI + 0.35 - angle;
-        g.fillStyle(0xff40a0, 0.045);
+        g.fillStyle(0xfff6d0, 0.04);
         g.fillTriangle(
             x2, y2,
             x2 + Math.cos(angle2 - 0.07) * 480, y2 + Math.sin(angle2 - 0.07) * 480,
@@ -708,7 +599,7 @@ export class PreloadScene extends Phaser.Scene {
         const cx = GAME_WIDTH / 2;
         const cxLeft = cx - 160;
         const cy = GAME_HEIGHT / 2;
-        const inputSectionY = cy + 44;
+        const inputSectionY = cy + 64;
         const selectY = inputSectionY + 42;
         const spacing = 58;
 
@@ -747,7 +638,7 @@ export class PreloadScene extends Phaser.Scene {
     private drawInputBorder(focused: boolean): void {
         const cx = GAME_WIDTH / 2 + 160;
         const cy = GAME_HEIGHT / 2;
-        const inputSectionY = cy + 44;
+        const inputSectionY = cy + 64;
         const g = this.inputBorderGfx;
         g.clear();
 
@@ -783,7 +674,7 @@ export class PreloadScene extends Phaser.Scene {
     private drawStartButton(hover: boolean): void {
         const cx = GAME_WIDTH / 2 + 160;
         const cy = GAME_HEIGHT / 2;
-        const inputSectionY = cy + 44;
+        const inputSectionY = cy + 64;
         const btnY = inputSectionY + 74;
         const btnW = 280;
         const btnH = 48;
@@ -840,7 +731,7 @@ export class PreloadScene extends Phaser.Scene {
     private spawnTypeSparkle(): void {
         const cx = GAME_WIDTH / 2;
         const cy = GAME_HEIGHT / 2;
-        const inputSectionY = cy + 44;
+        const inputSectionY = cy + 64;
         
         const colors = [0xc9a84c, 0x00c8ff, 0xff40a0, 0x40ff80];
         const count = 4;

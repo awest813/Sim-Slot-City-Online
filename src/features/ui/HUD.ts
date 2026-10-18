@@ -255,10 +255,10 @@ export class HUD {
 
         const drawMuteBtn = (hover: boolean): void => {
             this.muteGfx.clear();
-            this.muteGfx.fillStyle(hover ? 0x2a2a3a : 0x141420, 0.88);
-            this.muteGfx.fillRoundedRect(muteX, muteY, muteSize, muteSize, 5);
-            this.muteGfx.lineStyle(1, 0x445566, 0.55);
-            this.muteGfx.strokeRoundedRect(muteX, muteY, muteSize, muteSize, 5);
+            this.muteGfx.fillStyle(hover ? 0x1faf98 : 0x14786c, 0.95);
+            this.muteGfx.fillRoundedRect(muteX, muteY, muteSize, muteSize, 8);
+            this.muteGfx.lineStyle(1.5, 0xd8ffe8, 0.8);
+            this.muteGfx.strokeRoundedRect(muteX, muteY, muteSize, muteSize, 8);
         };
         drawMuteBtn(false);
         this.muteLabel.setText(SoundManager.isMuted() ? '🔇' : '🔊');
@@ -298,10 +298,10 @@ export class HUD {
 
         const drawStatsBtn = (hover: boolean): void => {
             this.statsBtnGfx.clear();
-            this.statsBtnGfx.fillStyle(hover ? 0x2a2a3a : 0x141420, 0.88);
-            this.statsBtnGfx.fillRoundedRect(statsX, statsY, statsSize, statsSize, 5);
-            this.statsBtnGfx.lineStyle(1, 0x445566, 0.55);
-            this.statsBtnGfx.strokeRoundedRect(statsX, statsY, statsSize, statsSize, 5);
+            this.statsBtnGfx.fillStyle(hover ? 0x1faf98 : 0x14786c, 0.95);
+            this.statsBtnGfx.fillRoundedRect(statsX, statsY, statsSize, statsSize, 8);
+            this.statsBtnGfx.lineStyle(1.5, 0xd8ffe8, 0.8);
+            this.statsBtnGfx.strokeRoundedRect(statsX, statsY, statsSize, statsSize, 8);
         };
         drawStatsBtn(false);
 

@@ -2,8 +2,8 @@
 import Phaser from 'phaser';
 import {
     GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL,
-    COL_UI_BG, COL_UI_BG2, COL_UI_BORDER, COL_TRIM,
-    FONT, ANIM_MED, PANEL_RADIUS, COL_NEON_BLUE, COL_NEON_PINK,
+    COL_UI_BORDER, COL_TRIM,
+    FONT, ANIM_MED, PANEL_RADIUS,
 } from '../../game/constants';
 
 export interface ButtonConfig {
@@ -76,128 +76,37 @@ export class Panel {
 
         const px = cx - this.w / 2;
         const py = cy - this.h / 2;
+        const r = PANEL_RADIUS;
 
-        // ── 3-layer blur-simulated drop shadow ────────────────────────────
-        g.fillStyle(0x000000, 0.22);
-        g.fillRoundedRect(px + 12, py + 16, this.w, this.h, PANEL_RADIUS + 4);
-        g.fillStyle(0x000000, 0.38);
-        g.fillRoundedRect(px + 7,  py + 10, this.w, this.h, PANEL_RADIUS + 3);
-        g.fillStyle(0x000000, 0.55);
-        g.fillRoundedRect(px + 4,  py + 6,  this.w, this.h, PANEL_RADIUS + 2);
+        // Soft drop shadow
+        g.fillStyle(0x06362f, 0.35);
+        g.fillRoundedRect(px + 5, py + 8, this.w, this.h, r);
 
-        // ── 4-layer border glow (outermost first) ─────────────────────────
-        g.lineStyle(12, COL_UI_BORDER, 0.04);
-        g.strokeRoundedRect(px - 4, py - 4, this.w + 8, this.h + 8, PANEL_RADIUS + 5);
-        g.lineStyle(8, COL_UI_BORDER, 0.06);
-        g.strokeRoundedRect(px - 2, py - 2, this.w + 4, this.h + 4, PANEL_RADIUS + 3);
+        // Bright plastic shell
+        g.fillStyle(0x178f7c, 1);
+        g.fillRoundedRect(px, py, this.w, this.h, r);
+        g.fillStyle(0xb8ffe8, 0.55);
+        g.fillRoundedRect(px + 3, py + 3, this.w - 6, 16, 8);
+        g.fillStyle(0x0c6e60, 1);
+        g.fillRoundedRect(px, py + this.h - 14, this.w, 14, { tl: 0, tr: 0, bl: r, br: r });
 
-        // Main background with sleek gradient
-        g.fillGradientStyle(0x182436, 0x182436, 0x0a101a, 0x0a101a, 0.95, 0.95, 0.98, 0.98);
-        g.fillRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
-        g.fillStyle(COL_NEON_BLUE, 0.05);
-        g.fillCircle(cx - this.w * 0.2, cy - this.h * 0.15, this.w * 0.28);
-        g.fillStyle(COL_NEON_PINK, 0.05);
-        g.fillCircle(cx + this.w * 0.22, cy + this.h * 0.12, this.w * 0.24);
+        // Dark well so existing light type stays readable
+        g.fillStyle(0x102e2a, 1);
+        g.fillRoundedRect(px + 10, py + 10, this.w - 20, this.h - 20, r - 6);
 
-        // Center highlight simulation
-        g.fillStyle(0x0d1830, 0.6);
-        g.fillCircle(cx, cy - 30, this.w * 0.42);
-        g.fillStyle(COL_UI_BG, 0.78);
-        g.fillRoundedRect(px + 4, py + 4, this.w - 8, this.h - 8, PANEL_RADIUS - 2);
+        // Header band
+        g.fillStyle(0x14685c, 1);
+        g.fillRoundedRect(px + 10, py + 10, this.w - 20, 44, { tl: r - 6, tr: r - 6, bl: 0, br: 0 });
+        g.fillStyle(0xffffff, 0.12);
+        g.fillRoundedRect(px + 14, py + 12, this.w - 28, 10, 5);
 
-        // Vertical panel bands for a glass-casino feel
-        g.fillStyle(0xffffff, 0.025);
-        g.fillRoundedRect(px + 24, py + 18, 22, this.h - 36, 8);
-        g.fillRoundedRect(px + this.w - 46, py + 18, 22, this.h - 36, 8);
-        g.fillStyle(COL_NEON_BLUE, 0.06);
-        g.fillRoundedRect(px + 30, py + 26, 8, this.h - 52, 6);
-        g.fillStyle(COL_NEON_PINK, 0.05);
-        g.fillRoundedRect(px + this.w - 38, py + 26, 8, this.h - 52, 6);
+        g.lineStyle(2, 0xd8ffe8, 0.85);
+        g.strokeRoundedRect(px, py, this.w, this.h, r);
+        g.lineStyle(1, 0x06362f, 0.45);
+        g.strokeRoundedRect(px + 10, py + 10, this.w - 20, this.h - 20, r - 6);
 
-        // Top header band
-        g.fillStyle(COL_UI_BG2, 1);
-        g.fillRoundedRect(px, py, this.w, 54, { tl: PANEL_RADIUS, tr: PANEL_RADIUS, bl: 0, br: 0 });
-        // Header inner highlight
-        g.fillStyle(0x1a2840, 0.4);
-        g.fillRoundedRect(px + 2, py + 2, this.w - 4, 24, { tl: PANEL_RADIUS - 1, tr: PANEL_RADIUS - 1, bl: 0, br: 0 });
-        // Diagonal sheen stripe — thin triangle at top-right for a polished glint
-        g.fillStyle(0xffffff, 0.05);
-        g.fillTriangle(
-            px + this.w - PANEL_RADIUS - 72, py + 1,
-            px + this.w - PANEL_RADIUS - 2,  py + 1,
-            px + this.w - PANEL_RADIUS - 2,  py + 46,
-        );
-        g.fillStyle(0xffffff, 0.03);
-        g.fillTriangle(
-            px + PANEL_RADIUS + 2, py + 1,
-            px + PANEL_RADIUS + 56, py + 1,
-            px + PANEL_RADIUS + 2, py + 36,
-        );
-
-        // Gold border — main
-        g.lineStyle(2, COL_UI_BORDER, 0.9);
-        g.strokeRoundedRect(px, py, this.w, this.h, PANEL_RADIUS);
-        // Inner border for depth
-        g.lineStyle(1, COL_UI_BORDER, 0.2);
-        g.strokeRoundedRect(px + 3, py + 3, this.w - 6, this.h - 6, PANEL_RADIUS - 1);
-
-        // ── Double-track divider (header/content) ─────────────────────────
-        g.lineStyle(2, COL_TRIM, 0.7);
-        g.lineBetween(px + PANEL_RADIUS, py + 54, px + this.w - PANEL_RADIUS, py + 54);
-        // Inner track line 2 px below at half opacity
-        g.lineStyle(1, COL_TRIM, 0.35);
-        g.lineBetween(px + PANEL_RADIUS, py + 56, px + this.w - PANEL_RADIUS, py + 56);
-        // Faint third line for extra depth
-        g.lineStyle(0.5, COL_TRIM, 0.15);
-        g.lineBetween(px + PANEL_RADIUS + 8, py + 59, px + this.w - PANEL_RADIUS - 8, py + 59);
-
-        // ── Corner ornaments — primary + secondary L-shapes + diamond dots ─
-        const orn     = 12;
-        const ornPad  = PANEL_RADIUS + 4;
-        const ornInset = 2;
-        const op2      = ornPad + ornInset;
-        const orn2     = orn - 3;
-
-        // Primary L-shapes
-        g.lineStyle(1, COL_TRIM, 0.35);
-        g.lineBetween(px + ornPad,          py + ornPad,          px + ornPad + orn,      py + ornPad);
-        g.lineBetween(px + ornPad,          py + ornPad,          px + ornPad,            py + ornPad + orn);
-        g.lineBetween(px + this.w - ornPad, py + ornPad,          px + this.w - ornPad - orn, py + ornPad);
-        g.lineBetween(px + this.w - ornPad, py + ornPad,          px + this.w - ornPad,   py + ornPad + orn);
-        g.lineBetween(px + ornPad,          py + this.h - ornPad, px + ornPad + orn,      py + this.h - ornPad);
-        g.lineBetween(px + ornPad,          py + this.h - ornPad, px + ornPad,            py + this.h - ornPad - orn);
-        g.lineBetween(px + this.w - ornPad, py + this.h - ornPad, px + this.w - ornPad - orn, py + this.h - ornPad);
-        g.lineBetween(px + this.w - ornPad, py + this.h - ornPad, px + this.w - ornPad,   py + this.h - ornPad - orn);
-
-        // Secondary inset L-shapes (2 px inward, lower opacity)
-        g.lineStyle(1, COL_TRIM, 0.16);
-        g.lineBetween(px + op2,             py + op2,             px + op2 + orn2,        py + op2);
-        g.lineBetween(px + op2,             py + op2,             px + op2,               py + op2 + orn2);
-        g.lineBetween(px + this.w - op2,    py + op2,             px + this.w - op2 - orn2, py + op2);
-        g.lineBetween(px + this.w - op2,    py + op2,             px + this.w - op2,      py + op2 + orn2);
-        g.lineBetween(px + op2,             py + this.h - op2,    px + op2 + orn2,        py + this.h - op2);
-        g.lineBetween(px + op2,             py + this.h - op2,    px + op2,               py + this.h - op2 - orn2);
-        g.lineBetween(px + this.w - op2,    py + this.h - op2,    px + this.w - op2 - orn2, py + this.h - op2);
-        g.lineBetween(px + this.w - op2,    py + this.h - op2,    px + this.w - op2,      py + this.h - op2 - orn2);
-
-        // Diamond dots at each primary L-junction
-        const dotR = 2;
-        const dotPositions: Array<[number, number]> = [
-            [px + ornPad,           py + ornPad],
-            [px + this.w - ornPad,  py + ornPad],
-            [px + ornPad,           py + this.h - ornPad],
-            [px + this.w - ornPad,  py + this.h - ornPad],
-        ];
-        g.fillStyle(COL_TRIM, 0.5);
-        for (const [dx, dy] of dotPositions) {
-            g.fillRect(dx - dotR, dy - dotR, dotR * 2, dotR * 2);
-        }
-
-        // Bottom deco rails
-        g.lineStyle(2, COL_NEON_BLUE, 0.12);
-        g.lineBetween(px + 24, py + this.h - 20, px + this.w / 2 - 44, py + this.h - 20);
-        g.lineStyle(2, COL_NEON_PINK, 0.12);
-        g.lineBetween(px + this.w / 2 + 44, py + this.h - 20, px + this.w - 24, py + this.h - 20);
+        g.lineStyle(2, COL_TRIM, 0.55);
+        g.lineBetween(px + 22, py + 54, px + this.w - 22, py + 54);
     }
 
     addTitle(text: string): void {
