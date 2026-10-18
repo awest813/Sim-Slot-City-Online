@@ -46,6 +46,12 @@ const ZONE_LABELS: Record<Zone, string> = {
 };
 
 const FREE_CHIPS_AMOUNT = 500;
+const PLAYER_BAR_W = 276;
+const PLAYER_BAR_H = 58;
+
+function portraitTexture(avatarKey: string | undefined): string {
+    return `portrait_${avatarKey || 'avatar_player'}`;
+}
 
 export class HUD {
     private scene: Phaser.Scene;
@@ -54,6 +60,8 @@ export class HUD {
     private playerGfx!: Phaser.GameObjects.Graphics;
     private nameText!: Phaser.GameObjects.Text;
     private chipsText!: Phaser.GameObjects.Text;
+    private portrait!: Phaser.GameObjects.Image;
+    private portraitKey = '';
 
     // Zone badge (top-right)
     private zoneGfx!: Phaser.GameObjects.Graphics;
@@ -100,8 +108,8 @@ export class HUD {
 
     private build(): void {
         // ── Player info bar (top-left) ─────────────────────────────────────
-        const barW = 220;
-        const barH = 48;
+        const barW = PLAYER_BAR_W;
+        const barH = PLAYER_BAR_H;
         const barX = 0;
         const barY = 0;
 
@@ -118,7 +126,15 @@ export class HUD {
         this.drawPlayerBar(false);
 
         // Player star icon + name
-        this.nameText = this.scene.add.text(barX + 14, barY + 13, '', {
+        const portraitKey = portraitTexture(GameState.get().avatarTextureKey);
+        this.portrait = this.scene.add.image(8, 6, portraitKey)
+            .setOrigin(0, 0)
+            .setDisplaySize(40, 46)
+            .setScrollFactor(0)
+            .setDepth(DEPTH_HUD + 2);
+        this.portraitKey = portraitKey;
+
+        this.nameText = this.scene.add.text(barX + 56, barY + 16, '', {
             fontFamily: FONT, fontSize: '10px', color: '#c9a84c', fontStyle: 'bold',
         })
             .setScrollFactor(0)
@@ -126,7 +142,7 @@ export class HUD {
             .setOrigin(0, 0.5);
 
         // Chip counter — larger text with drop shadow
-        this.chipsText = this.scene.add.text(barX + 42, barY + 33, '', {
+        this.chipsText = this.scene.add.text(barX + 74, barY + 40, '', {
             fontFamily: FONT, fontSize: '14px', color: '#2ecc71', fontStyle: 'bold',
             shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 3, fill: true },
         })
@@ -135,7 +151,7 @@ export class HUD {
             .setOrigin(0, 0.5);
 
         // Session P&L — small text to the right of the chip counter
-        this.plText = this.scene.add.text(barX + barW - 8, barY + 33, '', {
+        this.plText = this.scene.add.text(barX + barW - 8, barY + 40, '', {
             fontFamily: FONT, fontSize: '10px', color: '#556677',
         })
             .setScrollFactor(0)
@@ -233,7 +249,7 @@ export class HUD {
 
         // ── Sound mute toggle (top-left, to the right of player bar) ──────
         const muteSize = 28;
-        const muteX = 228;
+        const muteX = PLAYER_BAR_W + 8;
         const muteY = 8;
 
         this.muteGfx = this.scene.add.graphics()
@@ -276,7 +292,7 @@ export class HUD {
 
         // ── Stats/Menu button (top-left, next to mute button) ──────────────
         const statsSize = 28;
-        const statsX = 262;
+        const statsX = PLAYER_BAR_W + 42;
         const statsY = 8;
 
         this.statsBtnGfx = this.scene.add.graphics()
@@ -336,8 +352,8 @@ export class HUD {
 
     private drawPlayerBar(chipFlash: boolean, flashGain = false): void {
         const g = this.playerGfx;
-        const barW = 220;
-        const barH = 48;
+        const barW = PLAYER_BAR_W;
+        const barH = PLAYER_BAR_H;
         g.clear();
 
         // Outer glow halo at low opacity
@@ -352,9 +368,14 @@ export class HUD {
         g.fillStyle(COL_UI_BG, 0.92);
         g.fillRoundedRect(0, 0, barW, barH, { tl: 0, tr: 0, bl: 6, br: 6 });
 
-        // Inner darker section for chips
+        // Portrait well, then the chip readout
+        g.fillStyle(0xfff6e8, 1);
+        g.fillRoundedRect(6, 4, 44, 50, 10);
+        g.lineStyle(1.5, 0x08332e, 0.55);
+        g.strokeRoundedRect(6, 4, 44, 50, 10);
+
         g.fillStyle(COL_UI_BG2, 0.7);
-        g.fillRoundedRect(8, barH / 2 + 4, barW - 16, barH / 2 - 8, 3);
+        g.fillRoundedRect(56, 28, barW - 64, 24, 6);
 
         // Border
         g.lineStyle(1, COL_UI_BORDER, chipFlash ? 0.9 : 0.55);
@@ -365,8 +386,8 @@ export class HUD {
         g.lineBetween(0, barH - 1, barW, barH - 1);
 
         // ── Detailed chip icon (gold circle + cross-hatch lines) ──────────
-        const iconX = 26;
-        const iconY = barH / 2 + 6;
+        const iconX = 68;
+        const iconY = 40;
         const iconR = 8;
         // Outer ring
         g.fillStyle(0xc9a84c, 0.9);
@@ -477,7 +498,12 @@ export class HUD {
 
     private refresh(s: PlayerState): void {
         this.nameText.setText(`★ ${s.displayName}  [${getPlayerTitle(s.chips)}]`);
-        this.chipsText.setText(`◈ ${s.chips.toLocaleString()} chips`);
+        this.chipsText.setText(s.chips.toLocaleString());
+        const nextPortrait = portraitTexture(s.avatarTextureKey);
+        if (nextPortrait !== this.portraitKey && this.scene.textures.exists(nextPortrait)) {
+            this.portrait.setTexture(nextPortrait);
+            this.portraitKey = nextPortrait;
+        }
         this.zoneText.setText(ZONE_LABELS[s.zone] ?? s.zone);
 
         // Session P&L display
@@ -568,6 +594,7 @@ export class HUD {
             this.chipFlashTimer = null;
         }
         this.playerGfx.destroy();
+        this.portrait.destroy();
         this.nameText.destroy();
         this.chipsText.destroy();
         this.plText.destroy();

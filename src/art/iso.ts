@@ -7,7 +7,7 @@ import { WORLD_W, WORLD_H } from '../game/constants';
 export const TILE = 40;
 export const ISO_X = 0.8;
 export const ISO_Y = 0.4;
-export const WALL_H = 104;
+export const WALL_H = 152;
 
 /** Shifts the lot so the yard sits in positive screen space. */
 export const ORIGIN_X = 780;
@@ -48,7 +48,8 @@ export interface Bounds {
     h: number;
 }
 
-const YARD = 14 * TILE;
+/** Grass past the walls, in cartesian pixels. Matches the lot painter. */
+export const YARD = 14 * TILE;
 
 export function cameraBounds(): Bounds {
     const pts = [

@@ -8,7 +8,7 @@ import {
     ZONE_PLINKO, ZONE_BINGO, ZONE_HORSES, ZONE_ENTRANCE, ZONE_VIP,
     GAME_WIDTH, GAME_HEIGHT,
 } from '../game/constants';
-import { TILE, WALL_H, cameraBounds, toScreen, worldDepth, type Pt } from './iso';
+import { TILE, WALL_H, YARD, cameraBounds, toScreen, worldDepth, type Pt } from './iso';
 import { diamondTexture, type FloorKind } from './floors';
 import { box, cylinder, hex, scale } from './draw3d';
 import { propOrigin } from './props';
@@ -58,6 +58,7 @@ function wallSegment(
     x1: number, y1: number,
     origin: Pt,
     windowed: boolean,
+    lit: boolean,
 ): void {
     const L = (x: number, y: number, lift = 0): Pt => {
         const s = toScreen(x, y);
@@ -78,7 +79,7 @@ function wallSegment(
     ctx.lineTo(t0.x, t0.y);
     ctx.closePath();
     ctx.clip();
-    ctx.fillStyle = '#f4e6cc';
+    ctx.fillStyle = lit ? '#f6ead2' : '#e4d0b0';
     const minX = Math.min(b0.x, b1.x, t0.x, t1.x) - 2;
     const maxX = Math.max(b0.x, b1.x, t0.x, t1.x) + 2;
     const minY = Math.min(t0.y, t1.y) - 2;
@@ -103,15 +104,31 @@ function wallSegment(
     }
     ctx.restore();
 
-    // baseboard and chair rail
-    const rail0 = L(x0, y0, 16);
-    const rail1 = L(x1, y1, 16);
-    quad(ctx, b0, b1, rail1, rail0, '#6b4228');
-    const cr0 = L(x0, y0, 48);
-    const cr1 = L(x1, y1, 48);
-    const crb0 = L(x0, y0, 44);
-    const crb1 = L(x1, y1, 44);
-    quad(ctx, crb0, crb1, cr1, cr0, '#c4a06a');
+    // Wood wainscot under the chair rail, with a baseboard and panel grooves.
+    const wainTop = 60;
+    const wtA = L(x0, y0, wainTop);
+    const wtB = L(x1, y1, wainTop);
+    quad(ctx, b0, b1, wtB, wtA, lit ? '#c99562' : '#a87448');
+    ctx.strokeStyle = 'rgba(70, 40, 18, 0.4)';
+    ctx.lineWidth = 1;
+    for (const t of [0.33, 0.66]) {
+        const gx = x0 + (x1 - x0) * t;
+        const gy = y0 + (y1 - y0) * t;
+        const a = L(gx, gy, 12);
+        const b = L(gx, gy, wainTop - 4);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+    }
+    const rail0 = L(x0, y0, 12);
+    const rail1 = L(x1, y1, 12);
+    quad(ctx, b0, b1, rail1, rail0, '#5c3820');
+    const cr0 = L(x0, y0, wainTop + 6);
+    const cr1 = L(x1, y1, wainTop + 6);
+    const crb0 = L(x0, y0, wainTop - 2);
+    const crb1 = L(x1, y1, wainTop - 2);
+    quad(ctx, crb0, crb1, cr1, cr0, lit ? '#f0d7a4' : '#d4b484');
 
     // top plate of the wall
     quad(ctx, t0, t1, cap1, cap0, '#d8b888');
@@ -127,29 +144,34 @@ function wallSegment(
         const wy0 = y0 + (y1 - y0) * 0.22;
         const wx1 = x0 + (x1 - x0) * 0.78;
         const wy1 = y0 + (y1 - y0) * 0.78;
-        const wb0 = L(wx0, wy0, 28);
-        const wb1 = L(wx1, wy1, 28);
-        const wt0 = L(wx0, wy0, 78);
-        const wt1 = L(wx1, wy1, 78);
+        const winBot = 74;
+        const winTop = WALL_H - 28;
+        const wb0 = L(wx0, wy0, winBot);
+        const wb1 = L(wx1, wy1, winBot);
+        const wt0 = L(wx0, wy0, winTop);
+        const wt1 = L(wx1, wy1, winTop);
         quad(ctx, wb0, wb1, wt1, wt0, '#f7f3ea');
         const inset = 0.18;
         const ix0 = wx0 + (wx1 - wx0) * inset;
         const iy0 = wy0 + (wy1 - wy0) * inset;
         const ix1 = wx1 - (wx1 - wx0) * inset;
         const iy1 = wy1 - (wy1 - wy0) * inset;
+        const glassBot = winBot + 6;
+        const glassTop = winTop - 6;
         quad(ctx,
-            L(ix0, iy0, 34),
-            L(ix1, iy1, 34),
-            L(ix1, iy1, 72),
-            L(ix0, iy0, 72),
+            L(ix0, iy0, glassBot),
+            L(ix1, iy1, glassBot),
+            L(ix1, iy1, glassTop),
+            L(ix0, iy0, glassTop),
             '#9fd4ea',
         );
         // mullion
         ctx.strokeStyle = '#f7f3ea';
         ctx.lineWidth = 1.5;
-        const mid = L((ix0 + ix1) / 2, (iy0 + iy1) / 2, 53);
-        const topM = L((ix0 + ix1) / 2, (iy0 + iy1) / 2, 72);
-        const botM = L((ix0 + ix1) / 2, (iy0 + iy1) / 2, 34);
+        const midLift = (glassBot + glassTop) / 2;
+        const mid = L((ix0 + ix1) / 2, (iy0 + iy1) / 2, midLift);
+        const topM = L((ix0 + ix1) / 2, (iy0 + iy1) / 2, glassTop);
+        const botM = L((ix0 + ix1) / 2, (iy0 + iy1) / 2, glassBot);
         ctx.beginPath();
         ctx.moveTo(topM.x, topM.y);
         ctx.lineTo(botM.x, botM.y);
@@ -188,14 +210,23 @@ function paintLotCanvas(): { canvas: HTMLCanvasElement; origin: Pt } {
     }
 
     // Yard, then the room floor on top.
-    const x0 = -3 * TILE;
-    const y0 = -3 * TILE;
-    const x1 = WORLD_W + 3 * TILE;
-    const y1 = WORLD_H + 3 * TILE;
+    const x0 = -YARD;
+    const y0 = -YARD;
+    const x1 = WORLD_W + YARD;
+    const y1 = WORLD_H + YARD;
     for (let y = y0; y < y1; y += TILE) {
         for (let x = x0; x < x1; x += TILE) {
             const inside = x >= 0 && y >= 0 && x < WORLD_W && y < WORLD_H;
             stamp(ctx, inside ? floorKind(x + TILE / 2, y + TILE / 2) : 'grass', x, y, origin);
+            if (!inside && ((Math.floor(x / TILE) * 5 + Math.floor(y / TILE)) % 29 === 0)) {
+                const s = toScreen(x + TILE * 0.5, y + TILE * 0.35);
+                const colors = ['#f2e14a', '#f25c6a', '#ffffff', '#7a4ea0'];
+                const color = colors[(Math.floor(x / TILE) + Math.floor(y / TILE)) & 3];
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(s.x - origin.x, s.y - origin.y, 2.4, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
     }
 
@@ -219,12 +250,12 @@ function paintLotCanvas(): { canvas: HTMLCanvasElement; origin: Pt } {
     // West wall (down the left edge), then north wall.
     let i = 0;
     for (let y = 0; y < WORLD_H; y += TILE) {
-        wallSegment(ctx, 0, y, 0, y + TILE, origin, i % 5 === 2);
+        wallSegment(ctx, 0, y, 0, y + TILE, origin, i % 5 === 2, false);
         i++;
     }
     i = 0;
     for (let x = 0; x < WORLD_W; x += TILE) {
-        wallSegment(ctx, x, 0, x + TILE, 0, origin, i % 6 === 3);
+        wallSegment(ctx, x, 0, x + TILE, 0, origin, i % 6 === 3, true);
         i++;
     }
 
