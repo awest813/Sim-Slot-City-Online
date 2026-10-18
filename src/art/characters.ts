@@ -143,7 +143,7 @@ const OUTFITS: Record<string, Outfit> = {
     },
     avatar_town_sam: {
         skin: '#d8a888', skinHi: '#f0c8ac', skinLo: '#b88868',
-        hair: '#c4a070', hairHi: '#efe0c0',
+        hair: '#8d6238', hairHi: '#e6c48a',
         shirt: '#b9a0e0', shirtHi: '#e4d6ff', shirtLo: '#8870b8',
         pants: '#6a6e76', pantsLo: '#454850',
         shoe: '#f6f3ec',
@@ -228,6 +228,20 @@ function drawHair(
                 ctx.fill();
                 ink(ctx);
             }
+        } else if (o.hairStyle === 'slick') {
+            hairCap(ctx, hx, hy, hr);
+            ctx.fillStyle = o.hair;
+            ctx.beginPath();
+            ctx.ellipse(hx - hr * 0.95, hy + 5, 5, 9, 0.2, 0, Math.PI * 2);
+            ctx.ellipse(hx + hr * 0.95, hy + 5, 5, 9, -0.2, 0, Math.PI * 2);
+            ctx.fill();
+            ink(ctx);
+            ctx.strokeStyle = o.hairHi;
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(hx - 1, hy - hr * 0.7);
+            ctx.quadraticCurveTo(hx + 7, hy - 1, hx + 3, hy + hr * 0.4);
+            ctx.stroke();
         } else {
             hairCap(ctx, hx, hy, hr);
         }
@@ -471,9 +485,14 @@ function paintSim(
 
     const drawArm = (side: number, armPhase: number) => {
         const x = cx + side * armSpread + face * 0.6;
-        const angle = face * armPhase * 0.95;
+        // Front views swing wide. From behind, that same mirror claps both
+        // hands onto the spine, so the back swing stays on its own side.
+        const angle = front
+            ? face * armPhase * 0.95
+            : -side * 0.36 + face * armPhase * 0.2;
+        const lift = front ? 0 : -armPhase * 3.5;
         ctx.save();
-        ctx.translate(x, shoulder + 2);
+        ctx.translate(x, shoulder + 2 + lift);
         ctx.rotate(angle);
         capsule(ctx, -3.3, 0, 6.6, 16, sleeve, sleeveHi, sleeveLo);
         if (o.clothes === 'suit') {
@@ -611,10 +630,8 @@ function paintSim(
         ctx.fill();
     }
 
-    // From behind, the same swing that reads as a walk in front
-    // pulls both hands onto the spine. Flip it so the arms swing out.
-    drawArm(near, front ? -phase : phase);
-    if (!front) drawArm(far, -phase);
+    drawArm(near, -phase);
+    if (!front) drawArm(far, phase);
 
     const neck = ctx.createLinearGradient(cx - 4, shoulder - 10, cx + 4, shoulder);
     neck.addColorStop(0, o.skinLo);

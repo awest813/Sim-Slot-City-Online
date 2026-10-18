@@ -364,7 +364,7 @@ export function buildSimsLot(scene: Phaser.Scene): void {
     floorSign(scene, 390, 248, 'Blackjack');
     floorSign(scene, 150, 470, 'Roulette');
     floorSign(scene, 800, 470, 'Plinko');
-    floorSign(scene, 470, 470, 'Bingo');
+    floorSign(scene, 600, 458, 'Bingo');
     floorSign(scene, 800, 610, 'Horses');
     floorSign(scene, 480, 660, 'Entrance');
     floorSign(scene, 150, 620, 'VIP');
