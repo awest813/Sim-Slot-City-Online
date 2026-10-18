@@ -90,20 +90,23 @@ export class AIWalker {
     private buildSprite(name: string): void {
         const here = toScreen(this.x, this.y);
         this.shadow = this.scene.add
-            .ellipse(here.x, here.y, 24, 10, 0x1a2410, 0.32)
+            .ellipse(here.x, here.y, 32, 12, 0x1a2410, 0.32)
             .setDepth(DEPTH_SHADOW);
 
-        const idx = AI_NAMES.indexOf(name);
-        let labelName = name;
-        if (idx % 3 === 0) this.outfit = 'avatar_ai_male';
-        else if (idx % 3 === 1) this.outfit = 'avatar_ai_female';
-        else {
-            this.outfit = 'avatar_ai_vip';
-            labelName = `${name}`;
-        }
+        const townieOutfit: Record<string, string> = {
+            Alex: 'avatar_ai_male',
+            Jamie: 'avatar_ai_female',
+            Morgan: 'avatar_ai_vip',
+            Riley: 'avatar_town_riley',
+            Casey: 'avatar_town_casey',
+            Jordan: 'avatar_town_jordan',
+            Taylor: 'avatar_town_taylor',
+            Sam: 'avatar_town_sam',
+        };
+        this.outfit = townieOutfit[name] ?? 'avatar_ai_male';
 
         this.sprite = this.scene.add.image(here.x, here.y, this.outfit);
-        this.nameTag = this.scene.add.text(here.x, here.y, labelName, {
+        this.nameTag = this.scene.add.text(here.x, here.y, name, {
             ...SIM_NAME_STYLE,
             color: this.outfit === 'avatar_ai_vip' ? '#6a4a12' : SIM_NAME_STYLE.color,
         }).setOrigin(0.5, 1);

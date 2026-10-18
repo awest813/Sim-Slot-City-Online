@@ -56,7 +56,7 @@ export class AvatarController {
 
     private buildSprite(displayName: string): void {
         const here = toScreen(this.x, this.y);
-        this.shadow = this.scene.add.ellipse(here.x, here.y, 26, 11, 0x1a2410, 0.35)
+        this.shadow = this.scene.add.ellipse(here.x, here.y, 32, 12, 0x1a2410, 0.35)
             .setDepth(DEPTH_SHADOW);
 
         const tex = GameState.get().avatarTextureKey || 'avatar_player';

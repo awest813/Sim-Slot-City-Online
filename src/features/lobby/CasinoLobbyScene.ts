@@ -231,7 +231,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         // Gigi (Showgirl right of entrance approach)
         const gigiQuotes = ["Feeling lucky? Scratch and win today!"];
         const gigi = new StationaryNPC(
-            this, 560, 520, "Gigi 💃", "avatar_showgirl", 0xff40a0, gigiQuotes
+            this, 560, 520, "Gigi 💃", "avatar_gigi", 0xff40a0, gigiQuotes
         );
         this.interaction.register({
             id: 'gigi_scratchers', x: 560, y: 520, radius: 60,
@@ -271,7 +271,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
             "Only the elite can enter here. You've earned it."
         ];
         const buster = new StationaryNPC(
-            this, 270, 620, "Buster 🕶️", "avatar_ai_male", 0xc9a84c, busterQuotes
+            this, 270, 620, "Buster 🕶️", "avatar_bouncer", 0xc9a84c, busterQuotes
         );
 
         // Duke (VIP inside the lounge)

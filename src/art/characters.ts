@@ -1,6 +1,6 @@
 // Original isometric people in a late-90s life-sim style.
-// Big readable heads, flat bright clothes, soft upper-left light,
-// and a spinning green mood crystal over the player.
+// Big heads, chunky clothes, a real walk stride, and a green mood crystal.
+// Every shape is drawn here. Nothing is traced from a life-sim sprite sheet.
 
 import type Phaser from 'phaser';
 
@@ -27,6 +27,10 @@ export function simAnimKey(outfit: string, facing: FacingDir, frame: number): st
     return `${outfit}__${DIR[facing]}__${f}`;
 }
 
+type HairStyle = 'short' | 'bob' | 'slick' | 'updo' | 'curly' | 'crop';
+type Clothes = 'casual' | 'dress' | 'suit' | 'skirt';
+type Build = 'slim' | 'broad';
+
 interface Outfit {
     skin: string;
     skinHi: string;
@@ -39,63 +43,132 @@ interface Outfit {
     pants: string;
     pantsLo: string;
     shoe: string;
-    hairStyle: 'short' | 'bob' | 'slick' | 'updo';
-    clothes: 'casual' | 'dress' | 'suit';
+    hairStyle: HairStyle;
+    clothes: Clothes;
+    build: Build;
+    glasses?: boolean;
+    shades?: boolean;
 }
 
 const OUTFITS: Record<string, Outfit> = {
     avatar_player: {
-        skin: '#f0c3a0', skinHi: '#ffd8b8', skinLo: '#d39a78',
-        hair: '#6b3e22', hairHi: '#8a5834',
-        shirt: '#f4f1ea', shirtHi: '#ffffff', shirtLo: '#d5d0c6',
-        pants: '#3d6eb5', pantsLo: '#2c5288',
+        skin: '#f0c3a0', skinHi: '#ffe0c4', skinLo: '#d39a78',
+        hair: '#6b3e22', hairHi: '#a56a3c',
+        shirt: '#f4f1ea', shirtHi: '#ffffff', shirtLo: '#c9c3b6',
+        pants: '#3d6eb5', pantsLo: '#2a4f86',
         shoe: '#f7f7f5',
-        hairStyle: 'short', clothes: 'casual',
+        hairStyle: 'short', clothes: 'casual', build: 'slim',
     },
     avatar_ai_male: {
-        skin: '#e0a67e', skinHi: '#f0c09a', skinLo: '#c48462',
-        hair: '#2a211c', hairHi: '#4a3b32',
-        shirt: '#d24a3a', shirtHi: '#e86a58', shirtLo: '#a83428',
-        pants: '#c4a36a', pantsLo: '#9a7c48',
+        skin: '#e0a67e', skinHi: '#f3c6a2', skinLo: '#c48462',
+        hair: '#241c18', hairHi: '#4e4036',
+        shirt: '#d24a3a', shirtHi: '#f07a68', shirtLo: '#9c3024',
+        pants: '#c4a36a', pantsLo: '#8f7040',
         shoe: '#5c4030',
-        hairStyle: 'short', clothes: 'casual',
+        hairStyle: 'crop', clothes: 'casual', build: 'broad',
     },
     avatar_ai_female: {
-        skin: '#f3c6a4', skinHi: '#ffe0c4', skinLo: '#d9a484',
-        hair: '#e2b15a', hairHi: '#f6d48a',
-        shirt: '#3aa8a0', shirtHi: '#6fd0c6', shirtLo: '#217e78',
-        pants: '#2c2c34', pantsLo: '#1a1a20',
+        skin: '#f3c6a4', skinHi: '#ffe0c8', skinLo: '#d9a484',
+        hair: '#e2b15a', hairHi: '#ffe09a',
+        shirt: '#3aa8a0', shirtHi: '#7fe0d4', shirtLo: '#1d6e68',
+        pants: '#2c2c34', pantsLo: '#16161c',
         shoe: '#f2efe8',
-        hairStyle: 'bob', clothes: 'casual',
+        hairStyle: 'bob', clothes: 'skirt', build: 'slim',
     },
     avatar_ai_vip: {
-        skin: '#c98b62', skinHi: '#e0a67e', skinLo: '#a86c48',
-        hair: '#1a1614', hairHi: '#3a3028',
-        shirt: '#f7f4ee', shirtHi: '#ffffff', shirtLo: '#d9d3c8',
-        pants: '#1c1e24', pantsLo: '#101216',
+        skin: '#c98b62', skinHi: '#e4b08a', skinLo: '#a86c48',
+        hair: '#1a1614', hairHi: '#5a4c40',
+        shirt: '#f7f4ee', shirtHi: '#ffffff', shirtLo: '#d4cdc2',
+        pants: '#1c1e24', pantsLo: '#0c0e12',
         shoe: '#111111',
-        hairStyle: 'slick', clothes: 'suit',
+        hairStyle: 'slick', clothes: 'suit', build: 'broad',
+        glasses: true,
     },
     avatar_showgirl: {
-        skin: '#f6c8aa', skinHi: '#ffe1c8', skinLo: '#e0a888',
-        hair: '#f0d070', hairHi: '#ffe9a8',
-        shirt: '#e23b4a', shirtHi: '#ff6a74', shirtLo: '#b42332',
-        pants: '#e23b4a', pantsLo: '#b42332',
+        skin: '#f6c8aa', skinHi: '#ffe4cc', skinLo: '#e0a888',
+        hair: '#f0d070', hairHi: '#fff0b8',
+        shirt: '#e23b4a', shirtHi: '#ff8a90', shirtLo: '#a41e2e',
+        pants: '#ffd0d4', pantsLo: '#c45460',
         shoe: '#f4efe6',
-        hairStyle: 'updo', clothes: 'dress',
+        hairStyle: 'updo', clothes: 'dress', build: 'slim',
+    },
+    avatar_gigi: {
+        skin: '#e8b090', skinHi: '#f8d0b4', skinLo: '#c88868',
+        hair: '#4a2418', hairHi: '#7a4030',
+        shirt: '#d4548a', shirtHi: '#f090b4', shirtLo: '#9a3060',
+        pants: '#ffe0ea', pantsLo: '#c46888',
+        shoe: '#f6f1ea',
+        hairStyle: 'updo', clothes: 'dress', build: 'slim',
+    },
+    avatar_bouncer: {
+        skin: '#8d5a3c', skinHi: '#b07858', skinLo: '#6a402c',
+        hair: '#1a120e', hairHi: '#3a2c24',
+        shirt: '#20242c', shirtHi: '#3a4250', shirtLo: '#101218',
+        pants: '#2a241c', pantsLo: '#16120e',
+        shoe: '#0e0e0e',
+        hairStyle: 'crop', clothes: 'casual', build: 'broad',
+        shades: true,
+    },
+    avatar_town_riley: {
+        skin: '#f6d0b4', skinHi: '#fff0e0', skinLo: '#e0b090',
+        hair: '#8a4e28', hairHi: '#c4844c',
+        shirt: '#3d8a4a', shirtHi: '#7ec87a', shirtLo: '#246030',
+        pants: '#d9d2c4', pantsLo: '#b0a894',
+        shoe: '#f4f1ea',
+        hairStyle: 'curly', clothes: 'casual', build: 'slim',
+    },
+    avatar_town_casey: {
+        skin: '#c98460', skinHi: '#e8aa84', skinLo: '#a86848',
+        hair: '#1c1418', hairHi: '#4a3840',
+        shirt: '#ee6a9a', shirtHi: '#ffb0c8', shirtLo: '#c04070',
+        pants: '#3a3e48', pantsLo: '#22262e',
+        shoe: '#f7f4ee',
+        hairStyle: 'bob', clothes: 'skirt', build: 'slim',
+    },
+    avatar_town_jordan: {
+        skin: '#e8b898', skinHi: '#ffd8bc', skinLo: '#cc9474',
+        hair: '#a84828', hairHi: '#e08050',
+        shirt: '#2a3e78', shirtHi: '#5a78b0', shirtLo: '#182448',
+        pants: '#f2f0ea', pantsLo: '#c8c4ba',
+        shoe: '#6a4a32',
+        hairStyle: 'short', clothes: 'casual', build: 'broad',
+    },
+    avatar_town_taylor: {
+        skin: '#6e442e', skinHi: '#946848', skinLo: '#4e2e1e',
+        hair: '#140e0c', hairHi: '#3a2a22',
+        shirt: '#f0c040', shirtHi: '#ffe088', shirtLo: '#c08820',
+        pants: '#2a3a6a', pantsLo: '#182444',
+        shoe: '#f0ece4',
+        hairStyle: 'curly', clothes: 'casual', build: 'broad',
+    },
+    avatar_town_sam: {
+        skin: '#d8a888', skinHi: '#f0c8ac', skinLo: '#b88868',
+        hair: '#c4a070', hairHi: '#efe0c0',
+        shirt: '#b9a0e0', shirtHi: '#e4d6ff', shirtLo: '#8870b8',
+        pants: '#6a6e76', pantsLo: '#454850',
+        shoe: '#f6f3ec',
+        hairStyle: 'slick', clothes: 'casual', build: 'slim',
     },
 };
+
+const INK = 'rgba(42, 24, 16, 0.42)';
+
+function ink(ctx: CanvasRenderingContext2D): void {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.15;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+}
 
 function capsule(
     ctx: CanvasRenderingContext2D,
     x: number, y: number, w: number, h: number,
     fill: string, hi: string, lo: string,
 ): void {
-    const r = Math.min(w / 2, 7);
-    const g = ctx.createLinearGradient(x, y, x + w, y + h * 0.15);
-    g.addColorStop(0, lo);
-    g.addColorStop(0.28, hi);
-    g.addColorStop(0.72, fill);
+    const r = Math.min(w / 2, 8);
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, hi);
+    g.addColorStop(0.45, fill);
     g.addColorStop(1, lo);
     ctx.fillStyle = g;
     ctx.beginPath();
@@ -104,7 +177,16 @@ function capsule(
     ctx.arcTo(x + w, y + h, x, y + h, r);
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
     ctx.fill();
+    ink(ctx);
+}
+
+function hairCap(ctx: CanvasRenderingContext2D, hx: number, hy: number, hr: number): void {
+    ctx.beginPath();
+    ctx.ellipse(hx, hy - 1, hr + 1.4, hr + 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ink(ctx);
 }
 
 function drawHair(
@@ -115,69 +197,109 @@ function drawHair(
     face: number,
 ): void {
     ctx.fillStyle = o.hair;
-    if (o.hairStyle === 'short') {
+    if (!front) {
+        if (o.hairStyle === 'crop') {
+            ctx.fillStyle = o.skin;
+            ctx.beginPath();
+            ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = o.skinLo;
+            ctx.beginPath();
+            ctx.ellipse(hx - hr + 1, hy + 2, 3, 4, 0, 0, Math.PI * 2);
+            ctx.ellipse(hx + hr - 1, hy + 2, 3, 4, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = o.hair;
+            ctx.beginPath();
+            ctx.ellipse(hx, hy - hr * 0.42, hr * 1.02, hr * 0.55, 0, Math.PI, Math.PI * 2);
+            ctx.fill();
+        } else {
+            hairCap(ctx, hx, hy, hr);
+        }
+        if (o.hairStyle === 'bob') {
+            ctx.fillStyle = o.hair;
+            ctx.beginPath();
+            ctx.ellipse(hx, hy + 8, hr + 2, 14, 0, 0, Math.PI);
+            ctx.fill();
+        } else if (o.hairStyle === 'curly') {
+            ctx.fillStyle = o.hair;
+            for (const [dx, dy, r] of [[-11, 1, 6], [11, 1, 6], [0, -hr * 0.9, 6], [-7, -hr, 5], [7, -hr, 5]] as Array<[number, number, number]>) {
+                ctx.beginPath();
+                ctx.arc(hx + dx, hy + dy, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else if (o.hairStyle === 'updo') {
+            ctx.fillStyle = o.hair;
+            ctx.beginPath();
+            ctx.ellipse(hx, hy - hr - 1, 6.5, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = o.shirt;
+            ctx.beginPath();
+            ctx.ellipse(hx + 7, hy - hr + 1, 3.4, 2.2, 0.4, 0, Math.PI * 2);
+            ctx.ellipse(hx + 7, hy - hr + 5, 3.4, 2.2, -0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.fillStyle = o.hairHi;
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(hx - hr * 0.45, hy - hr * 0.72, hr * 0.7, 2);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = o.skinLo;
         ctx.beginPath();
-        ctx.ellipse(hx, hy - hr * 0.22, hr * 1.12, hr * 0.95, 0, Math.PI * 0.15, Math.PI * 1.85);
+        ctx.ellipse(hx, hy + hr - 2, 4.6, 3, 0, 0, Math.PI);
+        ctx.fill();
+        return;
+    }
+
+    if (o.hairStyle === 'short' || o.hairStyle === 'crop' || o.hairStyle === 'slick') {
+        const squat = o.hairStyle === 'crop' ? 0.42 : o.hairStyle === 'slick' ? 0.62 : 0.78;
+        ctx.beginPath();
+        ctx.ellipse(hx + face, hy - hr * 0.28, hr * 1.05, hr * squat, face * -0.08, Math.PI * 0.95, Math.PI * 2.05);
         ctx.fill();
         ctx.fillStyle = o.hairHi;
         ctx.beginPath();
-        ctx.ellipse(hx - 4, hy - hr * 0.55, hr * 0.42, hr * 0.22, -0.5, 0, Math.PI * 2);
+        ctx.ellipse(hx - 4, hy - hr * 0.62, hr * 0.36, 2.2, -0.5, 0, Math.PI * 2);
         ctx.fill();
     } else if (o.hairStyle === 'bob') {
         ctx.beginPath();
-        ctx.ellipse(hx, hy + 2, hr + 4, hr + 8, 0, 0, Math.PI * 2);
+        ctx.ellipse(hx - hr * 0.72, hy + 4, 5.5, 12, face * 0.15, 0, Math.PI * 2);
+        ctx.ellipse(hx + hr * 0.72, hy + 4, 5.5, 12, face * -0.15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(hx, hy - hr * 0.35, hr * 1.05, hr * 0.55, 0, Math.PI, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = o.hairHi;
-        ctx.globalAlpha = 0.85;
         ctx.beginPath();
-        ctx.ellipse(hx - 5, hy - hr * 0.35, 6, 4, -0.6, 0, Math.PI * 2);
+        ctx.ellipse(hx - 5, hy - hr * 0.55, 4.5, 2.4, -0.6, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
-        if (front) {
-            const faceGrd = ctx.createRadialGradient(hx - 3, hy - 4, 2, hx, hy + 2, hr);
-            faceGrd.addColorStop(0, o.skinHi);
-            faceGrd.addColorStop(0.75, o.skin);
-            faceGrd.addColorStop(1, o.skinLo);
-            ctx.fillStyle = faceGrd;
+    } else if (o.hairStyle === 'curly') {
+        const puffs: Array<[number, number, number]> = [
+            [-8, -2, 5.2], [8, -1, 5.2], [0, -hr * 0.62, 5.5],
+            [-5, -hr * 0.9, 4.2], [5, -hr * 0.85, 4.2],
+        ];
+        for (const [dx, dy, r] of puffs) {
             ctx.beginPath();
-            ctx.ellipse(hx + face * 1.5, hy + 3, hr * 0.78, hr * 0.72, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = o.hair;
-            ctx.beginPath();
-            ctx.ellipse(hx + face * 1, hy - hr * 0.28, hr * 0.92, hr * 0.46, 0, Math.PI, Math.PI * 2);
+            ctx.arc(hx + dx, hy + dy, r, 0, Math.PI * 2);
             ctx.fill();
         }
-    } else if (o.hairStyle === 'slick') {
-        ctx.beginPath();
-        ctx.ellipse(hx + face * 2, hy - hr * 0.35, hr * 1.02, hr * 0.62, face * -0.15, Math.PI * 0.9, Math.PI * 2.2);
-        ctx.fill();
         ctx.fillStyle = o.hairHi;
-        ctx.globalAlpha = 0.7;
         ctx.beginPath();
-        ctx.ellipse(hx - 2, hy - hr * 0.62, hr * 0.7, 2.2, -0.2, 0, Math.PI * 2);
+        ctx.arc(hx - 3, hy - hr * 0.75, 2.2, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
     } else {
         ctx.beginPath();
-        ctx.ellipse(hx, hy - 1, hr + 2, hr * 0.9, 0, Math.PI * 0.85, Math.PI * 2.15);
+        ctx.ellipse(hx, hy - hr * 0.2, hr + 1, hr * 0.72, 0, Math.PI * 0.85, Math.PI * 2.15);
         ctx.fill();
         ctx.beginPath();
-        ctx.ellipse(hx + 2, hy - hr - 1, 8, 9, 0.2, 0, Math.PI * 2);
+        ctx.ellipse(hx + 1, hy - hr - 1, 6.2, 5.6, 0.1, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = o.hairHi;
+        ctx.fillStyle = o.shirt;
         ctx.beginPath();
-        ctx.ellipse(hx, hy - hr - 4, 3.5, 3, -0.4, 0, Math.PI * 2);
+        ctx.ellipse(hx + 8, hy - hr + 2, 3.6, 2.3, 0.5, 0, Math.PI * 2);
+        ctx.ellipse(hx + 8, hy - hr + 6, 3.6, 2.3, -0.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = '#f25c6a';
+        ctx.fillStyle = o.shirtHi;
         ctx.beginPath();
-        ctx.ellipse(hx + 10, hy - hr - 2, 2.4, 6, 0.7, 0, Math.PI * 2);
+        ctx.ellipse(hx + 7, hy - hr + 3, 1.4, 1, 0.4, 0, Math.PI * 2);
         ctx.fill();
-        if (front) {
-            ctx.fillStyle = o.hair;
-            ctx.beginPath();
-            ctx.ellipse(hx, hy - hr * 0.45, hr * 0.95, hr * 0.38, 0, Math.PI, Math.PI * 2);
-            ctx.fill();
-        }
     }
 }
 
@@ -187,54 +309,95 @@ function drawFace(
     hx: number, hy: number,
     face: number,
 ): void {
-    const ex = hx + face * 2.5;
-    ctx.fillStyle = 'rgba(214, 120, 110, 0.45)';
+    const ex = hx + face * 1.5;
+    const look = face * 0.7;
+
+    ctx.fillStyle = 'rgba(210, 110, 100, 0.4)';
     ctx.beginPath();
-    ctx.ellipse(ex - 7, hy + 3, 3.2, 2, 0, 0, Math.PI * 2);
-    ctx.ellipse(ex + 7, hy + 3, 3.2, 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex - 7, hy + 4, 3.4, 2.1, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex + 7, hy + 4, 3.4, 2.1, 0, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.strokeStyle = o.hair;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.5;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(ex - 6.2, hy - 5.2);
-    ctx.quadraticCurveTo(ex - 3.2, hy - 6.4, ex - 0.6, hy - 5);
-    ctx.moveTo(ex + 0.6, hy - 5);
-    ctx.quadraticCurveTo(ex + 3.2, hy - 6.4, ex + 6.2, hy - 5.2);
+    ctx.moveTo(ex - 7.2, hy - 6.4);
+    ctx.quadraticCurveTo(ex - 4, hy - 8, ex - 1, hy - 6.2);
+    ctx.moveTo(ex + 1, hy - 6.2);
+    ctx.quadraticCurveTo(ex + 4, hy - 8, ex + 7.2, hy - 6.4);
     ctx.stroke();
 
     ctx.fillStyle = '#fffaf6';
     ctx.beginPath();
-    ctx.ellipse(ex - 3.3, hy - 1.2, 2.5, 3.1, 0, 0, Math.PI * 2);
-    ctx.ellipse(ex + 3.3, hy - 1.2, 2.5, 3.1, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex - 3.6, hy - 1.4, 2.7, 3.3, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex + 3.6, hy - 1.4, 2.7, 3.3, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#2a211c';
+    ctx.strokeStyle = 'rgba(60, 36, 28, 0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    ctx.fillStyle = '#241c18';
     ctx.beginPath();
-    ctx.ellipse(ex - 2.7 + face * 0.4, hy - 0.8, 1.35, 1.7, 0, 0, Math.PI * 2);
-    ctx.ellipse(ex + 3.9 + face * 0.4, hy - 0.8, 1.35, 1.7, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex - 3.2 + look, hy - 0.8, 1.45, 1.85, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex + 4.0 + look, hy - 0.8, 1.45, 1.85, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(ex - 3.4, hy - 2.1, 1.1, 1.1);
-    ctx.fillRect(ex + 2.8, hy - 2.1, 1.1, 1.1);
+    ctx.fillRect(ex - 3.6 + look, hy - 2.2, 1.2, 1.2);
+    ctx.fillRect(ex + 3.4 + look, hy - 2.2, 1.2, 1.2);
 
     ctx.fillStyle = o.skinLo;
     ctx.beginPath();
-    ctx.moveTo(ex, hy + 1.2);
-    ctx.quadraticCurveTo(ex + face * 1.6, hy + 3.6, ex - face * 0.4, hy + 4.2);
-    ctx.quadraticCurveTo(ex - face * 1.2, hy + 2.4, ex, hy + 1.2);
+    ctx.moveTo(ex + face * 0.4, hy + 1.4);
+    ctx.quadraticCurveTo(ex + face * 2.2, hy + 3.8, ex + face * 0.2, hy + 4.6);
+    ctx.quadraticCurveTo(ex - face * 1.4, hy + 3.2, ex + face * 0.4, hy + 1.4);
     ctx.fill();
 
     ctx.strokeStyle = '#a85a52';
-    ctx.lineWidth = 1.3;
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(ex, hy + 5.2, 3.1, 0.18, Math.PI - 0.18);
+    ctx.arc(ex, hy + 6.4, 3.4, 0.2, Math.PI - 0.2);
     ctx.stroke();
-    ctx.strokeStyle = '#fff6f2';
-    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = 'rgba(255, 246, 242, 0.9)';
+    ctx.lineWidth = 0.9;
     ctx.beginPath();
-    ctx.arc(ex, hy + 4.6, 2.2, 0.35, Math.PI - 0.35);
+    ctx.arc(ex, hy + 5.6, 2.3, 0.4, Math.PI - 0.4);
     ctx.stroke();
+
+    if (o.glasses) {
+        ctx.strokeStyle = '#e6c56a';
+        ctx.lineWidth = 1.15;
+        ctx.beginPath();
+        ctx.ellipse(ex - 3.6, hy - 1.2, 4.6, 3.6, 0, 0, Math.PI * 2);
+        ctx.ellipse(ex + 3.6, hy - 1.2, 4.6, 3.6, 0, 0, Math.PI * 2);
+        ctx.moveTo(ex - 0.2, hy - 1.2);
+        ctx.lineTo(ex + 0.2, hy - 1.2);
+        ctx.moveTo(ex - 8.2, hy - 1.4);
+        ctx.lineTo(ex - 11, hy - 2.2);
+        ctx.moveTo(ex + 8.2, hy - 1.4);
+        ctx.lineTo(ex + 11, hy - 2.2);
+        ctx.stroke();
+    }
+
+    if (o.shades) {
+        ctx.fillStyle = '#14181e';
+        ctx.beginPath();
+        ctx.roundRect(ex - 9.2, hy - 4.2, 8.2, 5.4, 1.4);
+        ctx.roundRect(ex + 1, hy - 4.2, 8.2, 5.4, 1.4);
+        ctx.fill();
+        ctx.fillStyle = '#c8d4e0';
+        ctx.globalAlpha = 0.45;
+        ctx.fillRect(ex - 7.6, hy - 3.4, 2.2, 1.2);
+        ctx.fillRect(ex + 2.4, hy - 3.4, 2.2, 1.2);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = '#0c0e12';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(ex - 1, hy - 1.6);
+        ctx.lineTo(ex + 1, hy - 1.6);
+        ctx.stroke();
+    }
 }
 
 function paintSim(
@@ -246,187 +409,257 @@ function paintSim(
     const cx = SIM_W / 2;
     const front = dir === 'se' || dir === 'sw';
     const face = dir === 'se' || dir === 'ne' ? 1 : -1;
-    const bob = frame === 2 ? -2 : frame === 1 || frame === 3 ? -1 : 0;
-    const step = [0, 1, 0, -1][frame];
+    const phase = [1, 0.35, -1, -0.35][frame];
+    const bob = frame % 2 === 1 ? -2.5 : 0;
+    const broad = o.build === 'broad';
 
     const hip = 68 + bob;
-    const shoulder = hip - 22;
-    const headR = 15;
-    const headX = cx + face * (front ? 4 : 1);
-    const headY = 28 + bob;
-    const sleeve = o.clothes === 'suit' ? o.pants : o.shirt;
-    const sleeveHi = o.clothes === 'suit' ? '#4a5160' : o.shirtHi;
-    const sleeveLo = o.clothes === 'suit' ? o.pantsLo : o.shirtLo;
+    const shoulder = hip - 24;
+    const headR = 15.5;
+    const headX = cx + face * (front ? 3.5 : 0.5);
+    const headY = 30 + bob;
+    const legSpread = broad ? 6.2 : 5.2;
+    const armSpread = broad ? 16 : 14;
 
-    const drawLeg = (side: number, phase: number, color: string, hi: string, lo: string) => {
-        const x = cx + side * 6 + face;
-        const y = hip + phase * 2;
-        const h = 24 - Math.abs(phase);
-        capsule(ctx, x - 4.2, y, 8.4, h, color, hi, lo);
-        ctx.fillStyle = lo;
+    const sleeve = o.clothes === 'suit' ? o.pants : o.shirt;
+    const sleeveHi = o.clothes === 'suit' ? '#4a5468' : o.shirtHi;
+    const sleeveLo = o.clothes === 'suit' ? o.pantsLo : o.shirtLo;
+    const legFill = o.clothes === 'dress' || o.clothes === 'skirt' ? o.skin : o.pants;
+    const legHi = o.clothes === 'dress' || o.clothes === 'skirt' ? o.skinHi : o.pants;
+    const legLo = o.clothes === 'dress' || o.clothes === 'skirt' ? o.skinLo : o.pantsLo;
+
+    const drawLeg = (side: number, legPhase: number) => {
+        const x = cx + side * legSpread + face * 0.8;
+        const angle = face * legPhase * 0.62;
+        const lift = legPhase < 0 ? -5 : 0;
+        ctx.save();
+        ctx.translate(x, hip - 2 + lift);
+        ctx.rotate(angle);
+        const len = o.clothes === 'dress' ? 20 : 23;
+        capsule(ctx, -4.3, 0, 8.6, len, legFill, legHi, legLo);
+        ctx.fillStyle = '#241c16';
         ctx.beginPath();
-        ctx.ellipse(x + face * 2.2, y + h, 5.4, 2.8, face * 0.15, 0, Math.PI * 2);
+        ctx.ellipse(0.5, len + 0.4, 5.3, 1.7, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = o.shoe;
         ctx.beginPath();
-        ctx.ellipse(x + face * 2.4, y + h - 0.4, 5, 2.5, face * 0.15, 0, Math.PI * 2);
+        ctx.ellipse(0.4, len - 1.1, 5.1, 2.6, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ink(ctx);
+        if (o.clothes === 'dress') {
+            ctx.fillStyle = o.shoe;
+            ctx.fillRect(-1.1, len - 1, 2.1, 5.2);
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
         ctx.beginPath();
-        ctx.ellipse(x + face * 1.2, y + h - 1.2, 2.1, 1, 0, 0, Math.PI * 2);
+        ctx.ellipse(-0.8, len - 1.8, 2, 1, 0, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
     };
 
-    const drawArm = (side: number, phase: number) => {
-        const x = cx + side * 11 + face;
-        const swing = phase * 4;
-        capsule(ctx, x - 3.2, shoulder + swing, 6.6, 16, sleeve, sleeveHi, sleeveLo);
+    const drawArm = (side: number, armPhase: number) => {
+        const x = cx + side * armSpread + face * 0.6;
+        const angle = face * armPhase * 0.95;
+        ctx.save();
+        ctx.translate(x, shoulder + 2);
+        ctx.rotate(angle);
+        capsule(ctx, -3.3, 0, 6.6, 16, sleeve, sleeveHi, sleeveLo);
         if (o.clothes === 'suit') {
             ctx.fillStyle = o.shirt;
-            ctx.fillRect(x - 3, shoulder + 12 + swing, 6, 3);
+            ctx.fillRect(-3.1, 11, 6.2, 3);
         }
-        const hand = ctx.createRadialGradient(x - 1, shoulder + 16 + swing, 1, x, shoulder + 18 + swing, 4);
+        const hx = 0;
+        const hy = 16.5;
+        const hand = ctx.createRadialGradient(hx - 1, hy - 1, 1, hx, hy, 4);
         hand.addColorStop(0, o.skinHi);
         hand.addColorStop(1, o.skinLo);
         ctx.fillStyle = hand;
         ctx.beginPath();
-        ctx.arc(x, shoulder + 17 + swing, 3.3, 0, Math.PI * 2);
+        ctx.arc(hx, hy, 3.4, 0, Math.PI * 2);
         ctx.fill();
+        ink(ctx);
+        ctx.restore();
     };
 
     const far = -face;
     const near = face;
-    if (o.clothes !== 'dress') {
-        drawLeg(far, -step, o.pants, o.pants, o.pantsLo);
-        drawLeg(near, step, o.pants, o.pants, o.pantsLo);
-    }
-    drawArm(far, step);
+    drawLeg(far, -phase);
+    drawLeg(near, phase);
+    if (front) drawArm(far, phase);
 
-    if (o.clothes === 'dress') {
-        drawLeg(far, -step, o.skin, o.skinHi, o.skinLo);
-        drawLeg(near, step, o.skin, o.skinHi, o.skinLo);
-        const skirt = ctx.createLinearGradient(cx - 14, hip - 18, cx + 14, hip + 6);
-        skirt.addColorStop(0, o.shirtLo);
-        skirt.addColorStop(0.35, o.shirtHi);
-        skirt.addColorStop(1, o.shirt);
-        ctx.fillStyle = skirt;
-        ctx.beginPath();
-        ctx.moveTo(cx - 10, hip - 20);
-        ctx.quadraticCurveTo(cx, hip - 24, cx + 10, hip - 20);
-        ctx.lineTo(cx + 15, hip + 6);
-        ctx.quadraticCurveTo(cx, hip + 10, cx - 15, hip + 6);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    const topW = o.clothes === 'suit' ? 20 : 18;
-    const botW = o.clothes === 'dress' ? 16 : 22;
-    const ty = shoulder - 4;
-    const tb = hip - 2;
-    const skew = face * 1.4;
+    const topW = broad ? 22 : 17;
+    const botW = o.clothes === 'dress' ? 14 : broad ? 18 : 15;
+    const ty = o.clothes === 'skirt' ? shoulder - 2 : shoulder - 3;
+    const tb = o.clothes === 'skirt' ? hip - 8 : hip - 1;
+    const skew = face * 2.2;
     const torsoColor = o.clothes === 'suit' ? o.pants : o.shirt;
-    const torsoHi = o.clothes === 'suit' ? '#3c4454' : o.shirtHi;
+    const torsoHi = o.clothes === 'suit' ? '#3a4458' : o.shirtHi;
     const torsoLo = o.clothes === 'suit' ? o.pantsLo : o.shirtLo;
-    const tg = ctx.createLinearGradient(cx - topW, ty, cx + topW, tb);
-    tg.addColorStop(0, torsoLo);
-    tg.addColorStop(0.32, torsoHi);
+
+    ctx.beginPath();
+    ctx.moveTo(cx - face * 2 + skew, ty + 3);
+    ctx.lineTo(cx - face * (topW * 0.55) + skew * 0.3, ty + 7);
+    ctx.lineTo(cx - face * (botW * 0.62), tb);
+    ctx.lineTo(cx - face * 1, tb - 1);
+    ctx.closePath();
+    ctx.fillStyle = torsoLo;
+    ctx.fill();
+    ink(ctx);
+
+    const tg = ctx.createLinearGradient(cx - face * topW, ty, cx + face * topW, tb);
+    tg.addColorStop(0, face > 0 ? torsoLo : torsoHi);
+    tg.addColorStop(0.42, torsoHi);
     tg.addColorStop(1, torsoColor);
     ctx.fillStyle = tg;
     ctx.beginPath();
-    ctx.moveTo(cx - topW / 2 + skew, ty + 3);
-    ctx.quadraticCurveTo(cx + skew, ty - 2, cx + topW / 2 + skew, ty + 3);
+    ctx.moveTo(cx - topW / 2 + skew, ty + 4);
+    ctx.quadraticCurveTo(cx + skew * 0.3, ty - 2, cx + topW / 2 + skew, ty + 5);
     ctx.lineTo(cx + botW / 2, tb);
     ctx.quadraticCurveTo(cx, tb + 4, cx - botW / 2, tb);
     ctx.closePath();
     ctx.fill();
+    ink(ctx);
 
     if (o.clothes === 'suit') {
         ctx.fillStyle = o.shirt;
         ctx.beginPath();
-        ctx.moveTo(cx - 4 + skew, ty + 3);
-        ctx.lineTo(cx + 4 + skew, ty + 3);
-        ctx.lineTo(cx + 1, tb - 2);
-        ctx.lineTo(cx - 1, tb - 2);
+        ctx.moveTo(cx - 5 + skew, ty + 4);
+        ctx.lineTo(cx + 5 + skew, ty + 5);
+        ctx.lineTo(cx + 2, tb - 1);
+        ctx.lineTo(cx - 2, tb - 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = o.shirtHi;
+        ctx.beginPath();
+        ctx.moveTo(cx - 5 + skew, ty + 4);
+        ctx.lineTo(cx - 1, ty + 16);
+        ctx.lineTo(cx + 1, ty + 5);
+        ctx.closePath();
         ctx.fill();
         ctx.fillStyle = '#9a2430';
         ctx.beginPath();
-        ctx.moveTo(cx - 1.2, ty + 6);
-        ctx.lineTo(cx + 1.2, ty + 6);
-        ctx.lineTo(cx + 0.4, ty + 16);
-        ctx.lineTo(cx - 0.4, ty + 16);
+        ctx.moveTo(cx - 1.3, ty + 7);
+        ctx.lineTo(cx + 1.3, ty + 7);
+        ctx.lineTo(cx + 0.6, tb - 2);
+        ctx.lineTo(cx - 0.6, tb - 2);
         ctx.fill();
         ctx.fillStyle = '#e6c56a';
         ctx.beginPath();
-        ctx.arc(cx, ty + 12, 1.3, 0, Math.PI * 2);
+        ctx.arc(cx, ty + 14, 1.4, 0, Math.PI * 2);
         ctx.fill();
-    } else if (o.clothes === 'casual') {
+        ctx.fillStyle = '#f7f4ee';
+        ctx.fillRect(cx + face * 5, ty + 10, 4, 3);
+    } else if (o.clothes === 'casual' || o.clothes === 'skirt') {
         ctx.strokeStyle = o.shirtLo;
-        ctx.lineWidth = 1.4;
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
-        ctx.moveTo(cx + skew * 0.3, ty + 4);
+        ctx.moveTo(cx + skew * 0.2, ty + 5);
         ctx.lineTo(cx, tb - 2);
         ctx.stroke();
+        ctx.fillStyle = o.shirtLo;
+        ctx.beginPath();
+        ctx.arc(cx - 1.2, ty + 9, 0.9, 0, Math.PI * 2);
+        ctx.arc(cx - 0.6, ty + 13, 0.9, 0, Math.PI * 2);
+        ctx.fill();
     }
 
-    drawArm(near, -step);
+    if (o.clothes === 'dress' || o.clothes === 'skirt') {
+        const hem = o.clothes === 'dress' ? hip + 10 : hip + 16;
+        const flare = o.clothes === 'dress' ? 16 : 14;
+        const skirt = ctx.createLinearGradient(cx - flare, hip - 10, cx + flare, hem);
+        skirt.addColorStop(0, o.clothes === 'dress' ? o.shirtLo : o.pantsLo);
+        skirt.addColorStop(0.35, o.clothes === 'dress' ? o.shirtHi : o.pants);
+        skirt.addColorStop(1, o.clothes === 'dress' ? o.shirt : o.pants);
+        ctx.fillStyle = skirt;
+        ctx.beginPath();
+        ctx.moveTo(cx - topW * 0.42, hip - 12);
+        ctx.quadraticCurveTo(cx, hip - 16, cx + topW * 0.42, hip - 12);
+        ctx.lineTo(cx + flare, hem);
+        ctx.quadraticCurveTo(cx, hem + 4, cx - flare, hem);
+        ctx.closePath();
+        ctx.fill();
+        ink(ctx);
+        ctx.strokeStyle = o.clothes === 'dress' ? o.pants : o.shirtHi;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - flare + 1, hem - 1);
+        ctx.quadraticCurveTo(cx, hem + 3, cx + flare - 1, hem - 1);
+        ctx.stroke();
+    } else {
+        ctx.fillStyle = o.pantsLo;
+        ctx.fillRect(cx - botW * 0.42, hip - 3, botW * 0.84, 3.2);
+        ctx.fillStyle = '#e6c56a';
+        ctx.fillRect(cx - 1.3, hip - 3.2, 2.6, 2.4);
+    }
 
-    const neck = ctx.createLinearGradient(cx - 4, shoulder - 8, cx + 4, shoulder);
+    if (o.clothes === 'dress') {
+        ctx.fillStyle = '#e6c56a';
+        ctx.beginPath();
+        ctx.ellipse(cx + face, shoulder + 2, 2.2, 1.6, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    drawArm(near, -phase);
+    if (!front) drawArm(far, phase);
+
+    const neck = ctx.createLinearGradient(cx - 4, shoulder - 10, cx + 4, shoulder);
     neck.addColorStop(0, o.skinLo);
-    neck.addColorStop(0.5, o.skin);
+    neck.addColorStop(0.45, o.skinHi);
     neck.addColorStop(1, o.skinLo);
     ctx.fillStyle = neck;
-    ctx.fillRect(cx - 3 + face, shoulder - 8, 6, 8);
+    ctx.beginPath();
+    ctx.moveTo(cx - 3.5 + face, shoulder - 8);
+    ctx.lineTo(cx + 3.5 + face, shoulder - 8);
+    ctx.lineTo(cx + 4.5, shoulder + 1);
+    ctx.lineTo(cx - 4.5, shoulder + 1);
+    ctx.closePath();
+    ctx.fill();
 
     if (o.clothes !== 'dress') {
-        ctx.fillStyle = '#f7f4ee';
+        ctx.fillStyle = o.shirtHi;
         ctx.beginPath();
-        ctx.moveTo(cx - 5, shoulder - 2);
-        ctx.lineTo(cx, shoulder + 3);
-        ctx.lineTo(cx + 5, shoulder - 2);
+        ctx.moveTo(cx - 6, shoulder - 1);
+        ctx.lineTo(cx, shoulder + 4);
+        ctx.lineTo(cx + 6, shoulder - 1);
+        ctx.closePath();
         ctx.fill();
+        ink(ctx);
     }
 
     if (front) {
         ctx.fillStyle = o.skinLo;
         ctx.beginPath();
-        ctx.ellipse(headX - face * (headR - 1), headY + 2, 2.6, 3.4, 0, 0, Math.PI * 2);
+        ctx.ellipse(headX - face * (headR - 0.5), headY + 2, 3.1, 4, 0, 0, Math.PI * 2);
         ctx.fill();
+        ink(ctx);
         ctx.fillStyle = o.skin;
         ctx.beginPath();
-        ctx.ellipse(headX - face * (headR - 2), headY + 2, 1.6, 2.2, 0, 0, Math.PI * 2);
+        ctx.ellipse(headX - face * (headR - 1.4), headY + 2.2, 1.6, 2.4, 0, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    if (!front || o.hairStyle === 'bob' || o.hairStyle === 'updo') {
+    if (!front) {
         drawHair(ctx, o, headX, headY, headR, false, face);
+        return;
     }
 
-    const grd = ctx.createRadialGradient(headX - 5, headY - 6, 2, headX + 3, headY + 3, headR + 2);
+    const grd = ctx.createRadialGradient(headX - 6, headY - 7, 2, headX + 2, headY + 2, headR + 1);
     grd.addColorStop(0, o.skinHi);
-    grd.addColorStop(0.55, o.skin);
+    grd.addColorStop(0.62, o.skin);
     grd.addColorStop(1, o.skinLo);
     ctx.fillStyle = grd;
     ctx.beginPath();
     ctx.arc(headX, headY, headR, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(90, 48, 32, 0.28)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ink(ctx);
 
-    if (!front) {
-        ctx.fillStyle = o.hair;
-        ctx.beginPath();
-        ctx.ellipse(headX, headY - 1, headR + 2.2, headR + 1.2, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = o.skinLo;
-        ctx.beginPath();
-        ctx.ellipse(headX, headY + headR - 3, 4.2, 2.6, 0, 0, Math.PI);
-        ctx.fill();
-    }
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(headX - 5, headY - 8, 4.5, 2.6, -0.6, 0, Math.PI * 2);
+    ctx.fill();
 
-    drawHair(ctx, o, headX, headY, headR, front, face);
-
-    if (front) drawFace(ctx, o, headX, headY, face);
+    drawHair(ctx, o, headX, headY, headR, true, face);
+    drawFace(ctx, o, headX, headY, face);
 }
 
 function paintCrystal(ctx: CanvasRenderingContext2D, squash: number, flip: boolean): void {
@@ -436,7 +669,6 @@ function paintCrystal(ctx: CanvasRenderingContext2D, squash: number, flip: boole
     const cy = 20;
     const hw = Math.max(1.6, 11 * squash);
     ctx.clearRect(0, 0, w, h);
-    // soft glow
     ctx.fillStyle = 'rgba(80, 220, 70, 0.28)';
     ctx.beginPath();
     ctx.ellipse(cx, cy + 2, hw + 4, 12, 0, 0, Math.PI * 2);
@@ -466,7 +698,6 @@ function paintCrystal(ctx: CanvasRenderingContext2D, squash: number, flip: boole
     ctx.fillStyle = rightCol;
     ctx.fill();
 
-    // specular
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.beginPath();
     ctx.moveTo(cx - hw * 0.15, 7);
@@ -516,7 +747,7 @@ export function bakeCharacters(scene: Phaser.Scene): void {
                     portrait.height = 56;
                     const pctx = portrait.getContext('2d')!;
                     pctx.imageSmoothingEnabled = true;
-                    pctx.drawImage(canvas, 12, 0, 48, 58, 0, 0, 48, 56);
+                    pctx.drawImage(canvas, 14, 0, 48, 58, 0, 0, 48, 56);
                     addCanvas(scene, `portrait_${id}`, portrait);
                 }
             }

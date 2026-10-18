@@ -41,7 +41,7 @@ export class StationaryNPC {
     private build(): void {
         const here = toScreen(this.x, this.y);
         this.shadow = this.scene.add
-            .ellipse(here.x, here.y, 24, 10, 0x1a2410, 0.32)
+            .ellipse(here.x, here.y, 32, 12, 0x1a2410, 0.32)
             .setDepth(DEPTH_SHADOW);
 
         this.sprite = this.scene.add.image(here.x, here.y, this.textureKey);
