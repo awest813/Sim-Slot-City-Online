@@ -848,7 +848,7 @@ export class CasinoLobbyScene extends Phaser.Scene {
         });
 
         const dismiss = this.add.text(cx, tutY + tutH / 2 - 18, 'Press any key or click to dismiss  ·  Closes automatically in 12s', {
-            fontFamily: FONT, fontSize: '9px', color: '#3a5a4a',
+            fontFamily: FONT, fontSize: '9px', color: '#b7efe0',
         }).setOrigin(0.5).setScrollFactor(0).setDepth(DEPTH_HUD + 11);
         tutObjs.push(dismiss);
 
