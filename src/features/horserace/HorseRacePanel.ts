@@ -382,9 +382,9 @@ export class HorseRacePanel {
             trackGfx.fillRect(tLeft, ly + LANE_H / 2 - 1, TRACK_W, 2);
 
             // Multi-layered golden/cyan lane delimiters
-            trackGfx.lineStyle(0.5, i % 2 === 0 ? 0xffd700 : 0x00ffff, 0.22);
+            trackGfx.lineStyle(0.5, i % 2 === 0 ? 0xffd700 : 0xe7fff4, 0.22);
             trackGfx.lineBetween(tLeft, ly + LANE_H - 0.5, tLeft + TRACK_W, ly + LANE_H - 0.5);
-            trackGfx.lineStyle(1.0, i % 2 === 0 ? 0xc9a84c : 0x00c8ff, 0.08);
+            trackGfx.lineStyle(1.0, i % 2 === 0 ? 0xc9a84c : 0x9ef0dc, 0.1);
             trackGfx.lineBetween(tLeft, ly + LANE_H - 1.5, tLeft + TRACK_W, ly + LANE_H - 1.5);
 
             // Lane number
@@ -396,8 +396,7 @@ export class HorseRacePanel {
         trackGfx.lineStyle(1.5, COL_HORSES_ACCENT, 0.5);
         trackGfx.strokeRect(tLeft, TRACK_TOP, TRACK_W, HORSES.length * LANE_H);
 
-        // Checkered Finish Line (right edge) with neon side glow
-        trackGfx.lineStyle(3, 0x00ffff, 0.45); // cyan neon backing glow
+        trackGfx.lineStyle(3, 0xc9a84c, 0.35);
         trackGfx.lineBetween(tLeft + TRACK_W - 4, TRACK_TOP, tLeft + TRACK_W - 4, TRACK_TOP + HORSES.length * LANE_H);
         trackGfx.lineStyle(1.5, 0xffffff, 0.95);
         trackGfx.lineBetween(tLeft + TRACK_W - 4, TRACK_TOP, tLeft + TRACK_W - 4, TRACK_TOP + HORSES.length * LANE_H);

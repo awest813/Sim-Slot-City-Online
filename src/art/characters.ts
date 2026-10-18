@@ -212,6 +212,22 @@ function drawHair(
             ctx.beginPath();
             ctx.ellipse(hx, hy - hr * 0.42, hr * 1.02, hr * 0.55, 0, Math.PI, Math.PI * 2);
             ctx.fill();
+        } else if (o.hairStyle === 'curly') {
+            // Puffs only — a cap underneath reads as a smooth helmet from behind.
+            ctx.fillStyle = o.hair;
+            const puffs: Array<[number, number, number]> = [
+                [0, 1, hr * 0.72],
+                [-12, 2, 7.2], [12, 2, 7.2],
+                [0, -hr * 0.62, 7],
+                [-7, -hr * 0.95, 5.8], [7, -hr * 0.88, 5.8],
+                [-7, hr * 0.52, 5.2], [7, hr * 0.48, 5.2],
+            ];
+            for (const [dx, dy, r] of puffs) {
+                ctx.beginPath();
+                ctx.arc(hx + dx, hy + dy, r, 0, Math.PI * 2);
+                ctx.fill();
+                ink(ctx);
+            }
         } else {
             hairCap(ctx, hx, hy, hr);
         }
@@ -220,13 +236,6 @@ function drawHair(
             ctx.beginPath();
             ctx.ellipse(hx, hy + 8, hr + 2, 14, 0, 0, Math.PI);
             ctx.fill();
-        } else if (o.hairStyle === 'curly') {
-            ctx.fillStyle = o.hair;
-            for (const [dx, dy, r] of [[-11, 1, 6], [11, 1, 6], [0, -hr * 0.9, 6], [-7, -hr, 5], [7, -hr, 5]] as Array<[number, number, number]>) {
-                ctx.beginPath();
-                ctx.arc(hx + dx, hy + dy, r, 0, Math.PI * 2);
-                ctx.fill();
-            }
         } else if (o.hairStyle === 'updo') {
             ctx.fillStyle = o.hair;
             ctx.beginPath();
@@ -430,12 +439,15 @@ function paintSim(
 
     const drawLeg = (side: number, legPhase: number) => {
         const x = cx + side * legSpread + face * 0.8;
-        const angle = face * legPhase * 0.62;
+        const angle = face * legPhase * 0.48;
         const lift = legPhase < 0 ? -5 : 0;
+        const shoePad = o.clothes === 'dress' ? 4.2 : 2.2;
+        // Length is solved from the hip so a planted shoe lands on y=95.
+        // The trailing foot uses the same length, then shifts up.
+        const len = Math.max(14, (95 - hip - shoePad) / Math.cos(Math.abs(angle)));
         ctx.save();
-        ctx.translate(x, hip - 2 + lift);
+        ctx.translate(x, hip + lift);
         ctx.rotate(angle);
-        const len = o.clothes === 'dress' ? 20 : 23;
         capsule(ctx, -4.3, 0, 8.6, len, legFill, legHi, legLo);
         ctx.fillStyle = '#241c16';
         ctx.beginPath();
@@ -599,8 +611,10 @@ function paintSim(
         ctx.fill();
     }
 
-    drawArm(near, -phase);
-    if (!front) drawArm(far, phase);
+    // From behind, the same swing that reads as a walk in front
+    // pulls both hands onto the spine. Flip it so the arms swing out.
+    drawArm(near, front ? -phase : phase);
+    if (!front) drawArm(far, -phase);
 
     const neck = ctx.createLinearGradient(cx - 4, shoulder - 10, cx + 4, shoulder);
     neck.addColorStop(0, o.skinLo);
@@ -747,7 +761,7 @@ export function bakeCharacters(scene: Phaser.Scene): void {
                     portrait.height = 56;
                     const pctx = portrait.getContext('2d')!;
                     pctx.imageSmoothingEnabled = true;
-                    pctx.drawImage(canvas, 14, 0, 48, 58, 0, 0, 48, 56);
+                    pctx.drawImage(canvas, 12, 8, 48, 56, 0, 0, 48, 56);
                     addCanvas(scene, `portrait_${id}`, portrait);
                 }
             }

@@ -178,7 +178,7 @@ export class RoulettePanel {
 
     private buildHeader(): void {
         const title = this.scene.add.text(0, -PH / 2 + 26, '🎡  ROULETTE', {
-            fontFamily: FONT, fontSize: '20px', color: '#28cc50', fontStyle: 'bold',
+            fontFamily: FONT, fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
         this.container.add(title);
 

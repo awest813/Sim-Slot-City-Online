@@ -2,7 +2,7 @@
 import Phaser from 'phaser';
 import { GameState } from '../../core/state/GameState';
 import {
-    GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, COL_TRIM, FONT,
+    GAME_WIDTH, GAME_HEIGHT, DEPTH_PANEL, FONT,
 } from '../../game/constants';
 import { ToastManager } from '../ui/ToastManager';
 import { paintLifeSimShell } from '../ui/shell';
@@ -168,6 +168,7 @@ export class BarPanel {
 
         const bg = this.scene.add.graphics();
         paintLifeSimShell(bg, -pw / 2, -ph / 2, pw, ph);
+        this.container.add(bg);
 
         // Champagne Bubbles Particles
         for (let i = 0; i < 20; i++) {
@@ -187,76 +188,41 @@ export class BarPanel {
                 delay: Phaser.Math.Between(0, 3000)
             });
         }
-        // Gold border
-        bg.lineStyle(2, COL_TRIM, 1);
-        bg.strokeRoundedRect(-pw / 2, -ph / 2, pw, ph, 8);
-        // Inner border
-        bg.lineStyle(1, 0xe8c870, 0.2);
-        bg.strokeRoundedRect(-pw / 2 + 3, -ph / 2 + 3, pw - 6, ph - 6, 7);
-        // Left accent bar — 4px wide
-        bg.fillStyle(COL_TRIM, 0.4);
-        bg.fillRoundedRect(-pw / 2, -ph / 2, 4, ph, { tl: 8, bl: 8, tr: 0, br: 0 });
-        this.container.add(bg);
 
-        // Header panel — polished wood
-        const header = this.scene.add.graphics();
-        header.fillStyle(0x2a1208, 1);
-        header.fillRoundedRect(-pw / 2, -ph / 2, pw, 44, { tl: 8, tr: 8, bl: 0, br: 0 });
-        // Polished surface highlight at top
-        header.fillStyle(0x6a3a14, 0.6);
-        header.fillRoundedRect(-pw / 2 + 2, -ph / 2 + 1, pw - 4, 4, { tl: 7, tr: 7, bl: 0, br: 0 });
-        // Neon amber glow behind header text area (simulates neon bar sign)
-        header.fillStyle(0xff8800, 0.04);
-        header.fillRoundedRect(-pw / 2 + 20, -ph / 2 + 4, pw - 40, 36, 4);
-        header.lineStyle(1, 0xff9900, 0.18);
-        header.strokeRoundedRect(-pw / 2 + 20, -ph / 2 + 4, pw - 40, 36, 4);
-        // Header bottom gold line
-        header.lineStyle(1.5, COL_TRIM, 0.6);
-        header.lineBetween(-pw / 2 + 8, -ph / 2 + 44, pw / 2 - 8, -ph / 2 + 44);
-        this.container.add(header);
-
-        // Wood grain stripes (visual texture)
-        for (let i = 0; i < 8; i++) {
-            const stripe = this.scene.add.rectangle(0, -ph / 2 + 52 + i * 52, pw - 4, 1, 0x2a1a08, 0.5);
-            this.container.add(stripe);
-        }
-
-        // Title — 20px
-        const title = this.scene.add.text(0, -ph / 2 + 22, '🍹  BAR & LOUNGE', {
+        const title = this.scene.add.text(0, -ph / 2 + 30, '🍹  BAR & LOUNGE', {
             fontFamily: FONT, fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
-        const divider = this.scene.add.rectangle(0, -ph / 2 + 40, pw - 40, 1, COL_TRIM, 0.5);
-        this.container.add([title, divider]);
+        this.container.add(title);
 
         // Rotating bartender greeting
         const greeting = BARTENDER_GREETINGS[Math.floor(Math.random() * BARTENDER_GREETINGS.length)];
-        const greet = this.scene.add.text(0, -ph / 2 + 56, greeting, {
-            fontFamily: FONT, fontSize: '11px', color: '#a08050',
+        const greet = this.scene.add.text(0, -ph / 2 + 68, greeting, {
+            fontFamily: FONT, fontSize: '11px', color: '#d7c49a',
             fontStyle: 'italic',
         }).setOrigin(0.5);
         this.container.add(greet);
 
         // Chips display
-        this.chipsText = this.scene.add.text(-pw / 2 + 16, -ph / 2 + 74, '', {
+        this.chipsText = this.scene.add.text(-pw / 2 + 16, -ph / 2 + 86, '', {
             fontFamily: FONT, fontSize: '11px', color: '#2ecc71',
         }).setOrigin(0, 0);
         this.container.add(this.chipsText);
 
         // Drink counter (right side)
-        this.drinkCountText = this.scene.add.text(pw / 2 - 16, -ph / 2 + 74, '', {
-            fontFamily: FONT, fontSize: '10px', color: '#6a5030',
+        this.drinkCountText = this.scene.add.text(pw / 2 - 16, -ph / 2 + 86, '', {
+            fontFamily: FONT, fontSize: '10px', color: '#d7f3ea',
         }).setOrigin(1, 0);
         this.container.add(this.drinkCountText);
 
         // Today's Special banner
         const specName = this.drinks[this.specialIdx].name;
-        const specBanner = this.scene.add.text(0, -ph / 2 + 90, `✨ Today's Special: ${specName} (half price!)`, {
+        const specBanner = this.scene.add.text(0, -ph / 2 + 104, `✨ Today's Special: ${specName} (half price!)`, {
             fontFamily: FONT, fontSize: '10px', color: '#c9a84c',
         }).setOrigin(0.5);
         this.container.add(specBanner);
 
         // Drink buttons
-        const startY = -ph / 2 + 108;
+        const startY = -ph / 2 + 120;
         const bh = 32;
         const gap = 2;
         const DISABLED_COLOR = 0x0d0804;
@@ -341,12 +307,12 @@ export class BarPanel {
             .setStrokeStyle(1, 0x2a4a1a, 1)
             .setInteractive({ useHandCursor: true });
         const tipLabel = this.scene.add.text(-btnW - 8, tipY, '🎲  Get a Tip  (free)', {
-            fontFamily: FONT, fontSize: '9px', color: '#3a7a3a',
+            fontFamily: FONT, fontSize: '9px', color: '#8fd9a8',
         }).setOrigin(0.5);
 
         tipRect.on('pointerover', () => {
             tipRect.setFillStyle(0x153515);
-            tipRect.setStrokeStyle(1.5, 0x00ff80, 1.0);
+            tipRect.setStrokeStyle(1.5, 0xc9a84c, 1.0);
             this.scene.tweens.add({ targets: [tipRect, tipLabel], scaleX: 1.02, scaleY: 1.02, duration: 100 });
         });
         tipRect.on('pointerout',  () => {

@@ -50,7 +50,7 @@ export class ScratcherPanel {
         paintLifeSimShell(bg, -pw / 2, -ph / 2, pw, ph);
         
         const title = this.scene.add.text(0, -ph / 2 + 30, '🎟️ SHOWGIRL SCRATCHERS', {
-            fontFamily: FONT, fontSize: '20px', color: '#ff66b2', fontStyle: 'bold',
+            fontFamily: FONT, fontSize: '20px', color: '#c9a84c', fontStyle: 'bold',
         }).setOrigin(0.5);
 
         this.statusText = this.scene.add.text(0, -ph / 2 + 64, 'Match 3 to win! Buy a card to start.', {
